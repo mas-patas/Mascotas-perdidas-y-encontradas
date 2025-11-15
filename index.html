@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mascotas Perdidas y Encontradas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'brand-primary': '#1D4ED8',
+            'brand-secondary': '#FBBF24',
+            'brand-light': '#EFF6FF',
+            'brand-dark': '#1E3A8A',
+            'sidebar-dark': '#483D8B', // Un morado oscuro como en la imagen
+          }
+        }
+      }
+    }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #admin-dashboard, #admin-dashboard * {
+            visibility: visible;
+        }
+        #admin-dashboard {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        /* Add flyer print styles */
+        #flyer-modal, #flyer-modal * {
+            visibility: visible;
+        }
+        #flyer-modal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden !important;
+            box-shadow: none;
+            border: none;
+        }
+        header, aside, .no-print {
+            display: none !important;
+        }
+        main {
+            padding: 0 !important;
+        }
+    }
+</style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "name": "Mascotas Perdidas y Encontradas",
+  "description": "Una aplicación web para ayudar a reunir a las mascotas perdidas con sus dueños. Los usuarios pueden publicar anuncios de mascotas perdidas o encontradas en su ciudad.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
