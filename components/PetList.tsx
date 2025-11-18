@@ -6,21 +6,21 @@ import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
-    onPetSelect: (pet: Pet) => void;
     users: User[];
     onViewUser: (user: User) => void;
     filters: {
         status: PetStatus | 'Todos';
     };
+    onNavigate: (path: string) => void;
 }
 
 const PetSection: React.FC<{
     title: string;
     pets: Pet[];
-    onPetSelect: (pet: Pet) => void;
     users: User[];
     onViewUser: (user: User) => void;
-}> = ({ title, pets, onPetSelect, users, onViewUser }) => {
+    onNavigate: (path: string) => void;
+}> = ({ title, pets, users, onViewUser, onNavigate }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [cardsPerPage, setCardsPerPage] = useState(4);
     const [gridClass, setGridClass] = useState('grid-cols-4');
@@ -93,7 +93,7 @@ const PetSection: React.FC<{
                 <div className={`grid ${gridClass} gap-4`}>
                     {visiblePets.map(pet => {
                         const petOwner = users.find(u => u.email === pet.userEmail);
-                        return <PetCard key={pet.id} pet={pet} onPetSelect={onPetSelect} owner={petOwner} onViewUser={onViewUser} />;
+                        return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                     })}
                 </div>
 
@@ -123,7 +123,7 @@ const PetSection: React.FC<{
 };
 
 
-export const PetList: React.FC<PetListProps> = ({ pets, onPetSelect, users, onViewUser, filters }) => {
+export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate }) => {
     
     // Si se aplica un filtro de estado, mostrar una sola cuadrícula con todos los resultados.
     if (filters.status !== 'Todos') {
@@ -133,7 +133,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, onPetSelect, users, onVi
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {pets.map(pet => {
                             const petOwner = users.find(u => u.email === pet.userEmail);
-                            return <PetCard key={pet.id} pet={pet} onPetSelect={onPetSelect} owner={petOwner} onViewUser={onViewUser} />;
+                            return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                         })}
                     </div>
                 ) : (
@@ -160,37 +160,37 @@ export const PetList: React.FC<PetListProps> = ({ pets, onPetSelect, users, onVi
                     <PetSection 
                         title="Mascotas Perdidas"
                         pets={lostPets}
-                        onPetSelect={onPetSelect}
                         users={users}
                         onViewUser={onViewUser}
+                        onNavigate={onNavigate}
                     />
                      <PetSection 
                         title="Mascotas Encontradas"
                         pets={foundPets}
-                        onPetSelect={onPetSelect}
                         users={users}
                         onViewUser={onViewUser}
+                        onNavigate={onNavigate}
                     />
                     <PetSection 
                         title="En Adopción"
                         pets={adoptionPets}
-                        onPetSelect={onPetSelect}
                         users={users}
                         onViewUser={onViewUser}
+                        onNavigate={onNavigate}
                     />
                      <PetSection 
                         title="Mascotas Avistadas"
                         pets={sightedPets}
-                        onPetSelect={onPetSelect}
                         users={users}
                         onViewUser={onViewUser}
+                        onNavigate={onNavigate}
                     />
                      <PetSection 
                         title="Historias de Éxito (Reunidos)"
                         pets={reunitedPets}
-                        onPetSelect={onPetSelect}
                         users={users}
                         onViewUser={onViewUser}
+                        onNavigate={onNavigate}
                     />
                 </>
             ) : (

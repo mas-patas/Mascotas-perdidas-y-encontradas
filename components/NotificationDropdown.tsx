@@ -5,16 +5,14 @@ interface NotificationDropdownProps {
     notifications: Notification[];
     onMarkAsRead: (notificationId: string) => void;
     onClose: () => void;
-    onNavigate: (page: 'support') => void;
+    onNavigate: (link: Notification['link']) => void;
 }
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notifications, onMarkAsRead, onClose, onNavigate }) => {
     
     const handleNotificationClick = (notification: Notification) => {
         onMarkAsRead(notification.id);
-        if (notification.link === 'support') {
-            onNavigate('support');
-        }
+        onNavigate(notification.link);
         onClose();
     };
 

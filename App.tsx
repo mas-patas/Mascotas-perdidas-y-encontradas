@@ -1,12 +1,11 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PetList } from './components/PetList';
 import { ReportPetForm } from './components/ReportPetForm';
-import { PetDetailModal } from './components/PetDetailModal';
-import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification } from './types';
-import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS } from './constants';
+import { PetDetailPage } from './components/PetDetailPage';
+import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification, Campaign } from './types';
+import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, CAMPAIGN_TYPES } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import ProfilePage from './components/ProfilePage';
 import { FilterControls } from './components/FilterControls';
@@ -20,6 +19,8 @@ import { ReportAdoptionForm } from './components/ReportAdoptionForm';
 import { initialUsersForDemo } from './data/users';
 import AdminUserDetailModal from './components/AdminUserDetailModal';
 import SupportPage from './components/SupportPage';
+import CampaignsPage from './components/CampaignsPage';
+import CampaignDetailPage from './components/CampaignDetailPage';
 
 const initialPets: Pet[] = [
     // 10 Mascotas Perdidas
@@ -306,7 +307,7 @@ const initialPets: Pet[] = [
         location: 'Cayma, Arequipa',
         date: '2024-07-18T13:15:00Z',
         contact: '555-2020',
-        description: 'Gato grande y muy dócil, se deja cargar. Ojos azules intensos.',
+        description: 'Gato grande y muy dócil, se deixa cargar. Ojos azules intensos.',
         imageUrls: ['https://picsum.photos/seed/found_cat4/400/400'],
         userEmail: 'user20@example.com'
     },
@@ -495,15 +496,62 @@ const initialChats: Chat[] = [
     }
 ];
 
+const initialCampaigns: Campaign[] = [
+    // 2 Campañas de Esterilización
+    {
+        id: 'camp1',
+        userEmail: 'admin@admin.com',
+        type: CAMPAIGN_TYPES.ESTERILIZACION,
+        title: 'Campaña de Esterilización Gratuita en Miraflores',
+        description: '¡Cuida a tu mascota y a la comunidad! Estaremos ofreciendo esterilizaciones gratuitas para perros y gatos. Cupos limitados. Trae a tu mascota en ayunas.',
+        location: 'Parque Kennedy, Miraflores, Lima',
+        date: '2024-08-15T09:00:00Z',
+        imageUrls: ['https://picsum.photos/seed/sterilization1/800/600', 'https://picsum.photos/seed/sterilization2/800/600'],
+        contactPhone: '987654321',
+    },
+    {
+        id: 'camp2',
+        userEmail: 'admin@admin.com',
+        type: CAMPAIGN_TYPES.ESTERILIZACION,
+        title: 'Jornada de Salud y Esterilización en Arequipa',
+        description: 'Jornada completa de salud para tu engreído. Ofreceremos desparasitación, vacuna antirrábica y esterilizaciones a bajo costo. ¡No te lo pierdas!',
+        location: 'Plaza de Armas, Arequipa',
+        date: '2024-08-22T10:00:00Z',
+        imageUrls: ['https://picsum.photos/seed/sterilization3/800/600'],
+    },
+    // 2 Campañas de Adopción
+    {
+        id: 'camp3',
+        userEmail: 'admin@admin.com',
+        type: CAMPAIGN_TYPES.ADOPCION,
+        title: 'Gran Feria de Adopción: "Adopta un Amigo"',
+        description: 'Muchos cachorros y adultos buscan un hogar lleno de amor. Todos están vacunados y desparasitados, listos para empezar una nueva vida contigo. ¡Ven y conoce a tu próximo mejor amigo!',
+        location: 'Parque de la Exposición, Lima',
+        date: '2024-08-18T11:00:00Z',
+        imageUrls: ['https://picsum.photos/seed/adoption1/800/600', 'https://picsum.photos/seed/adoption2/800/600', 'https://picsum.photos/seed/adoption3/800/600'],
+    },
+    {
+        id: 'camp4',
+        userEmail: 'admin@admin.com',
+        type: CAMPAIGN_TYPES.ADOPCION,
+        title: 'Adopción Responsable en Cusco',
+        description: 'Dale una segunda oportunidad a un rescatado. Tendremos perritos y gatitos de todas las edades esperando por una familia. Se realizará una entrevista y seguimiento.',
+        location: 'Plaza San Blas, Cusco',
+        date: '2024-08-25T12:00:00Z',
+        imageUrls: ['https://picsum.photos/seed/adoption4/800/600'],
+    },
+];
+
 const App: React.FC = () => {
     const { currentUser, isGhosting, ghostLogin, stopGhosting, unsavePet } = useAuth();
-    const [currentPage, setCurrentPage] = useState<'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support'>('list');
+    
+    const getPathFromHash = () => window.location.hash.substring(1) || '/';
+    const [path, setPath] = useState(getPathFromHash());
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAdoptionModalOpen, setIsAdoptionModalOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [initialStatusForReport, setInitialStatusForReport] = useState<PetStatus>(PET_STATUS.PERDIDO);
-    const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
-    const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [petToEdit, setPetToEdit] = useState<Pet | null>(null);
     const [users, setUsers] = useState<User[]>([]);
     const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -513,7 +561,38 @@ const App: React.FC = () => {
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[] | null>(null);
     const [pendingPetReport, setPendingPetReport] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     const [petToReportFromProfile, setPetToReportFromProfile] = useState<OwnedPet | null>(null);
+
+    const [isAiSearchEnabled, setIsAiSearchEnabled] = useState<boolean>(() => {
+        try {
+            const savedSetting = localStorage.getItem('isAiSearchEnabled');
+            return savedSetting ? JSON.parse(savedSetting) : false; // Default to false
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('isAiSearchEnabled', JSON.stringify(isAiSearchEnabled));
+    }, [isAiSearchEnabled]);
     
+    // Router logic
+    const navigate = (href: string) => {
+        window.location.hash = href;
+    };
+
+    useEffect(() => {
+        const onHashChange = () => {
+            setPath(getPathFromHash());
+        };
+        window.addEventListener('hashchange', onHashChange);
+        setPath(getPathFromHash()); // Set initial path
+
+        return () => {
+            window.removeEventListener('hashchange', onHashChange);
+        };
+    }, []);
+
+
     const [pets, setPets] = useState<Pet[]>(() => {
         try {
             const savedPets = localStorage.getItem('pets');
@@ -521,12 +600,12 @@ const App: React.FC = () => {
 
             if (Array.isArray(parsedPets)) {
                 // Sanitize data to prevent crashes from malformed legacy data.
-                // The most common issue is missing or empty `imageUrls`.
+                // We strictly check that imageUrls is an array and has length > 0.
                 return parsedPets
-                    .filter(p => p && p.id) // Ensure pet object and id exist
+                    .filter(p => p && typeof p === 'object' && p.id) // Ensure pet object and id exist
                     .map(p => ({
                         ...p,
-                        imageUrls: (p.imageUrls && p.imageUrls.length > 0) 
+                        imageUrls: (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) 
                             ? p.imageUrls 
                             : ['https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'],
                         size: p.size || SIZES.MEDIANO, // Also good to have a fallback for size
@@ -539,14 +618,38 @@ const App: React.FC = () => {
         }
     });
 
+    const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
+        try {
+            const saved = localStorage.getItem('campaigns');
+            const parsed = saved ? JSON.parse(saved) : initialCampaigns;
+            // Ensure it is an array and filter out any null or undefined items.
+            // Also sanitize imageUrls to strictly be an array.
+            if (Array.isArray(parsed)) {
+                return parsed
+                    .filter((c: any) => c && typeof c === 'object' && c.id)
+                    .map(c => ({
+                        ...c,
+                        imageUrls: (Array.isArray(c.imageUrls) && c.imageUrls.length > 0)
+                            ? c.imageUrls
+                            : ['https://placehold.co/800x600/CCCCCC/FFFFFF?text=Sin+Imagen']
+                    }));
+            }
+            return initialCampaigns;
+        } catch {
+            return initialCampaigns;
+        }
+    });
+
     const [chats, setChats] = useState<Chat[]>(() => {
         try {
             const savedChats = localStorage.getItem('chats');
             const parsedChats = savedChats ? JSON.parse(savedChats) : initialChats;
-             // Ensure all chats have the new `lastReadTimestamps` field
-            return parsedChats.map((chat: Chat) => ({
+            if (!Array.isArray(parsedChats)) return initialChats;
+             // Ensure all chats have the new `lastReadTimestamps` field and filter invalid ones
+            return parsedChats.filter(c => c && c.id).map((chat: Chat) => ({
                 ...chat,
                 lastReadTimestamps: chat.lastReadTimestamps || {},
+                messages: Array.isArray(chat.messages) ? chat.messages : []
             }));
         } catch (error) {
             console.error('Error parsing chats from localStorage:', error);
@@ -557,7 +660,8 @@ const App: React.FC = () => {
     const [reports, setReports] = useState<Report[]>(() => {
         try {
             const savedReports = localStorage.getItem('reports');
-            return savedReports ? JSON.parse(savedReports) : [];
+            const parsed = savedReports ? JSON.parse(savedReports) : [];
+            return Array.isArray(parsed) ? parsed.filter(r => r && r.id) : [];
         } catch (error) {
             console.error('Error parsing reports from localStorage:', error);
             return [];
@@ -567,7 +671,8 @@ const App: React.FC = () => {
     const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
         try {
             const saved = localStorage.getItem('supportTickets');
-            return saved ? JSON.parse(saved) : [];
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed.filter(t => t && t.id) : [];
         } catch (error) {
             console.error('Error parsing support tickets from localStorage:', error);
             return [];
@@ -577,7 +682,8 @@ const App: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>(() => {
         try {
             const saved = localStorage.getItem('notifications');
-            return saved ? JSON.parse(saved) : [];
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed.filter(n => n && n.id) : [];
         } catch (error) {
             console.error('Error parsing notifications from localStorage:', error);
             return [];
@@ -609,6 +715,10 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('pets', JSON.stringify(pets));
     }, [pets]);
+
+    useEffect(() => {
+        localStorage.setItem('campaigns', JSON.stringify(campaigns));
+    }, [campaigns]);
 
     useEffect(() => {
         localStorage.setItem('chats', JSON.stringify(chats));
@@ -667,7 +777,6 @@ const App: React.FC = () => {
     const handleOpenEditModal = (pet: Pet) => {
         setPetToEdit(pet);
         setInitialStatusForReport(pet.status);
-        setSelectedPet(null);
         setIsModalOpen(true);
     };
 
@@ -690,7 +799,7 @@ const App: React.FC = () => {
             return;
         }
         
-        if (petData.status === PET_STATUS.PERDIDO) {
+        if (petData.status === PET_STATUS.PERDIDO && isAiSearchEnabled) {
             setIsModalOpen(false);
             setIsFindingMatches(true);
             setPendingPetReport(petData);
@@ -718,8 +827,10 @@ const App: React.FC = () => {
     };
 
     const handleDeletePet = (petId: string) => {
-        // 1. Close modal
-        setSelectedPet(null);
+        // 1. Navigate home if on the detail page of the deleted pet
+        if (path === `/mascota/${petId}`) {
+            navigate('/');
+        }
     
         // 2. Remove pet from main list
         setPets(prevPets => prevPets.filter(p => p.id !== petId));
@@ -764,9 +875,10 @@ const App: React.FC = () => {
     
     const handleStartChat = (pet: Pet) => {
         if (!currentUser || currentUser.email === pet.userEmail) return;
+        let chatId: string;
         const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
         if (existingChat) {
-            setActiveChatId(existingChat.id);
+            chatId = existingChat.id;
         } else {
             const now = new Date().toISOString();
             const newChat: Chat = { 
@@ -779,16 +891,15 @@ const App: React.FC = () => {
                 }
             };
             setChats(prev => [...prev, newChat]);
-            setActiveChatId(newChat.id);
+            chatId = newChat.id;
         }
-        setCurrentPage('chat');
-        setSelectedPet(null);
-        setPotentialMatches(null);
+        setPotentialMatches(null); // Close matches modal if open
+        navigate(`/chat/${chatId}`);
     };
     
     const handleStartAdminChat = (recipientEmail: string) => {
         if (!currentUser) return;
-        
+        let chatId: string;
         const existingChat = chats.find(c => 
             !c.petId &&
             c.participantEmails.includes(currentUser.email) && 
@@ -796,7 +907,7 @@ const App: React.FC = () => {
         );
 
         if (existingChat) {
-            setActiveChatId(existingChat.id);
+            chatId = existingChat.id;
         } else {
             const now = new Date().toISOString();
             const newChat: Chat = { 
@@ -808,10 +919,10 @@ const App: React.FC = () => {
                 }
             };
             setChats(prev => [...prev, newChat]);
-            setActiveChatId(newChat.id);
+            chatId = newChat.id;
         }
         setViewingUser(null);
-        setCurrentPage('chat');
+        navigate(`/chat/${chatId}`);
     };
     
     const handleSendMessage = (chatId: string, text: string) => {
@@ -819,6 +930,14 @@ const App: React.FC = () => {
         const newMessage: Message = { senderEmail: currentUser.email, text, timestamp: new Date().toISOString() };
         setChats(prevChats => prevChats.map(chat => {
             if (chat.id === chatId) {
+                const recipientEmail = chat.participantEmails.find(e => e !== currentUser.email);
+                if (recipientEmail) {
+                    const pet = pets.find(p => p.id === chat.petId);
+                    const notificationMessage = pet 
+                        ? `Tienes un nuevo mensaje sobre "${pet.name}"`
+                        : `Tienes un nuevo mensaje de la administración`;
+                    handleCreateNotification(recipientEmail, notificationMessage, 'messages');
+                }
                 return { 
                     ...chat, 
                     messages: [...chat.messages, newMessage],
@@ -832,13 +951,25 @@ const App: React.FC = () => {
         }));
     };
     
+    const isChatUnread = (chat: Chat, user: User): boolean => {
+        if (chat.messages.length === 0) return false;
+
+        const lastMessage = chat.messages[chat.messages.length - 1];
+        if (lastMessage.senderEmail === user.email) return false;
+
+        const lastRead = chat.lastReadTimestamps?.[user.email];
+        if (!lastRead) return true;
+
+        return new Date(lastMessage.timestamp) > new Date(lastRead);
+    };
+
     const handleMarkChatAsRead = (chatId: string) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
         setChats(prevChats => prevChats.map(chat => {
             if (chat.id === chatId) {
-                // Check if an update is needed to avoid re-renders
-                if (chat.lastReadTimestamps[currentUser.email] < now) {
+                // Use the existing helper to see if an update is necessary
+                if (isChatUnread(chat, currentUser)) {
                     return {
                         ...chat,
                         lastReadTimestamps: {
@@ -854,7 +985,19 @@ const App: React.FC = () => {
 
     const handleUpdatePetStatus = (petId: string, status: PetStatus) => {
         setPets(prevPets => prevPets.map(p => p.id === petId ? { ...p, status } : p));
-        setSelectedPet(prev => prev && prev.id === petId ? { ...prev, status } : prev);
+    };
+
+    const handleRecordContactRequest = (petId: string) => {
+        if (!currentUser) return;
+        setPets(prevPets => prevPets.map(p => {
+            if (p.id === petId) {
+                const existingRequests = p.contactRequests || [];
+                if (!existingRequests.includes(currentUser.email)) {
+                    return { ...p, contactRequests: [...existingRequests, currentUser.email] };
+                }
+            }
+            return p;
+        }));
     };
 
     const handleUpdateUserStatus = (userEmail: string, status: UserStatus) => {
@@ -890,7 +1033,6 @@ const App: React.FC = () => {
             const userProfileToUpdate = userProfiles[userEmail] || {};
             userProfileToUpdate.role = role;
             userProfiles[userEmail] = userProfileToUpdate;
-            localStorage.setItem('userProfiles', JSON.stringify(userProfiles));
     
             if (currentUser && currentUser.email === userEmail) {
                 const updatedCurrentUser = { ...currentUser, role };
@@ -905,7 +1047,7 @@ const App: React.FC = () => {
         try {
             await ghostLogin(userToImpersonate);
             setViewingUser(null);
-            handleNavigate('list');
+            handleNavigate('/');
         } catch (error) {
             console.error("Failed to ghost login:", error);
             alert((error as Error).message);
@@ -981,7 +1123,7 @@ const App: React.FC = () => {
         setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
     };
 
-    const handleCreateNotification = (userId: string, message: string, link: 'support') => {
+    const handleCreateNotification = (userId: string, message: string, link: Notification['link']) => {
         const newNotification: Notification = {
             id: `notif_${new Date().toISOString()}`,
             userId,
@@ -995,6 +1137,37 @@ const App: React.FC = () => {
 
     const handleMarkNotificationAsRead = (notificationId: string) => {
         setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
+    };
+
+    const handleMarkAllNotificationsAsRead = () => {
+        if (notifications.some(n => !n.isRead)) {
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        }
+    };
+
+    const handleSaveCampaign = (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
+        if (!currentUser) return;
+
+        if (idToUpdate) {
+            const updatedCampaign: Campaign = { ...campaignData, id: idToUpdate, userEmail: currentUser.email };
+            setCampaigns(prev => prev.map(c => c.id === idToUpdate ? updatedCampaign : c));
+        } else {
+            const newCampaign: Campaign = { ...campaignData, id: `camp_${new Date().toISOString()}`, userEmail: currentUser.email };
+            setCampaigns(prev => [newCampaign, ...prev]);
+
+            // Notify all users
+            users.forEach(user => {
+                handleCreateNotification(
+                    user.email,
+                    `¡Nueva campaña! "${newCampaign.title.slice(0, 30)}..."`,
+                    { type: 'campaign', id: newCampaign.id }
+                );
+            });
+        }
+    };
+
+    const handleDeleteCampaign = (campaignId: string) => {
+        setCampaigns(prev => prev.filter(c => c.id !== campaignId));
     };
 
     const filteredPets = useMemo(() => {
@@ -1014,17 +1187,6 @@ const App: React.FC = () => {
         });
     }, [pets, filters]);
     
-    const isChatUnread = (chat: Chat, user: User): boolean => {
-        if (chat.messages.length === 0) return false;
-
-        const lastMessage = chat.messages[chat.messages.length - 1];
-        if (lastMessage.senderEmail === user.email) return false;
-
-        const lastRead = chat.lastReadTimestamps?.[user.email];
-        if (!lastRead) return true;
-
-        return new Date(lastMessage.timestamp) > new Date(lastRead);
-    };
     
     const userPets = useMemo(() => currentUser ? pets.filter(pet => pet.userEmail === currentUser.email) : [], [pets, currentUser]);
     
@@ -1049,10 +1211,7 @@ const App: React.FC = () => {
     }, [notifications, currentUser]);
 
     const hasUnreadMessages = useMemo(() => userChatsWithUnread.some(c => c.isUnread), [userChatsWithUnread]);
-    const activeChat = useMemo(() => chats.find(chat => chat.id === activeChatId), [chats, activeChatId]);
 
-    const handlePetSelect = (pet: Pet) => setSelectedPet(pet);
-    const handleCloseModal = () => setSelectedPet(null);
     const handleViewUser = (user: User) => setViewingUser(user);
     
     const handleCloseMatches = () => {
@@ -1061,30 +1220,100 @@ const App: React.FC = () => {
     }
     
     const handleOpenFlyer = (pet: Pet) => {
-        setSelectedPet(null); 
         setPetForFlyer(pet);
     };
 
-    const handleNavigate = (page: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support') => {
-        setCurrentPage(page);
+    const handleNavigate = (newPath: string) => {
+        navigate(newPath);
         setIsSidebarOpen(false);
+    };
+    
+    const getCurrentPageForHeader = () => {
+        if (path === '/perfil') return 'profile';
+        if (path === '/mensajes' || path.startsWith('/chat')) return 'messages';
+        if (path === '/admin') return 'admin';
+        if (path === '/soporte') return 'support';
+        if (path.startsWith('/campanas')) return 'campaigns';
+        return 'list';
     };
 
     const renderPage = () => {
-        switch (currentPage) {
-            case 'profile':
-                return currentUser && <ProfilePage user={currentUser} reportedPets={userPets} allPets={pets} onBack={() => handleNavigate('list')} onPetSelect={handlePetSelect} onReportOwnedPetAsLost={handleOpenReportFromProfile} />;
-            case 'messages':
-                return currentUser && <MessagesPage chats={userChatsWithUnread} pets={pets} users={users} currentUser={currentUser} onSelectChat={(id) => { setActiveChatId(id); handleNavigate('chat'); }} onBack={() => handleNavigate('list')} />;
-            case 'chat':
-                return currentUser && activeChat && <ChatPage chat={activeChat} pet={pets.find(p => p.id === activeChat.petId)} users={users} currentUser={currentUser} onSendMessage={handleSendMessage} onBack={() => handleNavigate('messages')} onMarkAsRead={handleMarkChatAsRead} />;
-            case 'admin':
-                return <AdminDashboard pets={pets} chats={chats} users={users} reports={reports} supportTickets={supportTickets} onBack={() => handleNavigate('list')} onViewUser={handleViewUser} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} />;
-            case 'support':
-                return currentUser && <SupportPage currentUser={currentUser} userTickets={supportTickets.filter(t => t.userEmail === currentUser.email)} onAddTicket={handleAddSupportTicket} onBack={() => handleNavigate('list')} />;
-            case 'list':
+        const petDetailMatch = path.match(/^\/mascota\/([^/]+)$/);
+        if (petDetailMatch) {
+            const petId = petDetailMatch[1];
+            const pet = pets.find(p => p.id === petId);
+            if (!pet) return (
+                <div className="text-center py-10">
+                    <h2 className="text-2xl font-bold">Mascota no encontrada</h2>
+                    <button onClick={() => navigate('/')} className="text-brand-primary hover:underline mt-4 inline-block">&larr; Volver al inicio</button>
+                </div>
+            );
+            return <PetDetailPage 
+                pet={pet}
+                onStartChat={handleStartChat}
+                onEdit={handleOpenEditModal}
+                onDelete={handleDeletePet}
+                onGenerateFlyer={handleOpenFlyer}
+                onUpdateStatus={handleUpdatePetStatus}
+                users={users}
+                onViewUser={handleViewUser}
+                onReport={handleAddReport}
+                onClose={() => navigate('/')}
+                onRecordContactRequest={handleRecordContactRequest}
+            />;
+        }
+
+        const campaignDetailMatch = path.match(/^\/campanas\/([^/]+)$/);
+        if (campaignDetailMatch) {
+            const campaignId = campaignDetailMatch[1];
+            const campaign = campaigns.find(c => c.id === campaignId);
+            if (!campaign) return (
+                <div className="text-center py-10">
+                    <h2 className="text-2xl font-bold">Campaña no encontrada</h2>
+                    <button onClick={() => navigate('/campanas')} className="text-brand-primary hover:underline mt-4 inline-block">&larr; Volver a campañas</button>
+                </div>
+            );
+            return <CampaignDetailPage campaign={campaign} onClose={() => navigate('/campanas')} />;
+        }
+
+        const chatMatch = path.match(/^\/chat\/([^/]+)$/);
+        if (chatMatch) {
+            const chatId = chatMatch[1];
+            const chat = chats.find(c => c.id === chatId);
+            return currentUser && chat ? <ChatPage chat={chat} pet={pets.find(p => p.id === chat.petId)} users={users} currentUser={currentUser} onSendMessage={handleSendMessage} onBack={() => handleNavigate('/mensajes')} onMarkAsRead={handleMarkChatAsRead} /> : <p>Chat no encontrado o no autorizado.</p>;
+        }
+    
+        switch (path) {
+            case '/perfil':
+                return currentUser && <ProfilePage user={currentUser} reportedPets={userPets} allPets={pets} users={users} onBack={() => handleNavigate('/')} onReportOwnedPetAsLost={handleOpenReportFromProfile} onNavigate={navigate} onViewUser={handleViewUser} />;
+            case '/mensajes':
+                return currentUser && <MessagesPage chats={userChatsWithUnread} pets={pets} users={users} currentUser={currentUser} onSelectChat={(id) => handleNavigate(`/chat/${id}`)} onBack={() => handleNavigate('/')} />;
+            case '/admin':
+                return <AdminDashboard 
+                    pets={pets} 
+                    chats={chats} 
+                    users={users} 
+                    reports={reports} 
+                    supportTickets={supportTickets} 
+                    onBack={() => handleNavigate('/')} 
+                    onViewUser={handleViewUser} 
+                    onUpdateReportStatus={handleUpdateReportStatus} 
+                    onDeletePet={handleDeletePet} 
+                    onUpdateSupportTicket={handleUpdateSupportTicket} 
+                    isAiSearchEnabled={isAiSearchEnabled}
+                    onToggleAiSearch={() => setIsAiSearchEnabled(prev => !prev)}
+                    campaigns={campaigns}
+                    onSaveCampaign={handleSaveCampaign}
+                    onDeleteCampaign={handleDeleteCampaign}
+                    onNavigate={handleNavigate}
+                />;
+            case '/soporte':
+                return currentUser && <SupportPage currentUser={currentUser} userTickets={supportTickets.filter(t => t.userEmail === currentUser.email)} onAddTicket={handleAddSupportTicket} onBack={() => handleNavigate('/')} />;
+            case '/campanas':
+                return <CampaignsPage campaigns={campaigns} onNavigate={navigate} />;
+            case '/':
             default:
-                return <PetList filters={filters} pets={filteredPets} onPetSelect={handlePetSelect} users={users} onViewUser={handleViewUser} />;
+                return <PetList filters={filters} pets={filteredPets} users={users} onViewUser={handleViewUser} onNavigate={navigate} />;
         }
     };
     
@@ -1102,18 +1331,15 @@ const App: React.FC = () => {
                  </div>
             )}
             <Header 
-                currentPage={currentPage}
+                currentPage={getCurrentPageForHeader()}
                 onToggleSidebar={() => setIsSidebarOpen(true)}
                 onReportPet={handleOpenReportModal}
                 onOpenAdoptionModal={handleOpenAdoptionModal}
-                onNavigateToHome={() => handleNavigate('list')}
-                onNavigateToProfile={() => handleNavigate('profile')}
-                onNavigateToMessages={() => handleNavigate('messages')}
-                onNavigateToAdmin={() => handleNavigate('admin')}
-                onNavigateToSupport={() => handleNavigate('support')}
+                onNavigate={handleNavigate}
                 hasUnreadMessages={hasUnreadMessages}
                 notifications={userNotifications}
                 onMarkNotificationAsRead={handleMarkNotificationAsRead}
+                onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
             />
             <div className="flex flex-1 overflow-hidden">
                 <FilterControls 
@@ -1121,11 +1347,12 @@ const App: React.FC = () => {
                     setFilters={setFilters}
                     isSidebarOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
-                    currentPage={currentPage}
-                    onNavigateToHome={() => handleNavigate('list')}
-                    onNavigateToProfile={() => handleNavigate('profile')}
-                    onNavigateToMessages={() => handleNavigate('messages')}
-                    onNavigateToAdmin={() => handleNavigate('admin')}
+                    currentPage={getCurrentPageForHeader()}
+                    onNavigateToHome={() => handleNavigate('/')}
+                    onNavigateToProfile={() => handleNavigate('/perfil')}
+                    onNavigateToMessages={() => handleNavigate('/mensajes')}
+                    onNavigateToAdmin={() => handleNavigate('/admin')}
+                    onNavigateToCampaigns={() => handleNavigate('/campanas')}
                 />
                 <main className="flex-1 p-6 md:p-10 overflow-y-auto">
                     {renderPage()}
@@ -1146,21 +1373,6 @@ const App: React.FC = () => {
                     onSubmit={handleSaveAdoption}
                 />
             )}
-            {selectedPet && (
-                <PetDetailModal 
-                    pet={selectedPet} 
-                    onClose={handleCloseModal} 
-                    onStartChat={handleStartChat}
-                    onEdit={handleOpenEditModal}
-                    onDelete={handleDeletePet}
-                    onGenerateFlyer={handleOpenFlyer}
-                    onUpdateStatus={handleUpdatePetStatus}
-                    users={users}
-                    onViewUser={handleViewUser}
-                    onReport={handleAddReport}
-                />
-            )}
-            {/* FIX: Cast array to UserRole[] to allow .includes() to check against the broader UserRole type of currentUser.role. */}
             {viewingUser && currentUser && ([USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] as UserRole[]).includes(currentUser.role) && (
                 <AdminUserDetailModal 
                     user={viewingUser} 
@@ -1172,6 +1384,7 @@ const App: React.FC = () => {
                     onUpdateRole={handleUpdateUserRole}
                     onStartChat={handleStartAdminChat}
                     onGhostLogin={currentUser.role === USER_ROLES.SUPERADMIN ? handleGhostLogin : undefined}
+                    onViewUser={handleViewUser}
                 />
             )}
             {isFindingMatches && (
@@ -1185,7 +1398,10 @@ const App: React.FC = () => {
                     matches={potentialMatches}
                     onClose={handleCloseMatches}
                     onConfirmPublication={handleFinalizeReport}
-                    onPetSelect={handlePetSelect}
+                    onPetSelect={(pet) => {
+                        setPotentialMatches(null);
+                        navigate(`/mascota/${pet.id}`);
+                    }}
                 />
             )}
             {petForFlyer && (

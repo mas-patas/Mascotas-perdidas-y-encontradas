@@ -61,3 +61,8 @@ export const SUPPORT_TICKET_CATEGORIES = {
     GENERAL_INQUIRY: 'Consulta General',
     FEEDBACK: 'Sugerencia o Feedback',
 } as const;
+
+export const CAMPAIGN_TYPES = {
+    ESTERILIZACION: 'Esterilización',
+    ADOPCION: 'Adopción',
+} as const;

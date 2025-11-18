@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 import type { User, Pet, OwnedPet } from '../types';
 import { PetCard } from './PetCard';
@@ -13,12 +12,14 @@ interface ProfilePageProps {
     user: User;
     reportedPets: Pet[];
     allPets: Pet[];
+    users: User[];
     onBack: () => void;
-    onPetSelect: (pet: Pet) => void;
     onReportOwnedPetAsLost: (pet: OwnedPet) => void;
+    onNavigate: (path: string) => void;
+    onViewUser: (user: User) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, onBack, onPetSelect, onReportOwnedPetAsLost }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser }) => {
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
@@ -30,6 +31,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         phone: user.phone || '',
+        avatarUrl: user.avatarUrl || '',
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -39,6 +41,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setEditableUser(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditableUser(prev => ({ ...prev, avatarUrl: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     const handleSaveProfile = async () => {
@@ -57,6 +70,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                 firstName: editableUser.firstName,
                 lastName: editableUser.lastName,
                 phone: editableUser.phone,
+                avatarUrl: editableUser.avatarUrl,
             });
             setIsEditing(false);
         } catch (err: any) {
@@ -122,25 +136,42 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                 
                 {isEditing ? (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div>
-                                <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">Nombres</label>
-                                <input type="text" name="firstName" id="firstName" value={editableUser.firstName} onChange={handleInputChange} className={inputClass} />
+                        <div className="flex items-center gap-6">
+                            <div className="flex-shrink-0">
+                                {editableUser.avatarUrl ? (
+                                    <img src={editableUser.avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full object-cover" />
+                                ) : (
+                                    <div className="w-24 h-24 rounded-full bg-brand-primary text-white flex items-center justify-center text-4xl font-bold">
+                                        {(editableUser.firstName || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <label htmlFor="avatar-upload" className="mt-2 block text-sm text-center text-brand-primary hover:underline cursor-pointer">
+                                    Cambiar foto
+                                </label>
+                                <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
                             </div>
-                            <div>
-                                <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">Apellidos</label>
-                                <input type="text" name="lastName" id="lastName" value={editableUser.lastName} onChange={handleInputChange} className={inputClass} />
+                            <div className="flex-grow space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">Nombres</label>
+                                        <input type="text" name="firstName" id="firstName" value={editableUser.firstName} onChange={handleInputChange} className={inputClass} />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">Apellidos</label>
+                                        <input type="text" name="lastName" id="lastName" value={editableUser.lastName} onChange={handleInputChange} className={inputClass} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="phone" className="block text-sm font-medium text-gray-900">Teléfono</label>
+                                    <input 
+                                        type="tel" 
+                                        name="phone" 
+                                        id="phone" value={editableUser.phone} 
+                                        onChange={handleInputChange} className={inputClass} 
+                                        pattern="9[0-9]{8}"
+                                        title="El número de teléfono debe tener 9 dígitos y empezar con 9." />
+                                </div>
                             </div>
-                        </div>
-                        <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-900">Teléfono</label>
-                            <input 
-                                type="tel" 
-                                name="phone" 
-                                id="phone" value={editableUser.phone} 
-                                onChange={handleInputChange} className={inputClass} 
-                                pattern="9[0-9]{8}"
-                                title="El número de teléfono debe tener 9 dígitos y empezar con 9." />
                         </div>
                         <div className="flex justify-end gap-3 pt-2">
                             <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
@@ -150,11 +181,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-2 text-gray-600">
-                        <p><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
-                        <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
-                        <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
-                        {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                    <div className="flex flex-col items-center md:flex-row md:items-start gap-6">
+                        <div className="relative">
+                            {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover shadow-md" />
+                            ) : (
+                                <div className="w-32 h-32 rounded-full bg-brand-primary text-white flex items-center justify-center text-5xl font-bold shadow-md">
+                                    {(user.firstName || '?').charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-center md:text-left space-y-2 text-gray-600">
+                            <p><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
+                            <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
+                            <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
+                            {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                        </div>
                     </div>
                 )}
             </div>
@@ -213,9 +255,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                 <h3 className="text-2xl font-semibold text-gray-700">Publicaciones guardadas</h3>
                 {savedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {savedPets.map(pet => (
-                            <PetCard key={pet.id} pet={pet} onPetSelect={onPetSelect} />
-                        ))}
+                        {savedPets.map(pet => {
+                            const petOwner = users.find(u => u.email === pet.userEmail);
+                            return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
+                        })}
                     </div>
                 ) : (
                     <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
@@ -230,7 +273,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                 {reportedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {reportedPets.map(pet => (
-                            <PetCard key={pet.id} pet={pet} onPetSelect={onPetSelect} />
+                            <PetCard key={pet.id} pet={pet} owner={user} onViewUser={onViewUser} onNavigate={onNavigate} />
                         ))}
                     </div>
                 ) : (

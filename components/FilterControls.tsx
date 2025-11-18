@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
-import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon } from './icons';
+import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon, MegaphoneIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -22,11 +22,12 @@ interface FilterControlsProps {
     setFilters: React.Dispatch<React.SetStateAction<Filters>>;
     isSidebarOpen: boolean;
     onClose: () => void;
-    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support';
+    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns';
     onNavigateToHome: () => void;
     onNavigateToProfile: () => void;
     onNavigateToMessages: () => void;
     onNavigateToAdmin: () => void;
+    onNavigateToCampaigns: () => void;
 }
 
 const statusOptions: (PetStatus | 'Todos')[] = ['Todos', PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
@@ -43,14 +44,15 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     onNavigateToHome,
     onNavigateToProfile,
     onNavigateToMessages,
-    onNavigateToAdmin
+    onNavigateToAdmin,
+    onNavigateToCampaigns
 }) => {
     
     const [breeds, setBreeds] = useState<string[]>(['Todos']);
     const { currentUser, logout } = useAuth();
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
-    const showDesktopSidebar = currentPage === 'list';
+    const showDesktopSidebar = currentPage === 'list' || currentPage === 'campaigns';
     const showFilters = currentPage === 'list';
 
     useEffect(() => {
@@ -77,6 +79,8 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     
     const selectClass = "w-full p-2 border border-gray-500 rounded-md focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition bg-sidebar-dark bg-opacity-50 text-white disabled:opacity-50 disabled:cursor-not-allowed";
     const showAdvancedFilters = filters.type === ANIMAL_TYPES.PERRO || filters.type === ANIMAL_TYPES.GATO;
+    
+    const navLinkClass = "flex items-center gap-3 px-4 py-2 text-gray-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors";
 
     return (
         <>
@@ -90,44 +94,50 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
             `}>
                 <div className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-white">Filtros</h2>
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold text-white">Menú</h2>
                         <button onClick={onClose} className="lg:hidden text-gray-300 hover:text-white text-3xl">&times;</button>
                     </div>
                 </div>
 
+                <nav className="px-6 mb-6">
+                    <button onClick={onNavigateToCampaigns} className={navLinkClass}>
+                        <MegaphoneIcon />
+                        <span>Campañas</span>
+                    </button>
+                </nav>
+
+
                 {/* Filters Section */}
                 {showFilters ? (
-                    <div className="flex-grow space-y-4 px-6 overflow-y-auto">
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Filtros Principales</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="status-filter" className="block text-sm font-medium text-gray-300 mb-1">Estado:</label>
-                                    <select
-                                        id="status-filter"
-                                        value={filters.status}
-                                        onChange={(e) => setFilters(f => ({ ...f, status: e.target.value as PetStatus | 'Todos' }))}
-                                        className={selectClass}
-                                    >
-                                        {statusOptions.map(status => (
-                                            <option key={status} value={status}>{status}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="type-filter" className="block text-sm font-medium text-gray-300 mb-1">Tipo de Animal:</label>
-                                    <select
-                                        id="type-filter"
-                                        value={filters.type}
-                                        onChange={handleTypeChange}
-                                        className={selectClass}
-                                    >
-                                        {typeOptions.map(type => (
-                                            <option key={type} value={type}>{type}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                    <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-gray-700 pt-6">
+                        <h3 className="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Filtros</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-300 mb-1">Estado:</label>
+                                <select
+                                    id="status-filter"
+                                    value={filters.status}
+                                    onChange={(e) => setFilters(f => ({ ...f, status: e.target.value as PetStatus | 'Todos' }))}
+                                    className={selectClass}
+                                >
+                                    {statusOptions.map(status => (
+                                        <option key={status} value={status}>{status}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="type-filter" className="block text-sm font-medium text-gray-300 mb-1">Tipo de Animal:</label>
+                                <select
+                                    id="type-filter"
+                                    value={filters.type}
+                                    onChange={handleTypeChange}
+                                    className={selectClass}
+                                >
+                                    {typeOptions.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 

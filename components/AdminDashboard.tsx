@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory } from '../types';
-import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from '../constants';
-import { UsersIcon, PetIcon, ChartBarIcon, FlagIcon, SupportIcon } from './icons';
+import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Campaign } from '../types';
+import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from '../constants';
+import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon } from './icons';
 import ReportDetailModal from './ReportDetailModal';
 import SupportTicketModal from './SupportTicketModal';
+import CampaignFormModal from './CampaignFormModal';
+import ConfirmationModal from './ConfirmationModal';
 
 interface AdminDashboardProps {
     onBack: () => void;
@@ -16,6 +19,12 @@ interface AdminDashboardProps {
     onUpdateReportStatus: (reportId: string, status: ReportStatusType) => void;
     onDeletePet: (petId: string) => void;
     onUpdateSupportTicket: (ticket: SupportTicket) => void;
+    isAiSearchEnabled: boolean;
+    onToggleAiSearch: () => void;
+    campaigns: Campaign[];
+    onSaveCampaign: (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => void;
+    onDeleteCampaign: (campaignId: string) => void;
+    onNavigate: (path: string) => void;
 }
 
 const getRoleForUser = (email: string): UserRole => {
@@ -24,6 +33,27 @@ const getRoleForUser = (email: string): UserRole => {
     if (email === 'mod@moderator.com') return USER_ROLES.MODERATOR;
     return USER_ROLES.USER;
 };
+
+const formatDateSafe = (dateString: string) => {
+    try {
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return 'N/A';
+        return d.toLocaleDateString('es-ES');
+    } catch {
+        return 'N/A';
+    }
+};
+
+const formatDateTimeSafe = (dateString: string) => {
+    try {
+         const d = new Date(dateString);
+         if (isNaN(d.getTime())) return 'N/A';
+         return d.toLocaleString('es-ES');
+    } catch {
+        return 'N/A';
+    }
+};
+
 
 interface StatCardProps {
     icon: React.ReactNode;
@@ -109,13 +139,16 @@ const SimpleBarChart: React.FC<{ data: { label: string, value: number }[], title
 };
 
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUser, pets, chats, reports, supportTickets, onUpdateReportStatus, onDeletePet, onUpdateSupportTicket }) => {
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support'>('dashboard');
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUser, pets, chats, reports, supportTickets, onUpdateReportStatus, onDeletePet, onUpdateSupportTicket, isAiSearchEnabled, onToggleAiSearch, campaigns, onSaveCampaign, onDeleteCampaign, onNavigate }) => {
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings'>('dashboard');
     const [statusFilter, setStatusFilter] = useState<PetStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<AnimalType | 'all'>('all');
     const [dateRangeFilter, setDateRangeFilter] = useState<'7d' | '30d' | '1y' | 'all'>('all');
     const [viewingReportDetail, setViewingReportDetail] = useState<{ report: Report; pet: Pet | ReportPostSnapshot; isDeleted: boolean } | null>(null);
     const [viewingTicket, setViewingTicket] = useState<SupportTicket | null>(null);
+    const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+    const [campaignToEdit, setCampaignToEdit] = useState<Campaign | null>(null);
+    const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
 
     // Support ticket filters
     const [ticketStatusFilter, setTicketStatusFilter] = useState<SupportTicketStatus | 'all'>('all');
@@ -158,6 +191,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
         const totalUsers = users.length;
         const totalReportsCount = reports.length;
         const pendingSupportTicketsCount = supportTickets.filter(t => t.status === SUPPORT_TICKET_STATUS.PENDING).length;
+        const totalCampaigns = campaigns ? campaigns.length : 0;
 
         const petsByStatus = {
             lost: filteredPets.filter(p => p.status === PET_STATUS.PERDIDO).length,
@@ -220,6 +254,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
             totalUsers,
             totalReportsCount,
             pendingSupportTicketsCount,
+            totalCampaigns,
             petsByStatus,
             petsByType,
             postsChartData,
@@ -227,7 +262,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
             recentUsers,
             recentPets,
         };
-    }, [pets, users, chats, reports, supportTickets, statusFilter, typeFilter, dateRangeFilter]);
+    }, [pets, users, chats, reports, supportTickets, campaigns, statusFilter, typeFilter, dateRangeFilter]);
 
     const filteredUsers = useMemo(() => {
         if (!searchQuery) {
@@ -362,11 +397,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard icon={<PetIcon />} title="Total de Publicaciones" value={dashboardData.totalPets} color="bg-blue-100 text-blue-600" />
                 <StatCard icon={<UsersIcon />} title="Usuarios Registrados" value={dashboardData.totalUsers} color="bg-green-100 text-green-600" />
                 <StatCard icon={<FlagIcon />} title="Total de Reportes" value={dashboardData.totalReportsCount} color="bg-red-100 text-red-600" />
                 <StatCard icon={<SupportIcon />} title="Tickets Pendientes" value={dashboardData.pendingSupportTicketsCount} color="bg-yellow-100 text-yellow-600" />
+                <StatCard icon={<MegaphoneIcon />} title="Total de Campañas" value={dashboardData.totalCampaigns} color="bg-indigo-100 text-indigo-600" />
             </div>
 
             {/* Bar Chart */}
@@ -588,7 +624,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
 
                                 return (
                                     <tr key={report.id} className="hover:bg-gray-50">
-                                        <td className="py-4 px-4 whitespace-nowrap text-sm">{new Date(report.timestamp).toLocaleString('es-ES')}</td>
+                                        <td className="py-4 px-4 whitespace-nowrap text-sm">{formatDateTimeSafe(report.timestamp)}</td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">
                                             <button onClick={() => reporter && onViewUser(reporter)} className="text-brand-primary hover:underline">{reporter?.username || report.reporterEmail}</button>
                                         </td>
@@ -685,7 +721,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                 const assignedAdmin = users.find(u => u.email === ticket.assignedTo);
                                 return (
                                     <tr key={ticket.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingTicket(ticket)}>
-                                        <td className="py-4 px-4 whitespace-nowrap text-sm">{new Date(ticket.timestamp).toLocaleString('es-ES')}</td>
+                                        <td className="py-4 px-4 whitespace-nowrap text-sm">{formatDateTimeSafe(ticket.timestamp)}</td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">
                                             {user?.username || ticket.userEmail}
                                         </td>
@@ -711,6 +747,129 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
             </div>
         );
     };
+
+    const renderCampaignsManagement = () => {
+        const handleOpenCreateModal = () => {
+            setCampaignToEdit(null);
+            setIsCampaignModalOpen(true);
+        };
+    
+        const handleOpenEditModal = (campaign: Campaign) => {
+            setCampaignToEdit(campaign);
+            setIsCampaignModalOpen(true);
+        };
+        
+        const handleSave = (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
+            onSaveCampaign(campaignData, idToUpdate);
+            setIsCampaignModalOpen(false);
+        };
+
+        const handleConfirmDelete = () => {
+            if (campaignToDelete) {
+                onDeleteCampaign(campaignToDelete.id);
+                setCampaignToDelete(null);
+            }
+        };
+        
+        // Robust handling: treat campaigns as an array even if null/undefined is passed
+        // AND filter out nulls just in case
+        const safeCampaigns = (Array.isArray(campaigns) ? campaigns : []).filter(c => c && c.id);
+    
+        return (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-800">Gestión de Campañas</h3>
+                    <button onClick={handleOpenCreateModal} className="py-2 px-4 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark flex items-center gap-2">
+                        <MegaphoneIcon /> Crear Campaña
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Título</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Tipo</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Fecha</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Lugar</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 text-gray-900">
+                            {safeCampaigns.map(campaign => (
+                                <tr key={campaign.id} className="hover:bg-gray-50">
+                                    <td className="py-4 px-4 text-sm font-medium">
+                                        <button 
+                                            onClick={() => onNavigate(`/campanas/${campaign.id}`)}
+                                            className="text-brand-primary hover:underline bg-transparent border-none p-0 cursor-pointer text-left"
+                                        >
+                                            {campaign.title}
+                                        </button>
+                                    </td>
+                                    <td className="py-4 px-4 whitespace-nowrap text-sm">{campaign.type}</td>
+                                    <td className="py-4 px-4 whitespace-nowrap text-sm">{formatDateSafe(campaign.date)}</td>
+                                    <td className="py-4 px-4 text-sm">{campaign.location}</td>
+                                    <td className="py-4 px-4 whitespace-nowrap text-sm font-medium flex gap-4">
+                                        <button onClick={() => handleOpenEditModal(campaign)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1">
+                                            <EditIcon /> Editar
+                                        </button>
+                                        <button onClick={() => setCampaignToDelete(campaign)} className="text-red-600 hover:text-red-900 flex items-center gap-1">
+                                            <TrashIcon /> Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {safeCampaigns.length === 0 && (
+                        <p className="text-center py-10 text-gray-500">No se han creado campañas.</p>
+                    )}
+                </div>
+                {isCampaignModalOpen && (
+                    <CampaignFormModal 
+                        isOpen={isCampaignModalOpen}
+                        onClose={() => setIsCampaignModalOpen(false)}
+                        onSave={handleSave}
+                        campaignToEdit={campaignToEdit}
+                    />
+                )}
+                {campaignToDelete && (
+                    <ConfirmationModal
+                        isOpen={!!campaignToDelete}
+                        onClose={() => setCampaignToDelete(null)}
+                        onConfirm={handleConfirmDelete}
+                        title="Eliminar Campaña"
+                        message={`¿Estás seguro de que quieres eliminar la campaña "${campaignToDelete.title}"? Esta acción no se puede deshacer.`}
+                    />
+                )}
+            </div>
+        );
+    };
+
+    const renderSettingsManagement = () => (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Configuración de la Plataforma</h3>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div>
+                        <h4 className="font-semibold text-gray-800">Búsqueda automática con IA al reportar un perdido</h4>
+                        <p className="text-sm text-gray-500">
+                            Si está activado, el sistema buscará automáticamente mascotas encontradas/avistadas similares cuando un usuario reporte una mascota perdida.
+                        </p>
+                    </div>
+                    <label htmlFor="ai-search-toggle" className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            id="ai-search-toggle" 
+                            className="sr-only peer" 
+                            checked={isAiSearchEnabled} 
+                            onChange={onToggleAiSearch} 
+                        />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div id="admin-dashboard" className="space-y-6">
@@ -759,12 +918,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                 {supportTickets.filter(t => t.status === 'Pendiente').length}
                             </span>
                         </button>
+                        <button
+                            onClick={() => setActiveTab('campaigns')}
+                            className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'campaigns' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        >
+                            Campañas
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('settings')}
+                            className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        >
+                            Configuración
+                        </button>
                     </nav>
                 </div>
             </div>
 
             <div className="p-1 md:p-0">
-                {activeTab === 'dashboard' ? renderDashboard() : activeTab === 'users' ? renderUserManagement() : activeTab === 'reports' ? renderReportsManagement() : renderSupportManagement()}
+                {activeTab === 'dashboard' ? renderDashboard() 
+                : activeTab === 'users' ? renderUserManagement() 
+                : activeTab === 'reports' ? renderReportsManagement() 
+                : activeTab === 'support' ? renderSupportManagement()
+                : activeTab === 'campaigns' ? renderCampaignsManagement()
+                : renderSettingsManagement()}
             </div>
             
             <div className="text-center pt-4">

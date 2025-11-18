@@ -11,7 +11,7 @@ interface AuthContextType {
     logout: () => void;
     loginWithGoogle: () => Promise<void>;
     loginWithApple: () => Promise<void>;
-    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni'>>) => Promise<void>;
+    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl'>>) => Promise<void>;
     addOwnedPet: (petData: Omit<OwnedPet, 'id'>) => Promise<void>;
     updateOwnedPet: (petData: OwnedPet) => Promise<void>;
     deleteOwnedPet: (petId: string) => Promise<void>;
@@ -202,7 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return socialLogin(user);
     };
     
-    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni'>>): Promise<void> => {
+    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl'>>): Promise<void> => {
         return new Promise((resolve, reject) => {
             setTimeout(() => { // Simulate network latency
                 if (!currentUser) {

@@ -12,6 +12,7 @@ export const initialUsersForDemo: User[] = [
         phone: '926961387', 
         dni: '76543210', 
         status: USER_STATUS.ACTIVE,
+        avatarUrl: 'https://picsum.photos/seed/tony_avatar/200/200',
         ownedPets: [
             { id: 'owned-1', name: 'Max', animalType: 'Perro', breed: 'Pastor Alemán', colors: ['Negro', 'Marrón'], description: 'Leal y protector, adora jugar a buscar la pelota.', imageUrls: ['https://picsum.photos/seed/max_tony/400/400'] },
             { id: 'owned-2', name: 'Misha', animalType: 'Gato', breed: 'Siamés', colors: ['Crema', 'Marrón'], description: 'Muy vocal y curiosa, siempre explorando la casa.', imageUrls: ['https://picsum.photos/seed/misha_tony/400/400'] }
@@ -26,6 +27,7 @@ export const initialUsersForDemo: User[] = [
         phone: '999999999', 
         dni: '12345678', 
         status: USER_STATUS.ACTIVE,
+        avatarUrl: 'https://picsum.photos/seed/super_avatar/200/200',
         ownedPets: [
             { id: 'owned-3', name: 'Rex', animalType: 'Perro', breed: 'Bulldog', colors: ['Atigrado'], description: 'Testarudo pero muy cariñoso. Le encantan las siestas.', imageUrls: ['https://picsum.photos/seed/rex_super/400/400'] },
             { id: 'owned-4', name: 'Whiskers', animalType: 'Gato', breed: 'Maine Coon', colors: ['Gris'], description: 'Un gigante gentil con un pelaje magnífico.', imageUrls: ['https://picsum.photos/seed/whiskers_super/400/400'] }
@@ -69,6 +71,7 @@ export const initialUsersForDemo: User[] = [
         phone: '987654321', 
         dni: '22334455', 
         status: USER_STATUS.ACTIVE,
+        avatarUrl: 'https://picsum.photos/seed/carlos_avatar/200/200',
         ownedPets: [
             { id: 'owned-9', name: 'Rocky', animalType: 'Perro', breed: 'Boxer', colors: ['Marrón'], description: 'Fuerte y juguetón. Un gran compañero de corridas.', imageUrls: ['https://picsum.photos/seed/rocky_carlos/400/400'] },
             { id: 'owned-10', name: 'Lucy', animalType: 'Gato', breed: 'Persa', colors: ['Blanco'], description: 'Tranquila y majestuosa. Reina de la casa.', imageUrls: ['https://picsum.photos/seed/lucy_carlos/400/400'] }

@@ -57,6 +57,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const [error, setError] = useState('');
     const [customAnimalType, setCustomAnimalType] = useState('');
     const [customBreed, setCustomBreed] = useState('');
+    const [shareContactInfo, setShareContactInfo] = useState(true);
 
     const isEncontrado = formData.status === PET_STATUS.ENCONTRADO;
     const isPerdido = formData.status === PET_STATUS.PERDIDO;
@@ -130,6 +131,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             setColor3(colors[2] || '');
             
             setImagePreviews(petToEdit.imageUrls);
+            setShareContactInfo(petToEdit.shareContactInfo !== false);
         }
     }, [petToEdit, isEditMode]);
 
@@ -272,6 +274,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             contact: formData.status === PET_STATUS.AVISTADO ? 'No aplica' : formData.contact,
             description: finalDescription,
             imageUrls: imagePreviews,
+            shareContactInfo: formData.status === PET_STATUS.AVISTADO ? false : shareContactInfo,
         };
         
         onSubmit(petToSubmit, petToEdit?.id);
@@ -456,6 +459,22 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             <div>
                                 <label className="block text-sm font-medium text-gray-900">Información de Contacto <span className="text-red-500">*</span></label>
                                 <input type="text" name="contact" value={formData.contact} onChange={handleInputChange} className={inputClass} placeholder="Tu teléfono o email" required />
+                                <div className="mt-2 flex items-start">
+                                    <div className="flex items-center h-5">
+                                        <input
+                                            id="shareContact"
+                                            name="shareContact"
+                                            type="checkbox"
+                                            checked={shareContactInfo}
+                                            onChange={(e) => setShareContactInfo(e.target.checked)}
+                                            className="focus:ring-brand-primary h-4 w-4 text-brand-primary border-gray-300 rounded"
+                                        />
+                                    </div>
+                                    <div className="ml-3 text-sm">
+                                        <label htmlFor="shareContact" className="font-medium text-gray-700">Compartir públicamente mi contacto</label>
+                                        <p className="text-gray-500">Si desmarcas esta opción, otros usuarios solo podrán contactarte a través del chat de la aplicación.</p>
+                                    </div>
+                                </div>
                             </div>
                         )}
                         

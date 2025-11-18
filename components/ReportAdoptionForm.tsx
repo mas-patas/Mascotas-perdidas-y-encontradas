@@ -45,6 +45,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     const [error, setError] = useState('');
     const [customAnimalType, setCustomAnimalType] = useState('');
     const [customBreed, setCustomBreed] = useState('');
+    const [shareContactInfo, setShareContactInfo] = useState(true);
 
     useEffect(() => {
         if (formData.animalType === ANIMAL_TYPES.PERRO) {
@@ -165,6 +166,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             description: finalDescription,
             adoptionRequirements: formData.adoptionRequirements,
             imageUrls: imagePreviews,
+            shareContactInfo: shareContactInfo,
         };
         
         onSubmit(petToSubmit);
@@ -307,6 +309,22 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                         <div>
                             <label className="block text-sm font-medium text-gray-900">Información de Contacto <span className="text-red-500">*</span></label>
                             <input type="text" name="contact" value={formData.contact} onChange={handleInputChange} className={inputClass} placeholder="Tu teléfono o email" required />
+                            <div className="mt-2 flex items-start">
+                                <div className="flex items-center h-5">
+                                    <input
+                                        id="shareContactAdoption"
+                                        name="shareContactAdoption"
+                                        type="checkbox"
+                                        checked={shareContactInfo}
+                                        onChange={(e) => setShareContactInfo(e.target.checked)}
+                                        className="focus:ring-brand-primary h-4 w-4 text-brand-primary border-gray-300 rounded"
+                                    />
+                                </div>
+                                <div className="ml-3 text-sm">
+                                    <label htmlFor="shareContactAdoption" className="font-medium text-gray-700">Compartir públicamente mi contacto</label>
+                                    <p className="text-gray-500">Si desmarcas esta opción, los interesados solo podrán contactarte a través del chat de la aplicación.</p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div className="pt-4 flex justify-end gap-3">

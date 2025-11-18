@@ -1,4 +1,4 @@
-import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
+import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from './constants';
 
 export type PetStatus = typeof PET_STATUS[keyof typeof PET_STATUS];
 export type AnimalType = typeof ANIMAL_TYPES[keyof typeof ANIMAL_TYPES];
@@ -10,12 +10,25 @@ export type ReportStatus = typeof REPORT_STATUS[keyof typeof REPORT_STATUS];
 export type ReportType = 'post' | 'user';
 export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUS[keyof typeof SUPPORT_TICKET_STATUS];
 export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeof SUPPORT_TICKET_CATEGORIES];
+export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
+
+export interface Campaign {
+    id: string;
+    userEmail: string; // Admin who created it
+    type: CampaignType;
+    title: string;
+    description: string;
+    location: string;
+    date: string; // ISO String
+    imageUrls: string[];
+    contactPhone?: string;
+}
 
 export interface Notification {
     id: string;
     userId: string;
     message: string;
-    link: 'support';
+    link: 'support' | 'messages' | { type: 'campaign'; id: string };
     timestamp: string;
     isRead: boolean;
 }
@@ -48,6 +61,8 @@ export interface Pet {
     description: string;
     imageUrls: string[];
     adoptionRequirements?: string;
+    shareContactInfo?: boolean;
+    contactRequests?: string[];
 }
 
 export type ReportPostSnapshot = Pet;
@@ -87,6 +102,7 @@ export interface User {
     provider?: 'email' | 'google' | 'apple';
     ownedPets?: OwnedPet[];
     savedPetIds?: string[];
+    avatarUrl?: string;
 }
 
 export interface LocationDetails {

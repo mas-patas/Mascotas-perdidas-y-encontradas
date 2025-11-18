@@ -47,7 +47,6 @@ const SupportTicketModal: React.FC<SupportTicketModalProps> = ({ isOpen, onClose
 
     const user = allUsers.find(u => u.email === ticket.userEmail);
     const admins = allUsers.filter(u => u.role === USER_ROLES.ADMIN || u.role === USER_ROLES.SUPERADMIN);
-    // FIX: Cast array to UserRole[] to allow .includes() to check against the broader UserRole type of currentUser.role.
     const canManage = currentUser && ([USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] as UserRole[]).includes(currentUser.role);
 
     const handleSaveChanges = () => {

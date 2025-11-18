@@ -1,39 +1,62 @@
 
+
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
-import { PetStatus, Notification } from '../types';
+import { PetStatus, Notification, User } from '../types';
 import { PET_STATUS, USER_ROLES } from '../constants';
 import NotificationDropdown from './NotificationDropdown';
 
 interface HeaderProps {
-    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support';
+    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns';
     onReportPet: (status: PetStatus) => void;
     onOpenAdoptionModal: () => void;
-    onNavigateToHome: () => void;
-    onNavigateToProfile: () => void;
-    onNavigateToMessages: () => void;
-    onNavigateToAdmin: () => void;
-    onNavigateToSupport: () => void;
+    onNavigate: (path: string) => void;
     onToggleSidebar: () => void;
     hasUnreadMessages: boolean;
     notifications: Notification[];
     onMarkNotificationAsRead: (notificationId: string) => void;
+    onMarkAllNotificationsAsRead: () => void;
 }
+
+// A new simple Avatar component
+const Avatar: React.FC<{ user: User | null, size?: 'sm' | 'md' | 'lg' }> = ({ user, size = 'md' }) => {
+    if (!user) return null;
+    
+    const sizeClasses = {
+        sm: 'w-6 h-6 text-xs',
+        md: 'w-10 h-10 text-xl',
+        lg: 'w-24 h-24 text-4xl',
+    };
+
+    if (user.avatarUrl) {
+        return (
+            <img src={user.avatarUrl} alt="Avatar" className={`${sizeClasses[size]} rounded-full object-cover`} />
+        );
+    }
+
+    const initial = user.firstName ? user.firstName.charAt(0).toUpperCase() : '?';
+
+    return (
+        <div className={`${sizeClasses[size]} rounded-full bg-brand-primary text-white flex items-center justify-center font-bold`}>
+            {initial}
+        </div>
+    );
+};
+
 
 export const Header: React.FC<HeaderProps> = ({ 
     currentPage,
     onReportPet, 
     onOpenAdoptionModal, 
-    onNavigateToHome, 
-    onNavigateToProfile, 
-    onNavigateToMessages, 
-    onNavigateToAdmin, 
-    onNavigateToSupport, 
+    onNavigate,
     onToggleSidebar, 
     hasUnreadMessages,
     notifications,
-    onMarkNotificationAsRead
+    onMarkNotificationAsRead,
+    onMarkAllNotificationsAsRead
 }) => {
     const { currentUser, logout } = useAuth();
     const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
@@ -68,17 +91,27 @@ export const Header: React.FC<HeaderProps> = ({
         setIsReportDropdownOpen(false);
     };
 
+    const handleToggleNotifications = () => {
+        setIsNotificationsOpen(prev => {
+            const willBeOpen = !prev;
+            if (willBeOpen) {
+                onMarkAllNotificationsAsRead();
+            }
+            return willBeOpen;
+        });
+    };
+
     const navButtonClass = "flex items-center gap-2 px-3 py-2 text-gray-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors";
 
     return (
         <header className="bg-sidebar-dark text-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
             <div className="flex items-center gap-4">
-                 {currentPage === 'list' && (
+                 {(currentPage === 'list' || currentPage === 'campaigns') && (
                     <button onClick={onToggleSidebar} className="lg:hidden text-gray-200 hover:text-white" aria-label="Abrir menú de filtros">
                         <MenuIcon />
                     </button>
                  )}
-                 <h1 className="text-2xl font-bold tracking-wider cursor-pointer" onClick={onNavigateToHome}>
+                 <h1 className="text-2xl font-bold tracking-wider cursor-pointer" onClick={() => onNavigate('/')}>
                     PETS
                 </h1>
             </div>
@@ -96,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 <ChevronDownIcon />
                             </button>
                             {isReportDropdownOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5">
+                                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5">
                                     <button
                                         onClick={() => handleReportSelection(PET_STATUS.PERDIDO)}
                                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -131,14 +164,14 @@ export const Header: React.FC<HeaderProps> = ({
                     )}
                     
                     {/* Inicio */}
-                    <button onClick={onNavigateToHome} className={navButtonClass} aria-label="Inicio">
+                    <button onClick={() => onNavigate('/')} className={navButtonClass} aria-label="Inicio">
                         <HomeIcon />
                         <span className="hidden md:inline">Inicio</span>
                     </button>
                     
                     {/* Admin */}
                     {isAdmin && (
-                        <button onClick={onNavigateToAdmin} className={navButtonClass} aria-label="Admin">
+                        <button onClick={() => onNavigate('/admin')} className={navButtonClass} aria-label="Admin">
                             <AdminIcon />
                              <span className="hidden md:inline">Admin</span>
                         </button>
@@ -146,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                     {/* Notifications */}
                     <div className="relative" ref={notificationsRef}>
-                        <button onClick={() => setIsNotificationsOpen(prev => !prev)} className={`${navButtonClass} relative`} aria-label="Notificaciones">
+                        <button onClick={handleToggleNotifications} className={`${navButtonClass} relative`} aria-label="Notificaciones">
                             <BellIcon />
                             {unreadNotificationsCount > 0 && (
                                 <span className="absolute top-1 right-1 h-4 w-4 text-xs bg-red-500 text-white rounded-full flex items-center justify-center">
@@ -159,8 +192,12 @@ export const Header: React.FC<HeaderProps> = ({
                                 notifications={notifications}
                                 onMarkAsRead={onMarkNotificationAsRead}
                                 onClose={() => setIsNotificationsOpen(false)}
-                                onNavigate={ (page) => {
-                                    if(page === 'support') onNavigateToSupport();
+                                onNavigate={ (link) => {
+                                    if(link === 'support') onNavigate('/soporte');
+                                    else if (link === 'messages') onNavigate('/mensajes');
+                                    else if (typeof link === 'object' && link.type === 'campaign') {
+                                        onNavigate(`/campanas/${link.id}`);
+                                    }
                                 }}
                             />
                         )}
@@ -171,24 +208,24 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="relative" ref={accountDropdownRef}>
                         <button 
                             onClick={() => setIsAccountDropdownOpen(prev => !prev)} 
-                            className={navButtonClass} 
+                            className="flex items-center gap-2 text-gray-200 hover:text-white rounded-full p-1 hover:bg-white/10 transition-colors"
                             aria-label="Mi Cuenta"
                         >
-                            <UserIcon />
-                            <span className="hidden md:inline">Mi Cuenta</span>
+                            <Avatar user={currentUser} />
+                            <span className="hidden md:inline">{currentUser?.username || 'Mi Cuenta'}</span>
                             <ChevronDownIcon />
                         </button>
                         {isAccountDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5">
                                 <button
-                                    onClick={() => { onNavigateToProfile(); setIsAccountDropdownOpen(false); }}
+                                    onClick={() => { onNavigate('/perfil'); setIsAccountDropdownOpen(false); }}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
                                 >
-                                    <UserIcon />
+                                    <Avatar user={currentUser} size="sm" />
                                     <span>Mi Perfil</span>
                                 </button>
                                 <button
-                                    onClick={() => { onNavigateToMessages(); setIsAccountDropdownOpen(false); }}
+                                    onClick={() => { onNavigate('/mensajes'); setIsAccountDropdownOpen(false); }}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 relative"
                                 >
                                     <ChatBubbleIcon />
@@ -198,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     )}
                                 </button>
                                  <button
-                                    onClick={() => { onNavigateToSupport(); setIsAccountDropdownOpen(false); }}
+                                    onClick={() => { onNavigate('/soporte'); setIsAccountDropdownOpen(false); }}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
                                 >
                                     <SupportIcon />

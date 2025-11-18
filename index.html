@@ -66,6 +66,32 @@
             padding: 0 !important;
         }
     }
+
+    /* Custom styles for date inputs to improve calendar icon visibility */
+    input[type="date"] {
+        appearance: none;
+        -webkit-appearance: none;
+        min-height: 42px;
+    }
+    
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        width: 24px;
+        height: 24px;
+        padding: 2px;
+        margin-right: 4px;
+        /* Custom SVG Icon in Brand Primary Color (#1D4ED8) */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231D4ED8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' /%3E%3C/svg%3E");
+        opacity: 0.8;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+        transform: scale(1.15);
+        background-color: rgba(29, 78, 216, 0.1);
+        border-radius: 4px;
+    }
 </style>
 </head>
 <body class="bg-gray-100">
