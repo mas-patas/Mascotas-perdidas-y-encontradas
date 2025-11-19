@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ReportReason, ReportType } from '../types';
 import { REPORT_REASONS } from '../constants';
@@ -32,7 +33,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onSub
 
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose} aria-modal="true" role="dialog">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-center p-4" onClick={onClose} aria-modal="true" role="dialog">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
                 <form onSubmit={handleSubmit}>
                     <div className="p-6">

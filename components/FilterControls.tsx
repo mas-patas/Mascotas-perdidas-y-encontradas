@@ -1,10 +1,9 @@
 
-
 import React, { useState, useEffect } from 'react';
 import type { PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
-import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon, MegaphoneIcon } from './icons';
+import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon, MegaphoneIcon, MapIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -22,12 +21,13 @@ interface FilterControlsProps {
     setFilters: React.Dispatch<React.SetStateAction<Filters>>;
     isSidebarOpen: boolean;
     onClose: () => void;
-    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns';
+    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns' | 'map';
     onNavigateToHome: () => void;
     onNavigateToProfile: () => void;
     onNavigateToMessages: () => void;
     onNavigateToAdmin: () => void;
     onNavigateToCampaigns: () => void;
+    onNavigateToMap: () => void;
 }
 
 const statusOptions: (PetStatus | 'Todos')[] = ['Todos', PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
@@ -45,14 +45,15 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     onNavigateToProfile,
     onNavigateToMessages,
     onNavigateToAdmin,
-    onNavigateToCampaigns
+    onNavigateToCampaigns,
+    onNavigateToMap
 }) => {
     
     const [breeds, setBreeds] = useState<string[]>(['Todos']);
     const { currentUser, logout } = useAuth();
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
-    const showDesktopSidebar = currentPage === 'list' || currentPage === 'campaigns';
+    const showDesktopSidebar = currentPage === 'list' || currentPage === 'campaigns' || currentPage === 'map';
     const showFilters = currentPage === 'list';
 
     useEffect(() => {
@@ -80,7 +81,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     const selectClass = "w-full p-2 border border-gray-500 rounded-md focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition bg-sidebar-dark bg-opacity-50 text-white disabled:opacity-50 disabled:cursor-not-allowed";
     const showAdvancedFilters = filters.type === ANIMAL_TYPES.PERRO || filters.type === ANIMAL_TYPES.GATO;
     
-    const navLinkClass = "flex items-center gap-3 px-4 py-2 text-gray-300 rounded-lg hover:bg-white/10 hover:text-white transition-colors";
+    const navLinkClass = (isActive: boolean) => `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-semibold' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`;
 
     return (
         <>
@@ -100,8 +101,16 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     </div>
                 </div>
 
-                <nav className="px-6 mb-6">
-                    <button onClick={onNavigateToCampaigns} className={navLinkClass}>
+                <nav className="px-6 mb-6 space-y-2">
+                    <button onClick={onNavigateToHome} className={navLinkClass(currentPage === 'list')}>
+                        <HomeIcon />
+                        <span>Inicio</span>
+                    </button>
+                     <button onClick={onNavigateToMap} className={navLinkClass(currentPage === 'map')}>
+                        <MapIcon />
+                        <span>Mapa Interactivo</span>
+                    </button>
+                    <button onClick={onNavigateToCampaigns} className={navLinkClass(currentPage === 'campaigns')}>
                         <MegaphoneIcon />
                         <span>Campañas</span>
                     </button>

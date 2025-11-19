@@ -2,6 +2,10 @@
 
 
 
+
+
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +14,7 @@ import { PET_STATUS, USER_ROLES } from '../constants';
 import NotificationDropdown from './NotificationDropdown';
 
 interface HeaderProps {
-    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns';
+    currentPage: 'list' | 'profile' | 'messages' | 'chat' | 'admin' | 'support' | 'campaigns' | 'map';
     onReportPet: (status: PetStatus) => void;
     onOpenAdoptionModal: () => void;
     onNavigate: (path: string) => void;
@@ -106,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
     return (
         <header className="bg-sidebar-dark text-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-20 flex-shrink-0">
             <div className="flex items-center gap-4">
-                 {(currentPage === 'list' || currentPage === 'campaigns') && (
+                 {(currentPage === 'list' || currentPage === 'campaigns' || currentPage === 'map') && (
                     <button onClick={onToggleSidebar} className="lg:hidden text-gray-200 hover:text-white" aria-label="Abrir menú de filtros">
                         <MenuIcon />
                     </button>
@@ -197,6 +201,8 @@ export const Header: React.FC<HeaderProps> = ({
                                     else if (link === 'messages') onNavigate('/mensajes');
                                     else if (typeof link === 'object' && link.type === 'campaign') {
                                         onNavigate(`/campanas/${link.id}`);
+                                    } else if (typeof link === 'object' && link.type === 'pet') {
+                                        onNavigate(`/mascota/${link.id}`);
                                     }
                                 }}
                             />

@@ -1,3 +1,4 @@
+
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from './constants';
 
 export type PetStatus = typeof PET_STATUS[keyof typeof PET_STATUS];
@@ -22,13 +23,15 @@ export interface Campaign {
     date: string; // ISO String
     imageUrls: string[];
     contactPhone?: string;
+    lat?: number;
+    lng?: number;
 }
 
 export interface Notification {
     id: string;
     userId: string;
     message: string;
-    link: 'support' | 'messages' | { type: 'campaign'; id: string };
+    link: 'support' | 'messages' | { type: 'campaign'; id: string } | { type: 'pet'; id: string };
     timestamp: string;
     isRead: boolean;
 }
@@ -44,6 +47,14 @@ export interface SupportTicket {
     assignedTo?: string; // Admin email
     assignmentHistory?: { adminEmail: string; timestamp: string }[];
     response?: string;
+}
+
+export interface Comment {
+    id: string;
+    userEmail: string;
+    userName: string;
+    text: string;
+    timestamp: string;
 }
 
 export interface Pet {
@@ -63,6 +74,9 @@ export interface Pet {
     adoptionRequirements?: string;
     shareContactInfo?: boolean;
     contactRequests?: string[];
+    lat?: number; // Coordenada Latitud
+    lng?: number; // Coordenada Longitud
+    comments?: Comment[];
 }
 
 export type ReportPostSnapshot = Pet;

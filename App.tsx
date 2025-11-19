@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 import { PetList } from './components/PetList';
 import { ReportPetForm } from './components/ReportPetForm';
 import { PetDetailPage } from './components/PetDetailPage';
-import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification, Campaign } from './types';
+import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification, Campaign, Comment } from './types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, CAMPAIGN_TYPES } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import ProfilePage from './components/ProfilePage';
@@ -21,6 +21,7 @@ import AdminUserDetailModal from './components/AdminUserDetailModal';
 import SupportPage from './components/SupportPage';
 import CampaignsPage from './components/CampaignsPage';
 import CampaignDetailPage from './components/CampaignDetailPage';
+import MapPage from './components/MapPage';
 
 const initialPets: Pet[] = [
     // 10 Mascotas Perdidas
@@ -609,6 +610,7 @@ const App: React.FC = () => {
                             ? p.imageUrls 
                             : ['https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'],
                         size: p.size || SIZES.MEDIANO, // Also good to have a fallback for size
+                        comments: p.comments || [] // Ensure comments array exists
                     }));
             }
             return initialPets; // Return default if data is malformed
@@ -823,6 +825,38 @@ const App: React.FC = () => {
             const newPet: Pet = { ...petData, id: new Date().toISOString(), userEmail: currentUser.email };
             setPets(prevPets => [newPet, ...prevPets]);
             setIsModalOpen(false);
+        }
+    };
+    
+    const handleAddComment = (petId: string, text: string) => {
+        if (!currentUser) return;
+
+        const newComment: Comment = {
+            id: `comment_${Date.now()}`,
+            userEmail: currentUser.email,
+            userName: currentUser.username || currentUser.email.split('@')[0],
+            text: text,
+            timestamp: new Date().toISOString(),
+        };
+
+        setPets(prevPets => prevPets.map(p => {
+            if (p.id === petId) {
+                return {
+                    ...p,
+                    comments: [...(p.comments || []), newComment]
+                };
+            }
+            return p;
+        }));
+        
+        // Optional: Create notification for pet owner
+        const pet = pets.find(p => p.id === petId);
+        if (pet && pet.userEmail !== currentUser.email) {
+            handleCreateNotification(
+                pet.userEmail, 
+                `@${currentUser.username} comentó en tu publicación de "${pet.name}"`, 
+                { type: 'pet', id: pet.id }
+            );
         }
     };
 
@@ -1234,6 +1268,7 @@ const App: React.FC = () => {
         if (path === '/admin') return 'admin';
         if (path === '/soporte') return 'support';
         if (path.startsWith('/campanas')) return 'campaigns';
+        if (path === '/mapa') return 'map';
         return 'list';
     };
 
@@ -1260,6 +1295,7 @@ const App: React.FC = () => {
                 onReport={handleAddReport}
                 onClose={() => navigate('/')}
                 onRecordContactRequest={handleRecordContactRequest}
+                onAddComment={handleAddComment} // Pass the handler
             />;
         }
 
@@ -1267,12 +1303,33 @@ const App: React.FC = () => {
         if (campaignDetailMatch) {
             const campaignId = campaignDetailMatch[1];
             const campaign = campaigns.find(c => c.id === campaignId);
-            if (!campaign) return (
-                <div className="text-center py-10">
-                    <h2 className="text-2xl font-bold">Campaña no encontrada</h2>
-                    <button onClick={() => navigate('/campanas')} className="text-brand-primary hover:underline mt-4 inline-block">&larr; Volver a campañas</button>
-                </div>
-            );
+            if (!campaign) {
+                // Fallback for legacy notifications where type was wrongly set to 'campaign' for pets
+                const pet = pets.find(p => p.id === campaignId);
+                if (pet) {
+                    return <PetDetailPage 
+                        pet={pet}
+                        onStartChat={handleStartChat}
+                        onEdit={handleOpenEditModal}
+                        onDelete={handleDeletePet}
+                        onGenerateFlyer={handleOpenFlyer}
+                        onUpdateStatus={handleUpdatePetStatus}
+                        users={users}
+                        onViewUser={handleViewUser}
+                        onReport={handleAddReport}
+                        onClose={() => navigate('/')}
+                        onRecordContactRequest={handleRecordContactRequest}
+                        onAddComment={handleAddComment}
+                    />;
+                }
+
+                return (
+                    <div className="text-center py-10">
+                        <h2 className="text-2xl font-bold">Campaña no encontrada</h2>
+                        <button onClick={() => navigate('/campanas')} className="text-brand-primary hover:underline mt-4 inline-block">&larr; Volver a campañas</button>
+                    </div>
+                );
+            }
             return <CampaignDetailPage campaign={campaign} onClose={() => navigate('/campanas')} />;
         }
 
@@ -1311,6 +1368,8 @@ const App: React.FC = () => {
                 return currentUser && <SupportPage currentUser={currentUser} userTickets={supportTickets.filter(t => t.userEmail === currentUser.email)} onAddTicket={handleAddSupportTicket} onBack={() => handleNavigate('/')} />;
             case '/campanas':
                 return <CampaignsPage campaigns={campaigns} onNavigate={navigate} />;
+            case '/mapa':
+                return <MapPage pets={pets} onNavigate={navigate} />;
             case '/':
             default:
                 return <PetList filters={filters} pets={filteredPets} users={users} onViewUser={handleViewUser} onNavigate={navigate} />;
@@ -1353,6 +1412,7 @@ const App: React.FC = () => {
                     onNavigateToMessages={() => handleNavigate('/mensajes')}
                     onNavigateToAdmin={() => handleNavigate('/admin')}
                     onNavigateToCampaigns={() => handleNavigate('/campanas')}
+                    onNavigateToMap={() => handleNavigate('/mapa')}
                 />
                 <main className="flex-1 p-6 md:p-10 overflow-y-auto">
                     {renderPage()}

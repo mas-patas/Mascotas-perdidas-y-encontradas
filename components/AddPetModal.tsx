@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { OwnedPet } from '../types';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
-import { XCircleIcon } from './icons';
+import { XCircleIcon, DogIcon, CatIcon } from './icons';
+import { compressImage } from '../utils/imageUtils';
+
 
 interface AddPetModalProps {
     onClose: () => void;
@@ -52,7 +54,7 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
         }
     }, [petToEdit, isEditMode]);
     
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
             if (imagePreviews.length + files.length > 3) {
@@ -67,11 +69,13 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
                         setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
                         continue;
                     }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setImagePreviews(prev => [...prev, reader.result as string]);
-                    };
-                    reader.readAsDataURL(file);
+                    try {
+                        const compressedBase64 = await compressImage(file);
+                        setImagePreviews(prev => [...prev, compressedBase64]);
+                    } catch (err) {
+                        console.error("Error compressing image:", err);
+                        setError("Error al procesar la imagen.");
+                    }
                 }
             }
         }
@@ -120,7 +124,7 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div className="p-6 relative">
                     <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
                     <h2 className="text-2xl font-bold text-brand-dark mb-6">{isEditMode ? 'Editar Mascota' : 'Agregar mi Mascota'}</h2>
@@ -135,11 +139,25 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-900">Tipo de Animal <span className="text-red-500">*</span></label>
-                                <select value={animalType} onChange={(e) => setAnimalType(e.target.value as 'Perro' | 'Gato')} className={inputClass} required>
-                                    <option value="Perro">Perro</option>
-                                    <option value="Gato">Gato</option>
-                                </select>
+                                <label className="block text-sm font-medium text-gray-900 mb-1">Tipo de Animal <span className="text-red-500">*</span></label>
+                                <div className="flex gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setAnimalType('Perro')}
+                                        className={`flex-1 flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${animalType === 'Perro' ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <DogIcon className="h-6 w-6 mb-1" />
+                                        <span className="text-xs font-bold">Perro</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setAnimalType('Gato')}
+                                        className={`flex-1 flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${animalType === 'Gato' ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <CatIcon className="h-6 w-6 mb-1" />
+                                        <span className="text-xs font-bold">Gato</span>
+                                    </button>
+                                </div>
                             </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-900">Raza <span className="text-red-500">*</span></label>
@@ -151,27 +169,29 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
 
                         <div className="p-4 bg-gray-50 rounded-md border">
                             <h3 className="text-sm font-medium text-gray-900 mb-2">Colores</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                  <div>
-                                    <label htmlFor="color1" className="block text-xs font-medium text-gray-900">Color Primario <span className="text-red-500">*</span></label>
-                                    <select id="color1" value={color1} onChange={(e) => setColor1(e.target.value)} className={inputClass} required>
+                                    <label htmlFor="color1" className="block text-xs font-medium text-gray-900 mb-2">Color Primario <span className="text-red-500">*</span></label>
+                                    <select value={color1} onChange={(e) => setColor1(e.target.value)} className={inputClass} required>
                                         <option value="">Seleccionar</option>
                                         {petColors.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
-                                <div>
-                                    <label htmlFor="color2" className="block text-xs font-medium text-gray-900">Color Secundario</label>
-                                    <select id="color2" value={color2} onChange={(e) => setColor2(e.target.value)} className={inputClass} disabled={!color1}>
-                                        <option value="">Ninguno</option>
-                                        {petColors.filter(c => c !== color1).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="color3" className="block text-xs font-medium text-gray-900">Tercer Color</label>
-                                    <select id="color3" value={color3} onChange={(e) => setColor3(e.target.value)} className={inputClass} disabled={!color1 || !color2}>
-                                        <option value="">Ninguno</option>
-                                        {petColors.filter(c => c !== color1 && c !== color2).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="color2" className="block text-xs font-medium text-gray-900">Color Secundario</label>
+                                        <select id="color2" value={color2} onChange={(e) => setColor2(e.target.value)} className={inputClass} disabled={!color1}>
+                                            <option value="">Ninguno</option>
+                                            {petColors.filter(c => c !== color1).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="color3" className="block text-xs font-medium text-gray-900">Tercer Color</label>
+                                        <select id="color3" value={color3} onChange={(e) => setColor3(e.target.value)} className={inputClass} disabled={!color1 || !color2}>
+                                            <option value="">Ninguno</option>
+                                            {petColors.filter(c => c !== color1 && c !== color2).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

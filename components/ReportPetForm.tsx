@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, PetStatus, PetSize, AnimalType, OwnedPet } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
 import { generatePetDescription } from '../services/geminiService';
-import { SparklesIcon, XCircleIcon } from './icons';
-import { locations, cities } from '../data/locations';
+import { SparklesIcon, XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon } from './icons';
+import { departments, getProvinces, getDistricts, locationCoordinates } from '../data/locations';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
+import { compressImage } from '../utils/imageUtils';
 
 
 interface ReportPetFormProps {
@@ -21,16 +23,32 @@ interface FormDataState {
     animalType: AnimalType;
     breed: string;
     size: PetSize;
-    city: string;
+    department: string;
+    province: string;
     district: string;
     address: string;
     contact: string;
     description: string;
     date: string;
+    lat?: number;
+    lng?: number;
 }
+
+// Helper for normalizing strings for comparison (removes accents, lowercase, specific prefixes)
+const normalizeLocationName = (name: string) => {
+    if (!name) return '';
+    return name.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/(provincia|departamento|distrito|region|municipalidad) de /g, "") // Remove prefixes
+        .trim();
+};
 
 export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit, petFromProfile }) => {
     const isEditMode = !!petToEdit;
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstance = useRef<any>(null);
+    const markerInstance = useRef<any>(null);
+    const isUpdatingFromMapRef = useRef(false); // Lock to prevent loop
 
     const [formData, setFormData] = useState<FormDataState>({
         status: initialStatus,
@@ -38,7 +56,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         animalType: ANIMAL_TYPES.PERRO,
         breed: dogBreeds[0],
         size: SIZES.MEDIANO,
-        city: '',
+        department: 'Lima',
+        province: '',
         district: '',
         address: '',
         contact: '',
@@ -51,6 +70,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const [color3, setColor3] = useState('');
     
     const [breeds, setBreeds] = useState(dogBreeds);
+    const [provinces, setProvinces] = useState<string[]>([]);
     const [districts, setDistricts] = useState<string[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -61,7 +81,214 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
     const isEncontrado = formData.status === PET_STATUS.ENCONTRADO;
     const isPerdido = formData.status === PET_STATUS.PERDIDO;
+
+    // Initialize Proviences for default Department
+    useEffect(() => {
+        if (formData.department) {
+            setProvinces(getProvinces(formData.department));
+        }
+    }, []);
     
+    // Initialize Map
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!mapRef.current) return;
+            
+            const L = (window as any).L;
+            if (!L || mapInstance.current) return;
+
+            const initialLat = formData.lat || locationCoordinates['Lima'].lat;
+            const initialLng = formData.lng || locationCoordinates['Lima'].lng;
+
+            mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(mapInstance.current);
+
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class='marker-pin ${formData.status === PET_STATUS.ENCONTRADO ? 'found' : formData.status === PET_STATUS.AVISTADO ? 'sighted' : 'lost'}'></div><i class='material-icons'></i>`,
+                iconSize: [30, 42],
+                iconAnchor: [15, 42]
+            });
+
+            const updateAddressFromCoords = async (lat: number, lng: number) => {
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const data = await response.json();
+                    
+                    if (data && data.address) {
+                        const addr = data.address;
+                        const road = addr.road || '';
+                        const number = addr.house_number || '';
+                        const newAddress = `${road} ${number}`.trim();
+
+                        // Logic to auto-detect Department, Province, District
+                        let newDept = '';
+                        let newProv = '';
+                        let newDist = '';
+                        let newProvincesList: string[] = [];
+                        let newDistrictsList: string[] = [];
+
+                        // 1. Identify Department
+                        const apiState = addr.state || addr.region;
+                        if (apiState) {
+                            const normalizedApiState = normalizeLocationName(apiState);
+                            newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || 
+                                      departments.find(d => normalizedApiState.includes(normalizeLocationName(d))) || '';
+                        }
+
+                        // 2. Identify Province
+                        if (newDept) {
+                            newProvincesList = getProvinces(newDept);
+                            // OSM can map province to 'province', 'region', 'city', or 'county'
+                            const apiProv = addr.province || addr.region || addr.city || addr.county;
+                            
+                            if (apiProv) {
+                                const normalizedApiProv = normalizeLocationName(apiProv);
+                                newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || 
+                                          newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
+                            }
+                            
+                             // Fallback: sometimes City name is the Province name (e.g. Lima)
+                            if (!newProv && addr.city) {
+                                const normalizedCity = normalizeLocationName(addr.city);
+                                newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
+                            }
+                        }
+
+                        // 3. Identify District
+                        if (newDept && newProv) {
+                            newDistrictsList = getDistricts(newDept, newProv);
+                            // OSM can map district to 'district', 'town', 'city_district', 'suburb', 'village', 'neighbourhood'
+                            const apiDist = addr.district || addr.town || addr.city_district || addr.suburb || addr.village || addr.neighbourhood;
+                            if (apiDist) {
+                                const normalizedApiDist = normalizeLocationName(apiDist);
+                                newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) ||
+                                          newDistrictsList.find(d => normalizedApiDist.includes(normalizeLocationName(d))) || '';
+                            }
+                        }
+                        
+                        isUpdatingFromMapRef.current = true;
+                        
+                        // Update lists if found - CRITICAL: These setters are async, so React might not update state immediately
+                        // but passing valid values to setFormData works because the select will pick it up if the list matches
+                        if (newProvincesList.length > 0) setProvinces(newProvincesList);
+                        if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
+
+                        setFormData(prev => ({ 
+                            ...prev, 
+                            address: newAddress || prev.address,
+                            department: newDept || prev.department,
+                            province: newProv || (newDept ? '' : prev.province),
+                            district: newDist || (newProv ? '' : prev.district)
+                        }));
+
+                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000); // Release lock
+                    }
+                } catch (err) {
+                    console.error("Reverse geocoding error", err);
+                }
+            };
+
+            const onDragEnd = (event: any) => {
+                const position = event.target.getLatLng();
+                setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
+                updateAddressFromCoords(position.lat, position.lng);
+            };
+
+            if (formData.lat && formData.lng) {
+                markerInstance.current = L.marker([formData.lat, formData.lng], { 
+                    icon: icon,
+                    draggable: true 
+                }).addTo(mapInstance.current);
+                markerInstance.current.on('dragend', onDragEnd);
+            }
+
+            mapInstance.current.on('click', (e: any) => {
+                const { lat, lng } = e.latlng;
+                if (markerInstance.current) {
+                    markerInstance.current.setLatLng([lat, lng]);
+                } else {
+                    markerInstance.current = L.marker([lat, lng], { icon, draggable: true }).addTo(mapInstance.current);
+                    markerInstance.current.on('dragend', onDragEnd);
+                }
+                setFormData(prev => ({ ...prev, lat, lng }));
+                updateAddressFromCoords(lat, lng);
+            });
+            
+            setTimeout(() => mapInstance.current.invalidateSize(), 200);
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, []); 
+
+    // Forward Geocoding (Address -> Coords)
+    useEffect(() => {
+        if (!formData.address || isUpdatingFromMapRef.current) return;
+
+        const timeoutId = setTimeout(async () => {
+            try {
+                // Construct cleaner query to avoid empty parts
+                const queryParts = [formData.address, formData.district, formData.province, formData.department, 'Peru'].filter(part => part && part.trim() !== '');
+                const query = queryParts.join(', ');
+                
+                if (!query) return;
+
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const { lat, lon } = data[0];
+                    const newLat = parseFloat(lat);
+                    const newLng = parseFloat(lon);
+
+                    setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
+
+                    if (mapInstance.current) {
+                        mapInstance.current.invalidateSize(); // Force refresh size
+                        mapInstance.current.setView([newLat, newLng], 16);
+                        if (markerInstance.current) {
+                            markerInstance.current.setLatLng([newLat, newLng]);
+                        } else {
+                            const L = (window as any).L;
+                            const icon = L.divIcon({
+                                className: 'custom-div-icon',
+                                html: `<div class='marker-pin ${formData.status === PET_STATUS.ENCONTRADO ? 'found' : formData.status === PET_STATUS.AVISTADO ? 'sighted' : 'lost'}'></div><i class='material-icons'></i>`,
+                                iconSize: [30, 42],
+                                iconAnchor: [15, 42]
+                            });
+                            markerInstance.current = L.marker([newLat, newLng], { icon, draggable: true }).addTo(mapInstance.current);
+                            
+                            markerInstance.current.on('dragend', (event: any) => {
+                                const position = event.target.getLatLng();
+                                setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Geocoding error:", error);
+            }
+        }, 1000); 
+
+        return () => clearTimeout(timeoutId);
+    }, [formData.address, formData.district, formData.province, formData.department]);
+
+    // Center map when Department or Province changes
+    useEffect(() => {
+        // If the update is coming from the map interaction (isUpdatingFromMapRef), do NOT re-center the map.
+        if (!mapInstance.current || isUpdatingFromMapRef.current) return;
+        
+        const coords = locationCoordinates[formData.province] || locationCoordinates[formData.department];
+        if (coords) {
+             mapInstance.current.invalidateSize();
+             mapInstance.current.setView([coords.lat, coords.lng], 10);
+        }
+    }, [formData.department, formData.province]);
+
+
     useEffect(() => {
         if (petFromProfile) {
             setFormData(prev => ({
@@ -70,8 +297,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 name: petFromProfile.name,
                 animalType: petFromProfile.animalType as AnimalType,
                 breed: petFromProfile.breed,
-                // The main description in the report form is about the incident,
-                // but we can pre-fill it with the pet's description as a starting point.
                 description: `Señas particulares: ${petFromProfile.description || 'No especificadas'}.`,
             }));
             const colors = petFromProfile.colors;
@@ -84,13 +309,29 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
     useEffect(() => {
         if (isEditMode && petToEdit) {
-            const locationParts = petToEdit.location.split(', ');
-            const city = cities.find(c => locationParts.includes(c)) || '';
-            if (city) {
-                setDistricts(locations[city as keyof typeof locations] || []);
+            // Attempt to parse location string: "Address, District, Province, Department"
+            const locationParts = petToEdit.location.split(', ').reverse(); // Dept, Prov, Dist, Addr
+            
+            let dept = 'Lima';
+            let prov = 'Lima';
+            let dist = '';
+            let addr = '';
+
+            if (locationParts.length >= 3) {
+                dept = locationParts[0] || 'Lima';
+                prov = locationParts[1] || '';
+                dist = locationParts[2] || '';
+                addr = locationParts.slice(3).reverse().join(', '); 
+            } else if (locationParts.length > 0) {
+                 const city = locationParts[0];
+                 if (city === 'Arequipa' || city === 'Cusco' || city === 'Trujillo' || city === 'Piura' || city === 'Chiclayo') {
+                     dept = city;
+                     prov = city;
+                 }
             }
-            const district = city ? (locations[city as keyof typeof locations] || []).find(d => locationParts.includes(d)) || '' : '';
-            const address = locationParts.filter(part => part !== city && part !== district).join(', ');
+            
+            setProvinces(getProvinces(dept));
+            setDistricts(getDistricts(dept, prov));
 
             let description = petToEdit.description;
             if (petToEdit.animalType === ANIMAL_TYPES.OTRO) {
@@ -117,12 +358,15 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 animalType: petToEdit.animalType,
                 breed: breed,
                 size: petToEdit.size || SIZES.MEDIANO,
-                city: city,
-                district: district,
-                address: address,
+                department: dept,
+                province: prov,
+                district: dist,
+                address: addr,
                 contact: petToEdit.contact === 'No aplica' ? '' : petToEdit.contact,
                 description: description,
                 date: petToEdit.date.split('T')[0],
+                lat: petToEdit.lat,
+                lng: petToEdit.lng
             });
             
             const colors = petToEdit.color.split(', ');
@@ -163,13 +407,26 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         setFormData(prev => ({ ...prev, [name]: value }));
     };
     
-    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedCity = e.target.value;
-        setFormData(prev => ({ ...prev, city: selectedCity, district: '' }));
-        setDistricts(locations[selectedCity as keyof typeof locations] || []);
+    const handleAnimalTypeChange = (type: AnimalType) => {
+        setFormData(prev => ({ ...prev, animalType: type }));
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const dept = e.target.value;
+        const newProvinces = getProvinces(dept);
+        setProvinces(newProvinces);
+        setDistricts([]);
+        setFormData(prev => ({ ...prev, department: dept, province: '', district: '' }));
+    };
+
+    const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const prov = e.target.value;
+        const newDistricts = getDistricts(formData.department, prov);
+        setDistricts(newDistricts);
+        setFormData(prev => ({ ...prev, province: prov, district: '' }));
+    };
+
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
             if (imagePreviews.length + files.length > 3) {
@@ -185,11 +442,13 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         continue;
                     }
 
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setImagePreviews(prev => [...prev, reader.result as string]);
-                    };
-                    reader.readAsDataURL(file);
+                    try {
+                        const compressedBase64 = await compressImage(file);
+                        setImagePreviews(prev => [...prev, compressedBase64]);
+                    } catch (err) {
+                        console.error("Error compressing image:", err);
+                        setError("Error al procesar la imagen. Intenta con otra.");
+                    }
                 }
             }
         }
@@ -216,6 +475,116 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const handleGetCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            alert("La geolocalización no es soportada por este navegador.");
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
+
+                if (mapInstance.current) {
+                    mapInstance.current.invalidateSize();
+                    mapInstance.current.setView([latitude, longitude], 16);
+
+                    const L = (window as any).L;
+                    if (markerInstance.current) {
+                        markerInstance.current.setLatLng([latitude, longitude]);
+                    } else {
+                        const icon = L.divIcon({
+                             className: 'custom-div-icon',
+                             html: `<div class='marker-pin ${formData.status === PET_STATUS.ENCONTRADO ? 'found' : formData.status === PET_STATUS.AVISTADO ? 'sighted' : 'lost'}'></div><i class='material-icons'></i>`,
+                             iconSize: [30, 42],
+                             iconAnchor: [15, 42]
+                         });
+                        markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
+                         markerInstance.current.on('dragend', (event: any) => {
+                             const pos = event.target.getLatLng();
+                             setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }));
+                         });
+                    }
+                }
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await response.json();
+                    if (data && data.address) {
+                        const addr = data.address;
+                        const road = addr.road || '';
+                        const number = addr.house_number || '';
+                        const newAddress = `${road} ${number}`.trim();
+                        
+                        if (newAddress) {
+                             isUpdatingFromMapRef.current = true;
+                             
+                             // Copied logic for consistency
+                             let newDept = '';
+                             let newProv = '';
+                             let newDist = '';
+                             let newProvincesList: string[] = [];
+                             let newDistrictsList: string[] = [];
+
+                             const apiState = addr.state || addr.region;
+                             if (apiState) {
+                                const normalizedApiState = normalizeLocationName(apiState);
+                                newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || 
+                                          departments.find(d => normalizedApiState.includes(normalizeLocationName(d))) || '';
+                             }
+
+                             if (newDept) {
+                                newProvincesList = getProvinces(newDept);
+                                const apiProv = addr.province || addr.region || addr.city || addr.county;
+                                if (apiProv) {
+                                    const normalizedApiProv = normalizeLocationName(apiProv);
+                                    newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || 
+                                              newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
+                                }
+                                // Fallback for city
+                                if (!newProv && addr.city) {
+                                    const normalizedCity = normalizeLocationName(addr.city);
+                                    newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
+                                }
+                             }
+
+                             if (newDept && newProv) {
+                                newDistrictsList = getDistricts(newDept, newProv);
+                                const apiDist = addr.district || addr.town || addr.city_district || addr.suburb || addr.village || addr.neighbourhood;
+                                if (apiDist) {
+                                    const normalizedApiDist = normalizeLocationName(apiDist);
+                                    newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) ||
+                                              newDistrictsList.find(d => normalizedApiDist.includes(normalizeLocationName(d))) || '';
+                                }
+                             }
+
+                             if (newProvincesList.length > 0) setProvinces(newProvincesList);
+                             if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
+
+                             setFormData(prev => ({ 
+                                 ...prev, 
+                                 address: newAddress,
+                                 department: newDept || prev.department,
+                                 province: newProv || (newDept ? '' : prev.province),
+                                 district: newDist || (newProv ? '' : prev.district)
+                             }));
+                             
+                             setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error reversing location", error);
+                }
+            },
+            (error: GeolocationPositionError) => {
+                console.error("Error getting location", error.message);
+                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos.");
+            }
+        );
     };
     
     const handleSubmit = (e: React.FormEvent) => {
@@ -268,13 +637,16 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             location: [
                 !isEncontrado ? formData.address : '',
                 formData.district,
-                formData.city,
+                formData.province,
+                formData.department
             ].filter(Boolean).join(', '),
             date: new Date(formData.date).toISOString(),
             contact: formData.status === PET_STATUS.AVISTADO ? 'No aplica' : formData.contact,
             description: finalDescription,
             imageUrls: imagePreviews,
             shareContactInfo: formData.status === PET_STATUS.AVISTADO ? false : shareContactInfo,
+            lat: formData.lat,
+            lng: formData.lng
         };
         
         onSubmit(petToSubmit, petToEdit?.id);
@@ -283,7 +655,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const inputClass = "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-center p-4">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <div className="p-6 relative">
                     <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
@@ -304,12 +676,33 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-900">Tipo de Animal <span className="text-red-500">*</span></label>
-                                <select name="animalType" value={formData.animalType} onChange={handleInputChange} className={inputClass} required>
-                                    <option value={ANIMAL_TYPES.PERRO}>Perro</option>
-                                    <option value={ANIMAL_TYPES.GATO}>Gato</option>
-                                    <option value={ANIMAL_TYPES.OTRO}>Otro</option>
-                                </select>
+                                <label className="block text-sm font-medium text-gray-900 mb-1">Tipo de Animal <span className="text-red-500">*</span></label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleAnimalTypeChange(ANIMAL_TYPES.PERRO)}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${formData.animalType === ANIMAL_TYPES.PERRO ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <DogIcon className="h-8 w-8 mb-1" />
+                                        <span className="text-xs font-bold">Perro</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleAnimalTypeChange(ANIMAL_TYPES.GATO)}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${formData.animalType === ANIMAL_TYPES.GATO ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <CatIcon className="h-8 w-8 mb-1" />
+                                        <span className="text-xs font-bold">Gato</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleAnimalTypeChange(ANIMAL_TYPES.OTRO)}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${formData.animalType === ANIMAL_TYPES.OTRO ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <InfoIcon />
+                                        <span className="text-xs font-bold mt-1">Otro</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -353,46 +746,82 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         
                         <div className="p-4 bg-gray-50 rounded-md border">
                             <h3 className="text-sm font-medium text-gray-900 mb-2">Colores</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                  <div>
-                                    <label className="block text-xs font-medium text-gray-900">Color Primario <span className="text-red-500">*</span></label>
+                                    <label className="block text-xs font-medium text-gray-900 mb-2">Color Primario <span className="text-red-500">*</span></label>
                                     <select value={color1} onChange={(e) => setColor1(e.target.value)} className={inputClass} required>
                                         <option value="">Seleccionar</option>
                                         {petColors.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-900">Color Secundario</label>
-                                    <select value={color2} onChange={(e) => setColor2(e.target.value)} className={inputClass} disabled={!color1}>
-                                        <option value="">Ninguno</option>
-                                        {petColors.filter(c => c !== color1).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-900">Tercer Color</label>
-                                    <select value={color3} onChange={(e) => setColor3(e.target.value)} className={inputClass} disabled={!color1 || !color2}>
-                                        <option value="">Ninguno</option>
-                                        {petColors.filter(c => c !== color1 && c !== color2).map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-900">Color Secundario</label>
+                                        <select value={color2} onChange={(e) => setColor2(e.target.value)} className={inputClass} disabled={!color1}>
+                                            <option value="">Ninguno</option>
+                                            {petColors.filter(c => c !== color1).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-900">Tercer Color</label>
+                                        <select value={color3} onChange={(e) => setColor3(e.target.value)} className={inputClass} disabled={!color1 || !color2}>
+                                            <option value="">Ninguno</option>
+                                            {petColors.filter(c => c !== color1 && c !== color2).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Hierarchical Location Fields */}
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-900">Ciudad <span className="text-red-500">*</span></label>
-                                <select name="city" value={formData.city} onChange={handleCityChange} className={inputClass} required>
-                                    <option value="">Selecciona una ciudad</option>
-                                    {cities.map(city => <option key={city} value={city}>{city}</option>)}
+                                <label className="block text-sm font-medium text-gray-900">Departamento <span className="text-red-500">*</span></label>
+                                <select name="department" value={formData.department} onChange={handleDepartmentChange} className={inputClass} required>
+                                    <option value="">Seleccionar</option>
+                                    {departments.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900">Provincia <span className="text-red-500">*</span></label>
+                                <select name="province" value={formData.province} onChange={handleProvinceChange} className={inputClass} required disabled={!formData.department}>
+                                    <option value="">Seleccionar</option>
+                                    {provinces.map(prov => <option key={prov} value={prov}>{prov}</option>)}
                                 </select>
                             </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-900">Distrito <span className="text-red-500">*</span></label>
-                                <select name="district" value={formData.district} onChange={handleInputChange} className={inputClass} required disabled={!formData.city || districts.length === 0}>
-                                    <option value="">Selecciona un distrito</option>
-                                    {districts.map(district => <option key={district} value={district}>{district}</option>)}
+                                <select name="district" value={formData.district} onChange={handleInputChange} className={inputClass} required disabled={!formData.province}>
+                                    <option value="">Seleccionar</option>
+                                    {districts.map(dist => <option key={dist} value={dist}>{dist}</option>)}
                                 </select>
                             </div>
+                        </div>
+                        
+                         <div>
+                            <label className="block text-sm font-medium text-gray-900">Calle / Número / Referencia <span className="text-red-500">*</span></label>
+                            <input type="text" name="address" value={formData.address} onChange={handleInputChange} className={`${inputClass}`} placeholder="Ej: Av. Arequipa 500" required />
+                        </div>
+
+                        {/* Interactive Map Section */}
+                        <div>
+                             <div className="flex justify-between items-end mb-2">
+                                <label className="block text-sm font-medium text-gray-900">Ubicación exacta (Opcional)</label>
+                                <button
+                                    type="button"
+                                    onClick={handleGetCurrentLocation}
+                                    className="flex items-center gap-2 text-sm font-bold text-white transition-colors bg-emerald-500 px-3 py-1.5 rounded-lg shadow hover:bg-emerald-600"
+                                    title="Usar mi ubicación actual"
+                                >
+                                    <CrosshairIcon /> Usar mi ubicación actual
+                                </button>
+                            </div>
+                            <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 relative">
+                                <div ref={mapRef} className="w-full h-full z-0" />
+                            </div>
+                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <LocationMarkerIcon /> Mueve el pin para ajustar. La dirección se actualizará automáticamente.
+                            </p>
                         </div>
 
                         <div>
@@ -408,13 +837,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             />
                         </div>
                         
-                        { !isEncontrado && (
-                             <div>
-                                <label className="block text-sm font-medium text-gray-900">Referencia del lugar <span className="text-red-500">*</span></label>
-                                <input type="text" name="address" value={formData.address} onChange={handleInputChange} className={`${inputClass}`} placeholder="Cerca del parque, frente a la tienda" required />
-                            </div>
-                         )}
-
                         <div>
                             <label className="block text-sm font-medium text-gray-900">
                                 Descripción

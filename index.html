@@ -21,6 +21,23 @@
       }
     }
     </script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+     
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+     <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+     
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
 <script type="importmap">
 {
   "imports": {
@@ -92,6 +109,49 @@
         background-color: rgba(29, 78, 216, 0.1);
         border-radius: 4px;
     }
+
+    /* Leaflet Custom Marker Styles */
+    .custom-div-icon {
+        background: transparent;
+        border: none;
+    }
+    .marker-pin {
+        width: 30px;
+        height: 30px;
+        border-radius: 50% 50% 50% 0;
+        background: #3073FA;
+        position: absolute;
+        transform: rotate(-45deg);
+        left: 50%;
+        top: 50%;
+        margin: -15px 0 0 -15px;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
+    }
+    .marker-pin::after {
+        content: '';
+        width: 14px;
+        height: 14px;
+        margin: 8px 0 0 8px;
+        background: #fff;
+        position: absolute;
+        border-radius: 50%;
+    }
+    
+    .marker-pin.lost { background: #EF4444; }
+    .marker-pin.found { background: #10B981; }
+    .marker-pin.sighted { background: #3B82F6; }
+    .marker-pin.adoption { background: #8B5CF6; }
+
+    .marker-icon-svg {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        left: 5px;
+        top: 2px; 
+        z-index: 10;
+        color: white;
+    }
+
 </style>
 </head>
 <body class="bg-gray-100">

@@ -7,6 +7,8 @@ import { EditIcon, PlusIcon, TrashIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
+import { compressImage } from '../utils/imageUtils';
+
 
 interface ProfilePageProps {
     user: User;
@@ -43,14 +45,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         setEditableUser(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setEditableUser(prev => ({ ...prev, avatarUrl: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
+             try {
+                // Resize avatars smaller (200x200)
+                const compressedBase64 = await compressImage(file, 200, 200);
+                setEditableUser(prev => ({ ...prev, avatarUrl: compressedBase64 }));
+            } catch (err) {
+                 console.error("Error compressing avatar:", err);
+                setError("Error al procesar la imagen de perfil.");
+            }
         }
     };
 

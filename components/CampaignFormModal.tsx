@@ -1,8 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Campaign, CampaignType } from '../types';
 import { CAMPAIGN_TYPES } from '../constants';
-import { XCircleIcon } from './icons';
+import { XCircleIcon, LocationMarkerIcon, CrosshairIcon } from './icons';
+import { compressImage } from '../utils/imageUtils';
+
 
 interface CampaignFormModalProps {
     isOpen: boolean;
@@ -13,14 +15,21 @@ interface CampaignFormModalProps {
 
 const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, onSave, campaignToEdit }) => {
     const isEditMode = !!campaignToEdit;
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstance = useRef<any>(null);
+    const markerInstance = useRef<any>(null);
+    const isUpdatingFromMapRef = useRef(false);
+
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [type, setType] = useState<CampaignType>(CAMPAIGN_TYPES.ESTERILIZACION);
     const [date, setDate] = useState('');
-    const [location, setLocation] = useState('');
+    const [location, setLocation] = useState(''); // Used as address now
     const [contactPhone, setContactPhone] = useState('');
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [error, setError] = useState('');
+    const [lat, setLat] = useState<number | undefined>(undefined);
+    const [lng, setLng] = useState<number | undefined>(undefined);
 
     useEffect(() => {
         if (isOpen && campaignToEdit) {
@@ -31,8 +40,9 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             setLocation(campaignToEdit.location);
             setContactPhone(campaignToEdit.contactPhone || '');
             setImagePreviews(campaignToEdit.imageUrls);
+            setLat(campaignToEdit.lat);
+            setLng(campaignToEdit.lng);
         } else {
-            // Reset form when opening for creation
             setTitle('');
             setDescription('');
             setType(CAMPAIGN_TYPES.ESTERILIZACION);
@@ -40,12 +50,182 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             setLocation('');
             setContactPhone('');
             setImagePreviews([]);
+            setLat(undefined);
+            setLng(undefined);
         }
     }, [isOpen, campaignToEdit]);
 
+    // Initialize Map
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!mapRef.current || !isOpen) return;
+            
+            const L = (window as any).L;
+            if (!L) return;
+            
+            // Update function for reverse geocoding
+            const updateAddressFromCoords = async (latitude: number, longitude: number) => {
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        isUpdatingFromMapRef.current = true;
+                        // Use display_name for campaigns as it's more descriptive for events
+                        setLocation(data.display_name);
+                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                    }
+                } catch (err) {
+                    console.error("Reverse geocoding error", err);
+                }
+            };
+
+            if (mapInstance.current) {
+                mapInstance.current.invalidateSize();
+                if (lat && lng) {
+                    mapInstance.current.setView([lat, lng], 15);
+                    if (!markerInstance.current) {
+                        const icon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div class='marker-pin sighted'></div><i class='material-icons'></i>`,
+                            iconSize: [30, 42],
+                            iconAnchor: [15, 42]
+                        });
+                         markerInstance.current = L.marker([lat, lng], { 
+                            icon: icon,
+                            draggable: true 
+                        }).addTo(mapInstance.current);
+                         markerInstance.current.on('dragend', (event: any) => {
+                            const position = event.target.getLatLng();
+                            setLat(position.lat);
+                            setLng(position.lng);
+                            updateAddressFromCoords(position.lat, position.lng);
+                        });
+                    } else {
+                        markerInstance.current.setLatLng([lat, lng]);
+                    }
+                }
+                return;
+            }
+
+            // Default center (Lima)
+            const initialLat = lat || -12.046374;
+            const initialLng = lng || -77.042793;
+
+            mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(mapInstance.current);
+
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class='marker-pin sighted'></div><i class='material-icons'></i>`,
+                iconSize: [30, 42],
+                iconAnchor: [15, 42]
+            });
+            
+            if (lat && lng) {
+                markerInstance.current = L.marker([lat, lng], { 
+                    icon: icon,
+                    draggable: true 
+                }).addTo(mapInstance.current);
+                 markerInstance.current.on('dragend', (event: any) => {
+                    const position = event.target.getLatLng();
+                    setLat(position.lat);
+                    setLng(position.lng);
+                    updateAddressFromCoords(position.lat, position.lng);
+                });
+            }
+
+            mapInstance.current.on('click', (e: any) => {
+                const { lat, lng } = e.latlng;
+                
+                if (markerInstance.current) {
+                    markerInstance.current.setLatLng([lat, lng]);
+                } else {
+                    markerInstance.current = L.marker([lat, lng], { 
+                        icon: icon,
+                        draggable: true 
+                    }).addTo(mapInstance.current);
+                    
+                    markerInstance.current.on('dragend', (event: any) => {
+                        const position = event.target.getLatLng();
+                        setLat(position.lat);
+                        setLng(position.lng);
+                        updateAddressFromCoords(position.lat, position.lng);
+                    });
+                }
+                setLat(lat);
+                setLng(lng);
+                updateAddressFromCoords(lat, lng);
+            });
+            
+            setTimeout(() => {
+                mapInstance.current.invalidateSize();
+            }, 200);
+
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [isOpen]);
+
+
+    // Geocoding Logic for Campaign Location
+    useEffect(() => {
+        if (!location || isUpdatingFromMapRef.current) return;
+
+        const timeoutId = setTimeout(async () => {
+            try {
+                const query = `${location}, Peru`;
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const { lat, lon } = data[0];
+                    const newLat = parseFloat(lat);
+                    const newLng = parseFloat(lon);
+
+                    setLat(newLat);
+                    setLng(newLng);
+
+                    if (mapInstance.current) {
+                        mapInstance.current.invalidateSize(); // Fix: Ensure map is resized properly
+                        mapInstance.current.setView([newLat, newLng], 16);
+                        
+                        const L = (window as any).L;
+                        const icon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div class='marker-pin sighted'></div><i class='material-icons'></i>`,
+                            iconSize: [30, 42],
+                            iconAnchor: [15, 42]
+                        });
+
+                        if (markerInstance.current) {
+                            markerInstance.current.setLatLng([newLat, newLng]);
+                        } else {
+                            markerInstance.current = L.marker([newLat, newLng], { 
+                                icon: icon,
+                                draggable: true 
+                            }).addTo(mapInstance.current);
+                             markerInstance.current.on('dragend', (event: any) => {
+                                const position = event.target.getLatLng();
+                                setLat(position.lat);
+                                setLng(position.lng);
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Geocoding error:", error);
+            }
+        }, 1000);
+
+        return () => clearTimeout(timeoutId);
+    }, [location]);
+
     if (!isOpen) return null;
     
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
             if (imagePreviews.length + files.length > 3) {
@@ -60,11 +240,13 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                         setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
                         continue;
                     }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setImagePreviews(prev => [...prev, reader.result as string]);
-                    };
-                    reader.readAsDataURL(file);
+                     try {
+                        const compressedBase64 = await compressImage(file);
+                        setImagePreviews(prev => [...prev, compressedBase64]);
+                    } catch (err) {
+                         console.error("Error compressing image:", err);
+                        setError("Error al procesar la imagen.");
+                    }
                 }
             }
         }
@@ -72,6 +254,61 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
     
     const handleRemoveImage = (indexToRemove: number) => {
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleGetCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            alert("La geolocalización no es soportada por este navegador.");
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                setLat(latitude);
+                setLng(longitude);
+
+                if (mapInstance.current) {
+                    mapInstance.current.invalidateSize();
+                    mapInstance.current.setView([latitude, longitude], 16);
+
+                    const L = (window as any).L;
+                    if (markerInstance.current) {
+                        markerInstance.current.setLatLng([latitude, longitude]);
+                    } else {
+                        const icon = L.divIcon({
+                             className: 'custom-div-icon',
+                             html: `<div class='marker-pin sighted'></div><i class='material-icons'></i>`,
+                             iconSize: [30, 42],
+                             iconAnchor: [15, 42]
+                         });
+                        markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
+                         markerInstance.current.on('dragend', (event: any) => {
+                             const pos = event.target.getLatLng();
+                             setLat(pos.lat);
+                             setLng(pos.lng);
+                         });
+                    }
+                }
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        isUpdatingFromMapRef.current = true;
+                        setLocation(data.display_name);
+                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                    }
+                } catch (error) {
+                    console.error("Error reversing location", error);
+                }
+            },
+            (error: GeolocationPositionError) => {
+                console.error("Error getting location", error.message);
+                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos.");
+            }
+        );
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -91,6 +328,8 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             date: new Date(date).toISOString(),
             imageUrls: imagePreviews,
             contactPhone,
+            lat,
+            lng,
         };
 
         onSave(campaignData, campaignToEdit?.id);
@@ -99,7 +338,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
     const inputClass = "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-center p-4">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b">
                     <h2 className="text-2xl font-bold text-brand-dark">{isEditMode ? 'Editar Campaña' : 'Crear Nueva Campaña'}</h2>
@@ -115,10 +354,23 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="type" className="block text-sm font-medium text-gray-900">Tipo</label>
-                                <select id="type" value={type} onChange={(e) => setType(e.target.value as CampaignType)} className={inputClass} required>
-                                    {Object.values(CAMPAIGN_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                                <label className="block text-sm font-medium text-gray-900 mb-1">Tipo</label>
+                                <div className="flex bg-gray-100 p-1 rounded-lg">
+                                    <button
+                                        type="button"
+                                        onClick={() => setType(CAMPAIGN_TYPES.ESTERILIZACION)}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${type === CAMPAIGN_TYPES.ESTERILIZACION ? 'bg-white shadow text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Esterilización
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setType(CAMPAIGN_TYPES.ADOPCION)}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${type === CAMPAIGN_TYPES.ADOPCION ? 'bg-white shadow text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        Adopción
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label htmlFor="date" className="block text-sm font-medium text-gray-900">Fecha</label>
@@ -128,7 +380,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="location" className="block text-sm font-medium text-gray-900">Lugar</label>
+                                <label htmlFor="location" className="block text-sm font-medium text-gray-900">Lugar / Dirección</label>
                                 <input id="location" type="text" value={location} onChange={(e) => setLocation(e.target.value)} className={inputClass} placeholder="Ej: Parque Central, Miraflores, Lima" required />
                             </div>
                             <div>
@@ -137,6 +389,27 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                             </div>
                         </div>
                         
+                        {/* Map Section */}
+                        <div>
+                             <div className="flex justify-between items-end mb-2">
+                                <label className="block text-sm font-medium text-gray-900">Ubicación exacta del evento</label>
+                                <button
+                                    type="button"
+                                    onClick={handleGetCurrentLocation}
+                                    className="flex items-center gap-2 text-sm font-bold text-white transition-colors bg-emerald-500 px-3 py-1.5 rounded-lg shadow hover:bg-emerald-600"
+                                    title="Usar mi ubicación actual"
+                                >
+                                    <CrosshairIcon /> Usar mi ubicación actual
+                                </button>
+                            </div>
+                            <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 relative">
+                                <div ref={mapRef} className="w-full h-full z-0" />
+                            </div>
+                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <LocationMarkerIcon /> El mapa se actualiza al escribir. Mueve el pin para ajustar la dirección.
+                            </p>
+                        </div>
+
                         <div>
                             <label htmlFor="description" className="block text-sm font-medium text-gray-900">Descripción</label>
                             <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className={inputClass} required />
