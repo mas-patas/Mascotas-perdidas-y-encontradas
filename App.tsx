@@ -66,8 +66,8 @@ const App: React.FC = () => {
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     
-    // Admin Settings
-    const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
+    // Admin Settings - Disabled by default for simplicity
+    const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(false);
 
     // 1. FETCH REAL DATA FROM SUPABASE
     useEffect(() => {

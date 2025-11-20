@@ -60,25 +60,35 @@ export const uploadImage = async (file: File, bucket: string = 'pet-images'): Pr
         const res = await fetch(base64);
         const blob = await res.blob();
 
-        // 3. Generate unique filename
+        // 3. Generate unique filename (sanitize to safe chars)
         const fileExt = 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        
+        // Ensure user is authenticated before upload (though RLS handles the check)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error("Debes iniciar sesión para subir imágenes.");
+        }
 
         // 4. Upload to Supabase
         const { error: uploadError } = await supabase.storage
             .from(bucket)
-            .upload(filePath, blob, {
+            .upload(fileName, blob, {
                 contentType: 'image/jpeg',
                 upsert: false
             });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+            if (uploadError.message.includes('row-level security policy')) {
+                console.error("ERROR DE PERMISOS: Debes configurar las Policies en Supabase Storage para el bucket 'pet-images'. Revisa la consola para ver el script SQL necesario.");
+            }
+            throw uploadError;
+        }
 
         // 5. Get Public URL
         const { data } = supabase.storage
             .from(bucket)
-            .getPublicUrl(filePath);
+            .getPublicUrl(fileName);
 
         return data.publicUrl;
     } catch (error) {
