@@ -73,7 +73,7 @@ const CommentListAndInput: React.FC<{
                                 onChange={(e) => setNewComment(e.target.value)}
                                 placeholder="Escribe una pista o comentario..."
                                 rows={1}
-                                className="w-full p-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm resize-none bg-gray-100 text-gray-900 placeholder-gray-500"
+                                className="w-full p-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm resize-none bg-gray-100 text-gray-900 placeholder-gray-600"
                                 style={{ minHeight: '46px' }}
                             />
                         </div>
@@ -87,8 +87,9 @@ const CommentListAndInput: React.FC<{
                         </button>
                     </form>
                 ) : (
-                    <div className="bg-blue-50 p-3 rounded-md text-center">
-                        <p className="text-sm text-blue-800">Inicia sesión para dejar un comentario.</p>
+                    <div className="bg-blue-50 p-4 rounded-md text-center border border-blue-100">
+                        <p className="text-sm text-blue-800 font-medium">Inicia sesión para dejar un comentario o pista.</p>
+                        <a href="#/login" className="text-xs text-brand-primary hover:underline mt-1 inline-block">Ir al login</a>
                     </div>
                 )}
             </div>
@@ -218,7 +219,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
     const generateStoryImage = async () => {
         return new Promise<string>((resolve, reject) => {
             const canvas = document.createElement('canvas');
-            // 1080x1920 (9:16 aspect ratio for stories)
             canvas.width = 1080;
             canvas.height = 1920;
             const ctx = canvas.getContext('2d');
@@ -229,39 +229,34 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
             img.src = pet.imageUrls[0];
 
             img.onload = () => {
-                // Background: Fill with brand/status color or blurred image
-                ctx.fillStyle = pet.status === PET_STATUS.PERDIDO ? '#EF4444' : '#10B981'; // Red or Green
+                ctx.fillStyle = pet.status === PET_STATUS.PERDIDO ? '#EF4444' : '#10B981';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // White Container for content
                 const margin = 80;
                 const cardWidth = canvas.width - (margin * 2);
-                const cardHeight = canvas.height - (margin * 4); // leave space top/bottom
+                const cardHeight = canvas.height - (margin * 4);
                 const cardY = margin * 2;
                 
                 ctx.fillStyle = '#FFFFFF';
                 ctx.roundRect(margin, cardY, cardWidth, cardHeight, 40);
                 ctx.fill();
                 
-                // Header Text (Status)
                 ctx.fillStyle = pet.status === PET_STATUS.PERDIDO ? '#DC2626' : '#059669';
                 ctx.font = 'bold 80px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(pet.status.toUpperCase(), canvas.width / 2, cardY + 120);
 
-                // Pet Image (Square-ish crop)
                 const imgSize = 800;
                 const imgX = (canvas.width - imgSize) / 2;
                 const imgY = cardY + 160;
                 
-                // Draw image cropped/fitted
                 let sWidth = img.width;
                 let sHeight = img.height;
                 let sx = 0;
                 let sy = 0;
                 
                 if (sWidth > sHeight) {
-                    sWidth = sHeight; // Crop center square
+                    sWidth = sHeight;
                     sx = (img.width - sHeight) / 2;
                 } else {
                     sHeight = sWidth;
@@ -275,27 +270,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
                 ctx.drawImage(img, sx, sy, sWidth, sHeight, imgX, imgY, imgSize, imgSize);
                 ctx.restore();
 
-                // Pet Name
-                ctx.fillStyle = '#1F2937'; // Dark Gray
+                ctx.fillStyle = '#1F2937';
                 ctx.font = 'bold 90px Arial';
                 ctx.fillText(pet.name, canvas.width / 2, imgY + imgSize + 100);
 
-                // Breed & Color
-                ctx.fillStyle = '#4B5563'; // Gray
+                ctx.fillStyle = '#4B5563';
                 ctx.font = '50px Arial';
                 ctx.fillText(`${pet.breed} - ${pet.color}`, canvas.width / 2, imgY + imgSize + 180);
 
-                // Location Icon & Text logic simulation
                 ctx.fillStyle = '#374151';
                 ctx.font = 'bold 40px Arial';
                 ctx.fillText("📍 " + pet.location.substring(0, 30) + (pet.location.length > 30 ? '...' : ''), canvas.width / 2, imgY + imgSize + 280);
 
-                // Call to Action
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 50px Arial';
                 ctx.fillText("¡AYÚDAME A VOLVER A CASA!", canvas.width / 2, canvas.height - margin * 3);
                 
-                // Small attribution
                 ctx.fillStyle = '#6B7280';
                 ctx.font = '30px Arial';
                 ctx.fillText("Publicado en Pets App", canvas.width / 2, canvas.height - margin * 2);
@@ -307,7 +297,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
     };
 
     const handleShare = async (platform: 'facebook' | 'whatsapp' | 'copy' | 'native_story') => {
-        setShareCount(prev => prev + 1); // Increment local share counter
+        setShareCount(prev => prev + 1);
         
         let pageUrl = window.location.href;
         try {
@@ -336,7 +326,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
                         text: shareText
                     });
                 } else {
-                    // Fallback: download image
                     const link = document.createElement('a');
                     link.href = dataUrl;
                     link.download = `historia_${pet.name}.png`;
@@ -427,43 +416,48 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
     );
 
     const SocialActionBar = () => (
-        <div className="mt-2 border-t border-b border-gray-300 py-1">
-            <div className="flex justify-between items-center px-4 py-2 text-gray-500 text-sm">
-               <div className="flex items-center gap-2">
-                    <div className="bg-brand-primary text-white rounded-full p-1">
-                       <ThumbUpIcon />
-                    </div>
-                    <span>{likeCount}</span>
-               </div>
-               <div className="flex gap-4">
-                    <span>{pet.comments?.length || 0} comentarios</span>
-                    <span>{shareCount} veces compartido</span>
-               </div>
+        <>
+            <div className="bg-blue-50 border border-blue-100 text-blue-800 px-4 py-2 text-sm text-center rounded-t-lg">
+                ¿Tienes información sobre esta mascota? Deja un comentario o contacta al dueño.
             </div>
-            <div className="flex border-t border-gray-200">
-                <button 
-                    onClick={handleToggleLike}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors font-semibold text-sm ${isLiked ? 'text-brand-primary' : 'text-gray-600'}`}
-                >
-                    <ThumbUpIcon /> Me gusta
-                </button>
-                <button 
-                    onClick={() => setIsCommentModalOpen(true)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-sm"
-                >
-                    <ChatBubbleIcon /> Comentar
-                </button>
-                <button 
-                    onClick={() => setIsShareModalOpen(true)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-sm"
-                >
-                    <div className="transform -scale-x-100">
-                        <SendIcon />
-                    </div>
-                    Compartir
-                </button>
+            <div className="border border-gray-300 border-t-0 rounded-b-lg py-1 mb-4">
+                <div className="flex justify-between items-center px-4 py-2 text-gray-500 text-sm">
+                   <div className="flex items-center gap-2">
+                        <div className="bg-brand-primary text-white rounded-full p-1">
+                           <ThumbUpIcon />
+                        </div>
+                        <span>{likeCount}</span>
+                   </div>
+                   <div className="flex gap-4">
+                        <span>{pet.comments?.length || 0} comentarios</span>
+                        <span>{shareCount} veces compartido</span>
+                   </div>
+                </div>
+                <div className="flex border-t border-gray-200">
+                    <button 
+                        onClick={handleToggleLike}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors font-semibold text-sm ${isLiked ? 'text-brand-primary' : 'text-gray-600'}`}
+                    >
+                        <ThumbUpIcon /> Me gusta
+                    </button>
+                    <button 
+                        onClick={() => setIsCommentModalOpen(true)}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-sm"
+                    >
+                        <ChatBubbleIcon /> Comentar
+                    </button>
+                    <button 
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 hover:bg-gray-100 transition-colors text-gray-600 font-semibold text-sm"
+                    >
+                        <div className="transform -scale-x-100">
+                            <SendIcon />
+                        </div>
+                        Compartir
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
     );
 
     const ActionButtons = () => (
@@ -482,13 +476,17 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
             )}
 
             {/* Contact Button (First) */}
-            {currentUser && !isOwner && (
+            {(!isOwner) && (
                 <button
-                    onClick={() => onStartChat(pet)}
-                    className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-brand-dark transition-colors shadow-md"
+                    onClick={() => currentUser ? onStartChat(pet) : window.location.hash = '/login'}
+                    className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
+                        currentUser 
+                        ? 'bg-brand-primary text-white hover:bg-brand-dark' 
+                        : 'bg-blue-400 text-white hover:bg-blue-500'
+                    }`}
                 >
                     <ChatBubbleIcon />
-                    <span>Contactar por Mensaje</span>
+                    <span>{currentUser ? 'Contactar por Mensaje' : 'Inicia sesión para contactar'}</span>
                 </button>
             )}
 
@@ -507,13 +505,17 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet, onClose, onSt
                                 </div>
                             </div>
                         ) : (
-                            currentUser && !isOwner && (
+                            (!isOwner) && (
                                 <button
-                                    onClick={handleRevealContact}
-                                    className="w-full flex items-center justify-center gap-2 bg-green-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-800 transition-colors shadow-md"
+                                    onClick={() => currentUser ? handleRevealContact() : window.location.hash = '/login'}
+                                    className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
+                                        currentUser 
+                                        ? 'bg-green-700 text-white hover:bg-green-800'
+                                        : 'bg-green-500 text-white hover:bg-green-600'
+                                    }`}
                                 >
                                     <PhoneIcon />
-                                    <span>Mostrar Información de Contacto</span>
+                                    <span>{currentUser ? 'Mostrar Información de Contacto' : 'Inicia sesión para ver contacto'}</span>
                                 </button>
                             )
                         )}

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { GoogleIcon, AppleIcon } from './icons';
 
@@ -6,10 +7,16 @@ const AuthPage: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [dni, setDni] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { login, register, loginWithGoogle, loginWithApple } = useAuth();
+    const { login, register, loginWithGoogle, loginWithApple, currentUser } = useAuth();
+
+    // Auto-redirect if already logged in
+    useEffect(() => {
+        if (currentUser) {
+            window.location.hash = '/';
+        }
+    }, [currentUser]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,18 +27,16 @@ const AuthPage: React.FC = () => {
             if (isLogin) {
                 await login(email, password);
             } else {
-                if (!/^\d{8}$/.test(dni)) {
-                    setError('El DNI es obligatorio y debe contener exactamente 8 dígitos.');
-                    setLoading(false);
-                    return;
-                }
-                await register(email, password, dni);
+                await register(email, password);
             }
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error.');
-        } finally {
-            setLoading(false);
+            setLoading(false); // Ensure loading is reset on error
         }
+        // Note: We don't set loading(false) on success here because the app will redirect/reload
+        // and setting it might cause a flicker. However, if redirection is handled by useEffect,
+        // we might want to reset it if the component persists.
+        // For now, rely on useEffect redirect or error catch.
     };
 
     const handleSocialLogin = async (provider: 'google' | 'apple') => {
@@ -46,7 +51,6 @@ const AuthPage: React.FC = () => {
             }
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error con el inicio de sesión social.');
-        } finally {
             setLoading(false);
         }
     }
@@ -82,23 +86,6 @@ const AuthPage: React.FC = () => {
                             required
                         />
                     </div>
-                    {!isLogin && (
-                        <div>
-                            <label htmlFor="dni" className="block text-sm font-medium text-gray-900">Número de DNI <span className="text-red-500">*</span></label>
-                            <input
-                                id="dni"
-                                type="text"
-                                name="dni"
-                                value={dni}
-                                onChange={(e) => setDni(e.target.value)}
-                                className={inputClass}
-                                placeholder="12345678"
-                                required
-                                pattern="\d{8}"
-                                title="El DNI debe contener 8 dígitos numéricos."
-                            />
-                        </div>
-                    )}
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-900">Contraseña</label>
                         <input
@@ -146,7 +133,7 @@ const AuthPage: React.FC = () => {
 
 
                 <div className="mt-6 text-center">
-                    <button onClick={() => { setIsLogin(!isLogin); setError(''); setDni(''); }} className="text-sm text-brand-primary hover:underline">
+                    <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-sm text-brand-primary hover:underline">
                         {isLogin ? '¿No tienes una cuenta? Regístrate' : '¿Ya tienes una cuenta? Inicia sesión'}
                     </button>
                 </div>

@@ -105,6 +105,7 @@ export interface OwnedPet {
 }
 
 export interface User {
+    id?: string; // Added ID for DB linking
     email: string;
     role: UserRole;
     status?: UserStatus;

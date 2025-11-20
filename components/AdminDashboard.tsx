@@ -27,13 +27,6 @@ interface AdminDashboardProps {
     onNavigate: (path: string) => void;
 }
 
-const getRoleForUser = (email: string): UserRole => {
-    if (email === 'super@admin.com' || email === 'roger1771@gmail.com') return USER_ROLES.SUPERADMIN;
-    if (email === 'admin@admin.com') return USER_ROLES.ADMIN;
-    if (email === 'mod@moderator.com') return USER_ROLES.MODERATOR;
-    return USER_ROLES.USER;
-};
-
 const formatDateSafe = (dateString: string) => {
     try {
         const d = new Date(dateString);

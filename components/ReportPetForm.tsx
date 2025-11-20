@@ -6,7 +6,7 @@ import { generatePetDescription } from '../services/geminiService';
 import { SparklesIcon, XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon } from './icons';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '../data/locations';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
-import { compressImage } from '../utils/imageUtils';
+import { uploadImage } from '../utils/imageUtils';
 
 
 interface ReportPetFormProps {
@@ -74,6 +74,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const [districts, setDistricts] = useState<string[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
     const [customAnimalType, setCustomAnimalType] = useState('');
     const [customBreed, setCustomBreed] = useState('');
@@ -433,23 +434,31 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 setError('Puedes subir un máximo de 3 fotos.');
                 return;
             }
+            
+            setIsUploading(true);
+            setError('');
+            
             const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-            for (let i = 0; i < files.length; i++) {
-                const file = files.item(i);
-                if (file) {
-                    if (!supportedTypes.includes(file.type)) {
-                        setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
-                        continue;
-                    }
+            const newImages: string[] = [];
 
-                    try {
-                        const compressedBase64 = await compressImage(file);
-                        setImagePreviews(prev => [...prev, compressedBase64]);
-                    } catch (err) {
-                        console.error("Error compressing image:", err);
-                        setError("Error al procesar la imagen. Intenta con otra.");
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files.item(i);
+                    if (file) {
+                        if (!supportedTypes.includes(file.type)) {
+                            setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+                            continue;
+                        }
+                        const publicUrl = await uploadImage(file);
+                        newImages.push(publicUrl);
                     }
                 }
+                setImagePreviews(prev => [...prev, ...newImages]);
+            } catch (err: any) {
+                console.error("Error uploading image:", err);
+                setError("Error al subir la imagen. Intenta de nuevo.");
+            } finally {
+                setIsUploading(false);
             }
         }
     };
@@ -862,7 +871,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         
                         <div>
                             <label className="block text-sm font-medium text-gray-900">Fotos de la Mascota (hasta 3) <span className="text-red-500">*</span></label>
-                            <input type="file" accept="image/jpeg, image/png, image/webp" multiple onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-light file:text-brand-primary hover:file:bg-blue-100" disabled={imagePreviews.length >= 3}/>
+                            <input type="file" accept="image/jpeg, image/png, image/webp" multiple onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-light file:text-brand-primary hover:file:bg-blue-100" disabled={imagePreviews.length >= 3 || isUploading}/>
+                            {isUploading && <p className="text-sm text-blue-600 mt-1">Subiendo imágenes...</p>}
                             {imagePreviews.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {imagePreviews.map((preview, index) => (
@@ -902,8 +912,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         
                         <div className="pt-4 flex justify-end gap-3">
                             <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark">
-                                {isEditMode ? 'Guardar Cambios' : 'Publicar Reporte'}
+                            <button type="submit" disabled={isUploading} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
                             </button>
                         </div>
                     </form>

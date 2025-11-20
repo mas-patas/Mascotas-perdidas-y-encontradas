@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Campaign, CampaignType } from '../types';
 import { CAMPAIGN_TYPES } from '../constants';
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon } from './icons';
-import { compressImage } from '../utils/imageUtils';
+import { uploadImage } from '../utils/imageUtils';
 
 
 interface CampaignFormModalProps {
@@ -27,6 +27,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
     const [location, setLocation] = useState(''); // Used as address now
     const [contactPhone, setContactPhone] = useState('');
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
     const [lat, setLat] = useState<number | undefined>(undefined);
     const [lng, setLng] = useState<number | undefined>(undefined);
@@ -232,22 +233,31 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                 setError('Puedes subir un máximo de 3 fotos.');
                 return;
             }
+            
+            setIsUploading(true);
+            setError('');
+            
             const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-            for (let i = 0; i < files.length; i++) {
-                const file = files.item(i);
-                if (file) {
-                    if (!supportedTypes.includes(file.type)) {
-                        setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
-                        continue;
-                    }
-                     try {
-                        const compressedBase64 = await compressImage(file);
-                        setImagePreviews(prev => [...prev, compressedBase64]);
-                    } catch (err) {
-                         console.error("Error compressing image:", err);
-                        setError("Error al procesar la imagen.");
+            const newImages: string[] = [];
+
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files.item(i);
+                    if (file) {
+                        if (!supportedTypes.includes(file.type)) {
+                            setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+                            continue;
+                        }
+                        const publicUrl = await uploadImage(file);
+                        newImages.push(publicUrl);
                     }
                 }
+                setImagePreviews(prev => [...prev, ...newImages]);
+            } catch (err: any) {
+                console.error("Error uploading image:", err);
+                setError("Error al subir la imagen. Intenta de nuevo.");
+            } finally {
+                setIsUploading(false);
             }
         }
     };
@@ -417,7 +427,8 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
 
                         <div>
                             <label className="block text-sm font-medium text-gray-900">Imágenes (hasta 3)</label>
-                            <input type="file" accept="image/*" multiple onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-light file:text-brand-primary hover:file:bg-blue-100" disabled={imagePreviews.length >= 3} />
+                            <input type="file" accept="image/*" multiple onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-light file:text-brand-primary hover:file:bg-blue-100" disabled={imagePreviews.length >= 3 || isUploading} />
+                            {isUploading && <p className="text-sm text-blue-600 mt-1">Subiendo imágenes...</p>}
                             {imagePreviews.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {imagePreviews.map((preview, index) => (
@@ -434,8 +445,8 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                     </div>
                     <div className="p-4 bg-gray-50 border-t flex justify-end gap-3 rounded-b-lg">
                         <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark">
-                            {isEditMode ? 'Guardar Cambios' : 'Crear Campaña'}
+                        <button type="submit" disabled={isUploading} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                            {isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Crear Campaña')}
                         </button>
                     </div>
                 </form>

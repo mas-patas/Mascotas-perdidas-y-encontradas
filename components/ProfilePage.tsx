@@ -7,7 +7,7 @@ import { EditIcon, PlusIcon, TrashIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
-import { compressImage } from '../utils/imageUtils';
+import { uploadImage } from '../utils/imageUtils';
 
 
 interface ProfilePageProps {
@@ -49,12 +49,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         const file = e.target.files?.[0];
         if (file) {
              try {
-                // Resize avatars smaller (200x200)
-                const compressedBase64 = await compressImage(file, 200, 200);
-                setEditableUser(prev => ({ ...prev, avatarUrl: compressedBase64 }));
+                // Upload to Supabase Storage and get URL
+                setLoading(true);
+                const publicUrl = await uploadImage(file);
+                setEditableUser(prev => ({ ...prev, avatarUrl: publicUrl }));
             } catch (err) {
-                 console.error("Error compressing avatar:", err);
+                 console.error("Error uploading avatar:", err);
                 setError("Error al procesar la imagen de perfil.");
+            } finally {
+                setLoading(false);
             }
         }
     };
@@ -150,10 +153,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                                         {(editableUser.firstName || '?').charAt(0).toUpperCase()}
                                     </div>
                                 )}
-                                <label htmlFor="avatar-upload" className="mt-2 block text-sm text-center text-brand-primary hover:underline cursor-pointer">
-                                    Cambiar foto
-                                </label>
-                                <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                                {loading ? (
+                                    <p className="mt-2 text-sm text-center text-gray-500">Subiendo...</p>
+                                ) : (
+                                    <>
+                                        <label htmlFor="avatar-upload" className="mt-2 block text-sm text-center text-brand-primary hover:underline cursor-pointer">
+                                            Cambiar foto
+                                        </label>
+                                        <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={loading} />
+                                    </>
+                                )}
                             </div>
                             <div className="flex-grow space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -179,7 +188,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-2">
-                            <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                            <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300" disabled={loading}>Cancelar</button>
                             <button onClick={handleSaveProfile} disabled={loading} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50">
                                 {loading ? 'Guardando...' : 'Guardar Cambios'}
                             </button>

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfileSetupPage: React.FC = () => {
+    const { currentUser, updateUserProfile } = useAuth();
     const [username, setUsername] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -9,7 +11,20 @@ const ProfileSetupPage: React.FC = () => {
     const [phone, setPhone] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { updateUserProfile } = useAuth();
+
+    // Pre-fill data if available in currentUser
+    useEffect(() => {
+        if (currentUser) {
+            // Only pre-fill if it's not a temporary generated username (starts with user_)
+            if (currentUser.username && !currentUser.username.startsWith('user_')) {
+                setUsername(currentUser.username);
+            }
+            if (currentUser.firstName) setFirstName(currentUser.firstName);
+            if (currentUser.lastName) setLastName(currentUser.lastName);
+            if (currentUser.dni) setDni(currentUser.dni);
+            if (currentUser.phone) setPhone(currentUser.phone);
+        }
+    }, [currentUser]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -40,9 +55,12 @@ const ProfileSetupPage: React.FC = () => {
                 dni: dni.trim(),
                 phone: phone.trim(),
             });
-            // The context update will trigger the AppRouter to re-render and show the main app
+            // Context will update and AppRouter will redirect automatically
         } catch (err: any) {
-            setError(err.message || 'Ocurrió un error.');
+            console.error("Profile update error:", err);
+            // Extract meaningful message from object or string
+            const message = err.message || (typeof err === 'object' ? JSON.stringify(err) : 'Ocurrió un error al guardar el perfil.');
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -62,7 +80,7 @@ const ProfileSetupPage: React.FC = () => {
                     </p>
                 </div>
 
-                {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">{error}</div>}
+                {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4 overflow-hidden text-sm" role="alert">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>

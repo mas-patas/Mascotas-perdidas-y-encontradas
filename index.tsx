@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -12,6 +13,16 @@ if (!rootElement) {
 
 const AppRouter: React.FC = () => {
     const { currentUser, loading } = useAuth();
+    const [currentHash, setCurrentHash] = useState(window.location.hash.substring(1));
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            setCurrentHash(window.location.hash.substring(1));
+        };
+
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
 
     if (loading) {
         return (
@@ -21,14 +32,21 @@ const AppRouter: React.FC = () => {
         );
     }
     
-    if (!currentUser) {
-        return <AuthPage />;
-    }
-
-    if (!currentUser.username) {
+    // If user is logged in but hasn't completed profile setup (missing username)
+    if (currentUser && !currentUser.username) {
         return <ProfileSetupPage />;
     }
     
+    // If specifically trying to access login page
+    if (currentHash === '/login') {
+        if (currentUser) {
+            window.location.hash = '/'; // Redirect to home if already logged in
+            return <App />;
+        }
+        return <AuthPage />;
+    }
+    
+    // For all other routes, render App (App handles protected routes internally)
     return <App />;
 };
 
