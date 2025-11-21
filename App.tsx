@@ -66,7 +66,7 @@ const App: React.FC = () => {
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     
-    // Admin Settings - Disabled by default for simplicity
+    // Admin Settings
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(false);
 
     // 1. FETCH REAL DATA FROM SUPABASE
@@ -86,8 +86,8 @@ const App: React.FC = () => {
                     phone: p.phone,
                     dni: p.dni,
                     avatarUrl: p.avatar_url,
-                    ownedPets: [],
-                    savedPetIds: []
+                    ownedPets: p.owned_pets || [],
+                    savedPetIds: p.saved_pet_ids || []
                 }));
                 setUsers(mappedUsers);
             }
@@ -119,15 +119,92 @@ const App: React.FC = () => {
                     contactRequests: p.contact_requests || [],
                     lat: p.lat,
                     lng: p.lng,
-                    comments: [] // Comments are pending DB implementation
+                    comments: p.comments || []
                 }));
                 setPets(mappedPets);
             }
              if (petsError) console.error("Error fetching pets:", petsError);
+             
+            // C. Chats
+            const { data: chatsData } = await supabase.from('chats').select('*');
+            if (chatsData) {
+                setChats(chatsData.map(c => ({
+                    id: c.id,
+                    petId: c.pet_id,
+                    participantEmails: c.participant_emails || [],
+                    messages: c.messages || [],
+                    lastReadTimestamps: c.last_read_timestamps || {}
+                })));
+            }
+            
+            // D. Reports
+            const { data: reportsData } = await supabase.from('reports').select('*');
+            if (reportsData) {
+                setReports(reportsData.map(r => ({
+                    id: r.id,
+                    reporterEmail: r.reporter_email,
+                    reportedEmail: r.reported_email,
+                    type: r.type,
+                    targetId: r.target_id,
+                    reason: r.reason,
+                    details: r.details,
+                    timestamp: r.timestamp,
+                    status: r.status,
+                    postSnapshot: r.post_snapshot
+                })));
+            }
+            
+            // E. Support Tickets
+            const { data: ticketsData } = await supabase.from('support_tickets').select('*');
+            if (ticketsData) {
+                setSupportTickets(ticketsData.map(t => ({
+                    id: t.id,
+                    userEmail: t.user_email,
+                    category: t.category,
+                    subject: t.subject,
+                    description: t.description,
+                    timestamp: t.timestamp,
+                    status: t.status,
+                    assignedTo: t.assigned_to,
+                    assignmentHistory: t.assignment_history || [],
+                    response: t.response
+                })));
+            }
+            
+            // F. Campaigns
+            const { data: campaignsData } = await supabase.from('campaigns').select('*').order('date', { ascending: false });
+            if (campaignsData) {
+                setCampaigns(campaignsData.map(c => ({
+                    id: c.id,
+                    userEmail: c.user_email,
+                    type: c.type,
+                    title: c.title,
+                    description: c.description,
+                    location: c.location,
+                    date: c.date,
+                    imageUrls: c.image_urls || [],
+                    contactPhone: c.contact_phone,
+                    lat: c.lat,
+                    lng: c.lng
+                })));
+            }
+            
+            // G. Notifications
+            const { data: notifsData } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false });
+            if (notifsData) {
+                setNotifications(notifsData.map(n => ({
+                    id: n.id,
+                    userId: n.user_id,
+                    message: n.message,
+                    link: n.link,
+                    timestamp: n.timestamp,
+                    isRead: n.is_read
+                })));
+            }
         };
 
         fetchData();
-    }, []);
+    }, [currentUser]); // Reload if user changes login state (though RLS handles security)
 
 
     // Routing Logic
@@ -364,33 +441,51 @@ const App: React.FC = () => {
         }
     };
 
-    const handleStartChat = (pet: Pet) => {
+    const handleStartChat = async (pet: Pet) => {
         if (!currentUser) return;
         
-        // Check if chat exists
+        // Check locally first
         const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
-        
         if (existingChat) {
             setSelectedChatId(existingChat.id);
             setCurrentView('chat');
-        } else {
-            const newChat: Chat = {
-                id: Date.now().toString(),
-                petId: pet.id,
-                participantEmails: [currentUser.email, pet.userEmail],
+            return;
+        }
+
+        // Create new chat
+        const chatID = Date.now().toString();
+        const newChat: Chat = {
+            id: chatID,
+            petId: pet.id,
+            participantEmails: [currentUser.email, pet.userEmail],
+            messages: [],
+            lastReadTimestamps: {
+                [currentUser.email]: new Date().toISOString(),
+                [pet.userEmail]: new Date(0).toISOString() 
+            }
+        };
+
+        try {
+            const { error } = await supabase.from('chats').insert({
+                id: chatID,
+                pet_id: pet.id,
+                participant_emails: newChat.participantEmails,
                 messages: [],
-                lastReadTimestamps: {
-                    [currentUser.email]: new Date().toISOString(),
-                    [pet.userEmail]: new Date(0).toISOString() 
-                }
-            };
+                last_read_timestamps: newChat.lastReadTimestamps
+            });
+            
+            if (error) throw error;
+            
             setChats(prev => [...prev, newChat]);
-            setSelectedChatId(newChat.id);
+            setSelectedChatId(chatID);
             setCurrentView('chat');
+        } catch (err: any) {
+            console.error("Error starting chat:", err);
+            alert("No se pudo iniciar el chat.");
         }
     };
 
-    const handleSendMessage = (chatId: string, text: string) => {
+    const handleSendMessage = async (chatId: string, text: string) => {
         if (!currentUser) return;
         const newMessage: Message = {
             senderEmail: currentUser.email,
@@ -398,54 +493,70 @@ const App: React.FC = () => {
             timestamp: new Date().toISOString()
         };
         
-        setChats(prev => prev.map(chat => {
-            if (chat.id === chatId) {
-                const updatedChat = {
-                    ...chat,
-                    messages: [...chat.messages, newMessage],
-                    lastReadTimestamps: {
-                        ...chat.lastReadTimestamps,
-                        [currentUser.email]: new Date().toISOString()
-                    }
-                };
-                
-                // Notify recipient
-                const recipientEmail = chat.participantEmails.find(e => e !== currentUser.email);
-                if (recipientEmail) {
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: recipientEmail,
-                        message: `Nuevo mensaje de ${currentUser.username || 'un usuario'}`,
-                        link: 'messages',
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                }
+        const chatIndex = chats.findIndex(c => c.id === chatId);
+        if (chatIndex === -1) return;
+        
+        const currentChat = chats[chatIndex];
+        const updatedMessages = [...currentChat.messages, newMessage];
+        const updatedTimestamps = {
+            ...currentChat.lastReadTimestamps,
+            [currentUser.email]: new Date().toISOString()
+        };
 
-                return updatedChat;
+        try {
+            const { error } = await supabase.from('chats').update({
+                messages: updatedMessages,
+                last_read_timestamps: updatedTimestamps
+            }).eq('id', chatId);
+
+            if (error) throw error;
+            
+            // Optimistic update
+            setChats(prev => prev.map(c => c.id === chatId ? { ...c, messages: updatedMessages, lastReadTimestamps: updatedTimestamps } : c));
+
+            // Notify recipient
+            const recipientEmail = currentChat.participantEmails.find(e => e !== currentUser.email);
+            if (recipientEmail) {
+                const newNotification = {
+                    id: Date.now().toString(),
+                    user_id: recipientEmail,
+                    message: `Nuevo mensaje de ${currentUser.username || 'un usuario'}`,
+                    link: 'messages',
+                    timestamp: new Date().toISOString(),
+                    is_read: false
+                };
+                // Assuming insert works
+                await supabase.from('notifications').insert(newNotification);
+                
+                // For local optimistic update if we were tracking recipient notifications (we aren't in this view)
             }
-            return chat;
-        }));
+        } catch (err) {
+            console.error("Error sending message:", err);
+        }
     };
     
-    const handleMarkChatAsRead = (chatId: string) => {
+    const handleMarkChatAsRead = async (chatId: string) => {
         if (!currentUser) return;
-        setChats(prev => prev.map(chat => {
-             if (chat.id === chatId) {
-                 return {
-                     ...chat,
-                     lastReadTimestamps: {
-                         ...chat.lastReadTimestamps,
-                         [currentUser.email]: new Date().toISOString()
-                     }
-                 };
-             }
-             return chat;
-        }));
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return;
+
+        const updatedTimestamps = {
+            ...chat.lastReadTimestamps,
+            [currentUser.email]: new Date().toISOString()
+        };
+
+        try {
+            await supabase.from('chats').update({
+                last_read_timestamps: updatedTimestamps
+            }).eq('id', chatId);
+            
+             setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: updatedTimestamps } : c));
+        } catch (err) {
+            console.error("Error marking read:", err);
+        }
     };
     
-    const handleReport = (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
+    const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
         if (!currentUser) return;
         const newReport: Report = {
             id: Date.now().toString(),
@@ -459,11 +570,40 @@ const App: React.FC = () => {
             status: REPORT_STATUS.PENDING,
             postSnapshot: type === 'post' ? pets.find(p => p.id === targetId) : undefined
         };
-        setReports(prev => [...prev, newReport]);
-        alert('Reporte enviado exitosamente. Gracias por ayudar a mantener segura la comunidad.');
+
+        try {
+            const { error } = await supabase.from('reports').insert({
+                id: newReport.id,
+                reporter_email: newReport.reporterEmail,
+                reported_email: newReport.reportedEmail,
+                type: newReport.type,
+                target_id: newReport.targetId,
+                reason: newReport.reason,
+                details: newReport.details,
+                timestamp: newReport.timestamp,
+                status: newReport.status,
+                post_snapshot: newReport.postSnapshot
+            });
+
+            if (error) throw error;
+            setReports(prev => [...prev, newReport]);
+            alert('Reporte enviado exitosamente.');
+        } catch (err) {
+             console.error("Error sending report:", err);
+             alert('Error al enviar el reporte.');
+        }
     };
 
-    const handleAddSupportTicket = (category: SupportTicketCategory, subject: string, description: string) => {
+    const onUpdateReportStatus = async (id: string, status: ReportStatusType) => {
+        try {
+            await supabase.from('reports').update({ status }).eq('id', id);
+            setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        } catch (err) {
+            console.error("Error updating report:", err);
+        }
+    };
+
+    const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => {
         if (!currentUser) return;
         const newTicket: SupportTicket = {
             id: Date.now().toString(),
@@ -474,58 +614,107 @@ const App: React.FC = () => {
             timestamp: new Date().toISOString(),
             status: SUPPORT_TICKET_STATUS.PENDING,
         };
-        setSupportTickets(prev => [...prev, newTicket]);
+        
+        try {
+            const { error } = await supabase.from('support_tickets').insert({
+                id: newTicket.id,
+                user_email: newTicket.userEmail,
+                category: newTicket.category,
+                subject: newTicket.subject,
+                description: newTicket.description,
+                timestamp: newTicket.timestamp,
+                status: newTicket.status
+            });
+            if (error) throw error;
+            setSupportTickets(prev => [...prev, newTicket]);
+        } catch(err) {
+             console.error("Error creating ticket:", err);
+        }
     };
     
-    const handleUpdateSupportTicket = (updatedTicket: SupportTicket) => {
-        setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
-        
-        // Notify user if status changed or response added
-        const originalTicket = supportTickets.find(t => t.id === updatedTicket.id);
-        if (originalTicket && (originalTicket.status !== updatedTicket.status || (!originalTicket.response && updatedTicket.response))) {
-             const notification: Notification = {
-                id: Date.now().toString(),
-                userId: updatedTicket.userEmail,
-                message: `Tu ticket "${updatedTicket.subject}" ha sido actualizado a: ${updatedTicket.status}`,
-                link: 'support',
-                timestamp: new Date().toISOString(),
-                isRead: false
-            };
-            setNotifications(n => [notification, ...n]);
-        }
-    };
+    const handleUpdateSupportTicket = async (updatedTicket: SupportTicket) => {
+        try {
+            const { error } = await supabase.from('support_tickets').update({
+                status: updatedTicket.status,
+                assigned_to: updatedTicket.assignedTo,
+                assignment_history: updatedTicket.assignmentHistory,
+                response: updatedTicket.response
+            }).eq('id', updatedTicket.id);
 
-    const handleSaveCampaign = (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
-        if (!currentUser) return;
-        if (idToUpdate) {
-            setCampaigns(prev => prev.map(c => c.id === idToUpdate ? { ...c, ...campaignData } : c));
-        } else {
-            const newCampaign: Campaign = {
-                ...campaignData,
-                id: Date.now().toString(),
-                userEmail: currentUser.email,
-            };
-            setCampaigns(prev => [newCampaign, ...prev]);
+            if (error) throw error;
+
+            setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
             
-            // Notify all users about new campaign
-            users.forEach(u => {
-                if (u.email !== currentUser.email) {
-                     const notification: Notification = {
-                        id: Date.now().toString() + Math.random(),
-                        userId: u.email,
-                        message: `Nueva campaña: ${newCampaign.title}`,
-                        link: { type: 'campaign', id: newCampaign.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                }
-            });
+            // Notify user
+            if (updatedTicket.response) {
+                const notif = {
+                    id: Date.now().toString(),
+                    user_id: updatedTicket.userEmail,
+                    message: `Tu ticket "${updatedTicket.subject}" ha sido actualizado.`,
+                    link: 'support',
+                    timestamp: new Date().toISOString(),
+                    is_read: false
+                };
+                await supabase.from('notifications').insert(notif);
+            }
+        } catch(err) {
+            console.error("Error updating ticket:", err);
         }
     };
 
-    const handleDeleteCampaign = (id: string) => {
-        setCampaigns(prev => prev.filter(c => c.id !== id));
+    const handleSaveCampaign = async (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
+        if (!currentUser) return;
+        
+        const campaignId = idToUpdate || Date.now().toString();
+        const dbPayload = {
+            id: campaignId,
+            user_email: currentUser.email,
+            type: campaignData.type,
+            title: campaignData.title,
+            description: campaignData.description,
+            location: campaignData.location,
+            date: campaignData.date,
+            image_urls: campaignData.imageUrls,
+            contact_phone: campaignData.contactPhone,
+            lat: campaignData.lat,
+            lng: campaignData.lng
+        };
+
+        try {
+            const { error } = await supabase.from('campaigns').upsert(dbPayload);
+            if (error) throw error;
+
+            const newCampaign = { ...campaignData, id: campaignId, userEmail: currentUser.email };
+            if (idToUpdate) {
+                 setCampaigns(prev => prev.map(c => c.id === idToUpdate ? { ...c, ...campaignData } : c));
+            } else {
+                setCampaigns(prev => [newCampaign, ...prev]);
+                // Notify all users
+                users.forEach(async u => {
+                    if (u.email !== currentUser.email) {
+                        await supabase.from('notifications').insert({
+                            id: Date.now().toString() + Math.random(),
+                            user_id: u.email,
+                            message: `Nueva campaña: ${campaignData.title}`,
+                            link: { type: 'campaign', id: campaignId },
+                            timestamp: new Date().toISOString(),
+                            is_read: false
+                        });
+                    }
+                });
+            }
+        } catch(err) {
+            console.error("Error saving campaign:", err);
+        }
+    };
+
+    const handleDeleteCampaign = async (id: string) => {
+        try {
+            await supabase.from('campaigns').delete().eq('id', id);
+            setCampaigns(prev => prev.filter(c => c.id !== id));
+        } catch(err) {
+            console.error("Error deleting campaign:", err);
+        }
     };
 
     const handleViewUser = (user: User) => {
@@ -539,66 +728,95 @@ const App: React.FC = () => {
         return notifications.filter(n => n.userId === currentUser.email);
     }, [notifications, currentUser]);
 
-    const handleMarkNotificationAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    const handleMarkNotificationAsRead = async (id: string) => {
+        try {
+            await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        } catch(err) {
+            console.error("Error reading notification:", err);
+        }
     };
 
-    const handleMarkAllNotificationsAsRead = () => {
+    const handleMarkAllNotificationsAsRead = async () => {
         if (!currentUser) return;
-        setNotifications(prev => prev.map(n => n.userId === currentUser.email ? { ...n, isRead: true } : n));
+        try {
+            await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.email);
+            setNotifications(prev => prev.map(n => n.userId === currentUser.email ? { ...n, isRead: true } : n));
+        } catch(err) {
+            console.error("Error reading all notifications:", err);
+        }
     };
     
-    const handleRecordContactRequest = (petId: string) => {
+    const handleRecordContactRequest = async (petId: string) => {
         if (!currentUser) return;
-        setPets(prev => prev.map(p => {
-            if (p.id === petId) {
-                const requests = p.contactRequests || [];
-                if (!requests.includes(currentUser.email)) {
-                     // Notify owner
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: p.userEmail,
-                        message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${p.name}`,
-                        link: { type: 'pet', id: p.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                    return { ...p, contactRequests: [...requests, currentUser.email] };
-                }
-            }
-            return p;
-        }));
+        const pet = pets.find(p => p.id === petId);
+        if (!pet) return;
+        
+        const currentRequests = pet.contactRequests || [];
+        if (currentRequests.includes(currentUser.email)) return;
+
+        const updatedRequests = [...currentRequests, currentUser.email];
+        
+        try {
+            await supabase.from('pets').update({ contact_requests: updatedRequests }).eq('id', petId);
+            setPets(prev => prev.map(p => p.id === petId ? { ...p, contactRequests: updatedRequests } : p));
+
+            // Notify Owner
+             await supabase.from('notifications').insert({
+                id: Date.now().toString(),
+                user_id: pet.userEmail,
+                message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${pet.name}`,
+                link: { type: 'pet', id: pet.id },
+                timestamp: new Date().toISOString(),
+                is_read: false
+            });
+
+        } catch(err) {
+            console.error("Error recording contact request:", err);
+        }
     };
 
-    const handleAddComment = (petId: string, text: string) => {
+    const handleAddComment = async (petId: string, text: string) => {
         if (!currentUser) return;
-        setPets(prev => prev.map(p => {
-            if (p.id === petId) {
-                const newComment: Comment = {
+        
+        const newComment: Comment = {
+            id: Date.now().toString(),
+            userEmail: currentUser.email,
+            userName: currentUser.username || 'Usuario',
+            text,
+            timestamp: new Date().toISOString()
+        };
+
+        const pet = pets.find(p => p.id === petId);
+        if (!pet) return;
+
+        const updatedComments = [...(pet.comments || []), newComment];
+
+        try {
+            const { error } = await supabase
+                .from('pets')
+                .update({ comments: updatedComments })
+                .eq('id', petId);
+
+            if (error) throw error;
+            
+            // Optimistic update
+            setPets(prev => prev.map(p => p.id === petId ? { ...p, comments: updatedComments } : p));
+            
+             if (pet.userEmail !== currentUser.email) {
+                 await supabase.from('notifications').insert({
                     id: Date.now().toString(),
-                    userEmail: currentUser.email,
-                    userName: currentUser.username || 'Usuario',
-                    text,
-                    timestamp: new Date().toISOString()
-                };
-                
-                if (p.userEmail !== currentUser.email) {
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: p.userEmail,
-                        message: `${currentUser.username || 'Un usuario'} comentó en tu publicación de ${p.name}`,
-                        link: { type: 'pet', id: p.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                }
-                
-                return { ...p, comments: [...(p.comments || []), newComment] };
+                    user_id: pet.userEmail,
+                    message: `${currentUser.username || 'Un usuario'} comentó en tu publicación de ${pet.name}`,
+                    link: { type: 'pet', id: pet.id },
+                    timestamp: new Date().toISOString(),
+                    is_read: false
+                });
             }
-            return p;
-        }));
+        } catch (err: any) {
+            console.error("Error saving comment:", err);
+            alert("Error al guardar el comentario. Por favor intenta de nuevo.");
+        }
     };
 
     const activeChat = chats.find(c => c.id === selectedChatId);
@@ -735,7 +953,7 @@ const App: React.FC = () => {
                             chats={chats}
                             reports={reports}
                             supportTickets={supportTickets}
-                            onUpdateReportStatus={(id, status) => setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r))}
+                            onUpdateReportStatus={(id, status) => onUpdateReportStatus(id, status)}
                             onDeletePet={handleDeletePet}
                             onUpdateSupportTicket={handleUpdateSupportTicket}
                             isAiSearchEnabled={isAiSearchEnabled}

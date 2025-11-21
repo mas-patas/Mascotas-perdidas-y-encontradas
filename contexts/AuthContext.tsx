@@ -45,15 +45,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         let mounted = true;
 
-        // 1. Safety Timeout: Force loading to false after 5 seconds to prevent infinite loading screens
+        // 1. Safety Timeout - Reduced to 3s for better UX
         const safetyTimeout = setTimeout(() => {
             if (mounted && loading) {
                 console.warn("Supabase auth check timed out. Forcing app load.");
                 setLoading(false);
             }
-        }, 5000);
+        }, 3000);
 
-        // 2. Check active session on mount
+        // 2. Check active session
         const checkUser = async () => {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         checkUser();
 
-        // 3. Listen for auth changes (login, logout, etc.)
+        // 3. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (session?.user) {
                 await fetchProfile(session.user.email!, session.user.id);
@@ -94,7 +94,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const fetchProfile = async (email: string, uid: string, retryCount = 0) => {
         if (retryCount > 2) {
-            console.error("Max retries reached for fetching profile.");
             setLoading(false);
             return;
         }
@@ -107,14 +106,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .single();
 
             if (error) {
-                // Error code PGRST116 means "The result contains 0 rows" (Profile deleted manually or not created)
                 if (error.code === 'PGRST116') {
-                    console.warn("Perfil no encontrado (Usuario Huérfano). Intentando autoreparación...");
-                    
-                    // Self-healing: Insert a new basic profile for this existing Auth user.
-                    // IMPORTANT: Generate a unique temporary username to avoid unique constraint violations.
+                    // Self-healing for orphaned users
                     const tempUsername = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-                    
                     const { error: insertError } = await supabase.from('profiles').insert({
                         id: uid,
                         email: email,
@@ -125,12 +119,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     });
 
                     if (!insertError) {
-                        console.log("Perfil recreado exitosamente.");
-                        // Recursive call to fetch the newly created profile
                         return fetchProfile(email, uid, retryCount + 1);
                     } else {
-                         console.error("Error al recrear perfil:", insertError);
-                         // Fallback basic user so app doesn't crash completely even if DB write failed
                          setCurrentUser({
                             id: uid,
                             email,
@@ -139,8 +129,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                          });
                     }
                 } else {
-                    console.warn("Error obteniendo perfil:", error.message);
-                    // Fallback basic user
                     setCurrentUser({
                         id: uid,
                         email,
@@ -149,7 +137,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     });
                 }
             } else {
-                // Map snake_case DB columns to camelCase User type
                 const user: User = {
                     id: uid,
                     email: data.email,
@@ -161,8 +148,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     phone: data.phone,
                     dni: data.dni,
                     avatarUrl: data.avatar_url,
-                    ownedPets: [], 
-                    savedPetIds: []
+                    // Parse JSONB columns
+                    ownedPets: data.owned_pets || [], 
+                    savedPetIds: data.saved_pet_ids || []
                 };
                 setCurrentUser(user);
             }
@@ -174,56 +162,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const login = async (email: string, pass: string): Promise<void> => {
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password: pass,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) throw new Error(error.message);
     };
 
     const register = async (email: string, pass: string): Promise<void> => {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password: pass,
-        });
-
+        const { error } = await supabase.auth.signUp({ email, password: pass });
         if (error) throw new Error(error.message);
-        // We don't need to insert DNI manually here. 
-        // The Supabase Trigger (handle_new_user) creates the profile row automatically.
-        // The user will be prompted to fill in details (DNI, Name) in the ProfileSetupPage upon first login.
     };
 
     const loginWithGoogle = async (): Promise<void> => {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-        });
+        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
         if (error) throw new Error(error.message);
     };
 
     const loginWithApple = async (): Promise<void> => {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'apple',
-        });
+        const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
         if (error) throw new Error(error.message);
     };
 
     const logout = async () => {
-        // 1. Perform local cleanup IMMEDIATELY to update UI
+        // Optimistic logout: Clear state immediately
         setCurrentUser(null);
         setIsGhosting(null);
         localStorage.removeItem('ghostingAdmin');
         
-        // Force redirect to home/login view if currently on a protected route
+        // Force redirect immediately
         if (window.location.hash !== '#/' && window.location.hash !== '') {
             window.location.hash = '/';
         }
-
-        // 2. Perform server-side sign out in background
+        
         try {
             await supabase.auth.signOut();
         } catch (error) {
-            console.error("Error during sign out (server-side):", error);
-            // We don't really care if this fails, as the user is already logged out locally
+            console.error("Error during sign out:", error);
         }
     };
 
@@ -231,7 +203,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('No auth session');
         
-        // Map camelCase to snake_case for DB
         const dbUpdates = {
             username: profileData.username,
             first_name: profileData.firstName,
@@ -239,12 +210,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             phone: profileData.phone,
             dni: profileData.dni,
             avatar_url: profileData.avatarUrl,
-            updated_at: new Date().toISOString(), // Safe string format
+            updated_at: new Date().toISOString(),
         };
 
-        // Strategy: Try UPDATE first. If it fails (row missing), try INSERT.
-        
-        // 1. Try Update
         const { error: updateError, data } = await supabase
             .from('profiles')
             .update(dbUpdates)
@@ -252,40 +220,89 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .select();
 
         if (updateError || !data || data.length === 0) {
-             // 2. If Update failed or no row found, try Insert (Upsert-like fallback)
              const { error: insertError } = await supabase
                 .from('profiles')
                 .insert({ id: user.id, email: user.email, ...dbUpdates });
              
-             if (insertError) {
-                 console.error("Profile update failed:", updateError || insertError);
-                 throw new Error((updateError || insertError)?.message);
-             }
+             if (insertError) throw new Error((updateError || insertError)?.message);
         }
 
-        // Refresh local state
         setCurrentUser(prev => prev ? { ...prev, ...profileData } : null);
     };
 
-    // Placeholder implementations for Owned Pets (To be migrated to DB tables later)
+    // Owned Pets: Stored as JSONB in 'owned_pets' column in 'profiles'
     const addOwnedPet = async (petData: Omit<OwnedPet, 'id'>) => {
-        console.log("addOwnedPet not yet connected to DB");
+        if (!currentUser) return;
+        
+        const newPet = { ...petData, id: Date.now().toString() };
+        const updatedOwnedPets = [...(currentUser.ownedPets || []), newPet];
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ owned_pets: updatedOwnedPets })
+            .eq('id', currentUser.id);
+
+        if (error) throw error;
+        setCurrentUser(prev => prev ? { ...prev, ownedPets: updatedOwnedPets } : null);
     };
 
     const updateOwnedPet = async (petData: OwnedPet) => {
-        console.log("updateOwnedPet not yet connected to DB");
+        if (!currentUser) return;
+
+        const updatedOwnedPets = (currentUser.ownedPets || []).map(p => p.id === petData.id ? petData : p);
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ owned_pets: updatedOwnedPets })
+            .eq('id', currentUser.id);
+
+        if (error) throw error;
+        setCurrentUser(prev => prev ? { ...prev, ownedPets: updatedOwnedPets } : null);
     };
 
     const deleteOwnedPet = async (petId: string) => {
-        console.log("deleteOwnedPet not yet connected to DB");
+        if (!currentUser) return;
+
+        const updatedOwnedPets = (currentUser.ownedPets || []).filter(p => p.id !== petId);
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ owned_pets: updatedOwnedPets })
+            .eq('id', currentUser.id);
+
+        if (error) throw error;
+        setCurrentUser(prev => prev ? { ...prev, ownedPets: updatedOwnedPets } : null);
     };
 
+    // Saved Pets: Stored as TEXT[] array in 'saved_pet_ids' column in 'profiles'
     const savePet = async (petId: string) => {
-        console.log("savePet not yet connected to DB");
+        if (!currentUser) return;
+        
+        if (currentUser.savedPetIds?.includes(petId)) return;
+        
+        const updatedSavedIds = [...(currentUser.savedPetIds || []), petId];
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ saved_pet_ids: updatedSavedIds })
+            .eq('id', currentUser.id);
+
+        if (error) throw error;
+        setCurrentUser(prev => prev ? { ...prev, savedPetIds: updatedSavedIds } : null);
     };
 
     const unsavePet = async (petId: string) => {
-        console.log("unsavePet not yet connected to DB");
+        if (!currentUser) return;
+
+        const updatedSavedIds = (currentUser.savedPetIds || []).filter(id => id !== petId);
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ saved_pet_ids: updatedSavedIds })
+            .eq('id', currentUser.id);
+
+        if (error) throw error;
+        setCurrentUser(prev => prev ? { ...prev, savedPetIds: updatedSavedIds } : null);
     };
 
     const ghostLogin = async (userToImpersonate: User) => {
