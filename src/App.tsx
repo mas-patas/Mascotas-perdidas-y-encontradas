@@ -248,6 +248,150 @@ const App: React.FC = () => {
         fetchData();
     }, []);
 
+    // 2. REALTIME SUBSCRIPTIONS
+    useEffect(() => {
+        const channels = supabase.channel('custom-all-channel')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'pets' },
+                async (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        const newPetRaw = payload.new as any;
+                        
+                        // Fetch owner profile if needed to display email correctly
+                        let ownerEmail = 'unknown';
+                        const { data: profile } = await supabase.from('profiles').select('email').eq('id', newPetRaw.user_id).single();
+                        if (profile) ownerEmail = profile.email;
+
+                        setPets(prev => {
+                            if (prev.find(p => p.id === newPetRaw.id)) return prev;
+                            const newPet: Pet = {
+                                id: newPetRaw.id,
+                                userEmail: ownerEmail,
+                                status: newPetRaw.status,
+                                name: newPetRaw.name,
+                                animalType: newPetRaw.animal_type,
+                                breed: newPetRaw.breed,
+                                color: newPetRaw.color,
+                                size: newPetRaw.size,
+                                location: newPetRaw.location,
+                                date: newPetRaw.date,
+                                contact: newPetRaw.contact,
+                                description: newPetRaw.description,
+                                imageUrls: newPetRaw.image_urls || [],
+                                adoptionRequirements: newPetRaw.adoption_requirements,
+                                shareContactInfo: newPetRaw.share_contact_info,
+                                contactRequests: newPetRaw.contact_requests || [],
+                                lat: newPetRaw.lat,
+                                lng: newPetRaw.lng,
+                                comments: []
+                            };
+                            return [newPet, ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        const updated = payload.new as any;
+                        setPets(prev => prev.map(p => p.id === updated.id ? { 
+                            ...p, 
+                            status: updated.status, 
+                            name: updated.name,
+                            contact: updated.contact,
+                            description: updated.description,
+                            contactRequests: updated.contact_requests || [] 
+                        } : p));
+                    } else if (payload.eventType === 'DELETE') {
+                        setPets(prev => prev.filter(p => p.id !== payload.old.id));
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages' },
+                (payload) => {
+                    const newMsg = payload.new as any;
+                    setChats(prev => prev.map(chat => {
+                        if (chat.id === newMsg.chat_id) {
+                            // Avoid duplicates from optimistic updates (check timestamp/sender/text)
+                            if (chat.messages.some(m => m.timestamp === newMsg.created_at && m.senderEmail === newMsg.sender_email && m.text === newMsg.text)) {
+                                return chat;
+                            }
+                            return {
+                                ...chat,
+                                messages: [...chat.messages, {
+                                    senderEmail: newMsg.sender_email,
+                                    text: newMsg.text,
+                                    timestamp: newMsg.created_at
+                                }]
+                            };
+                        }
+                        return chat;
+                    }));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'chats' },
+                (payload) => {
+                    const newChat = payload.new as any;
+                    setChats(prev => {
+                        if(prev.find(c => c.id === newChat.id)) return prev;
+                        return [...prev, {
+                            id: newChat.id,
+                            petId: newChat.pet_id,
+                            participantEmails: newChat.participant_emails,
+                            messages: [],
+                            lastReadTimestamps: newChat.last_read_timestamps || {}
+                        }];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'comments' },
+                (payload) => {
+                    const newComment = payload.new as any;
+                    setPets(prev => prev.map(p => {
+                        if (p.id === newComment.pet_id) {
+                            if(p.comments?.some(c => c.timestamp === newComment.created_at && c.userEmail === newComment.user_email)) return p;
+                            return {
+                                ...p,
+                                comments: [...(p.comments || []), {
+                                    id: newComment.id,
+                                    userEmail: newComment.user_email,
+                                    userName: newComment.user_name,
+                                    text: newComment.text,
+                                    timestamp: newComment.created_at
+                                }]
+                            };
+                        }
+                        return p;
+                    }));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'notifications' },
+                (payload) => {
+                    const newNotif = payload.new as any;
+                    setNotifications(prev => {
+                        if(prev.find(n => n.id === newNotif.id)) return prev;
+                        return [{
+                            id: newNotif.id,
+                            userId: newNotif.user_id,
+                            message: newNotif.message,
+                            link: newNotif.link,
+                            isRead: newNotif.is_read,
+                            timestamp: newNotif.created_at
+                        }, ...prev];
+                    });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channels);
+        };
+    }, []);
+
 
     // Routing Logic
     useEffect(() => {

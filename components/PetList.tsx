@@ -28,6 +28,11 @@ const PetSection: React.FC<{
     const [currentIndex, setCurrentIndex] = useState(0);
     const [cardsPerPage, setCardsPerPage] = useState(4);
     const [gridClass, setGridClass] = useState('grid-cols-4');
+    
+    // Touch state for swipe detection
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+    const minSwipeDistance = 50;
 
     useEffect(() => {
         const updateLayout = () => {
@@ -84,6 +89,31 @@ const PetSection: React.FC<{
 
     const visiblePets = showCarousel ? pets.slice(currentIndex, currentIndex + cardsPerPage) : pets;
 
+    // Touch Handlers
+    const onTouchStart = (e: React.TouchEvent) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+
+    const onTouchMove = (e: React.TouchEvent) => {
+        setTouchEnd(e.targetTouches[0].clientX);
+    };
+
+    const onTouchEnd = () => {
+        if (!touchStart || !touchEnd) return;
+        
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+
+        if (isLeftSwipe && canGoNext) {
+            handleNext();
+        }
+        if (isRightSwipe && canGoPrev) {
+            handlePrev();
+        }
+    };
+
     return (
         <section>
             <div className="flex justify-between items-center border-b border-gray-200 mb-4 pb-3">
@@ -99,8 +129,13 @@ const PetSection: React.FC<{
                 </button>
             </div>
             
-            <div className="relative group/carousel">
-                <div className={`grid ${gridClass} gap-4`}>
+            <div 
+                className="relative group/carousel select-none"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+            >
+                <div className={`grid ${gridClass} gap-4 transition-all duration-300`}>
                     {visiblePets.map(pet => {
                         const petOwner = users.find(u => u.email === pet.userEmail);
                         return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
@@ -112,7 +147,7 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handlePrev} 
                             disabled={!canGoPrev} 
-                            className="absolute top-1/2 -translate-y-1/2 -left-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
+                            className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
                             aria-label="Anterior"
                         >
                             <ChevronLeftIcon />
@@ -120,11 +155,21 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handleNext} 
                             disabled={!canGoNext} 
-                            className="absolute top-1/2 -translate-y-1/2 -right-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
+                            className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
                             aria-label="Siguiente"
                         >
                             <ChevronRightIcon />
                         </button>
+                        
+                        {/* Mobile Indicators (Dots) */}
+                        <div className="flex md:hidden justify-center mt-4 gap-1.5">
+                            {Array.from({ length: Math.ceil((pets.length - cardsPerPage) + 1) }).map((_, idx) => (
+                                <div 
+                                    key={idx} 
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-4 bg-brand-primary' : 'w-1.5 bg-gray-300'}`}
+                                />
+                            )).slice(0, 5)} {/* Limit dots to 5 to prevent overflow */}
+                        </div>
                     </>
                 )}
             </div>

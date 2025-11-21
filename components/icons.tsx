@@ -2,6 +2,7 @@
 
 
 
+
 import React from 'react';
 
 export const PlusIcon: React.FC = () => (
@@ -296,5 +297,18 @@ export const GoogleMapsIcon: React.FC = () => (
 export const WazeIcon: React.FC = () => (
      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
         <path d="M18.26 4.91c-1.88-1.61-4.3-2.5-6.85-2.5C7.16 2.41 3.35 5.47 2.14 9.57c-1.3 4.42.38 8.98 4.03 11.35 1.36.88 2.93 1.35 4.53 1.35.84 0 1.69-.13 2.52-.4 1.43.89 2.44 1.3 4.32 1.3 1.81 0 3.72-.77 4.42-2.54.34-.85.2-1.56-.36-2.13 2.1-1.68 3.02-4.58 2.31-7.28-.54-2.07-2.08-4.27-5.65-6.31zM13.7 17.4c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm-6.8 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+    </svg>
+);
+
+export const EyeIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+);
+
+export const EyeOffIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
     </svg>
 );

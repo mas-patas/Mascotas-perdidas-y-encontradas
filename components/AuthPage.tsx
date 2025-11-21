@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { GoogleIcon, AppleIcon, WarningIcon, CheckCircleIcon } from './icons';
+import { GoogleIcon, AppleIcon, WarningIcon, CheckCircleIcon, EyeIcon, EyeOffIcon } from './icons';
 
 const AuthPage: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     
     // Honeypot field (anti-bot)
     const [website, setWebsite] = useState('');
@@ -66,6 +67,9 @@ const AuthPage: React.FC = () => {
         if (lockoutTime) return;
 
         setError('');
+        
+        // Sanitize email input
+        const cleanEmail = email.trim();
 
         if (!isLogin) {
             // Registration Validations
@@ -82,19 +86,20 @@ const AuthPage: React.FC = () => {
         setLoading(true);
         try {
             if (isLogin) {
-                await login(email, password);
+                await login(cleanEmail, password);
                 setFailedAttempts(0);
             } else {
-                await register(email, password);
+                await register(cleanEmail, password);
             }
         } catch (err: any) {
             console.error(err);
             let msg = 'Ocurrió un error.';
             
             // Translate Supabase errors
-            if (err.message.includes('Invalid login credentials')) msg = 'Credenciales incorrectas.';
+            if (err.message.includes('Invalid login credentials')) msg = 'Credenciales incorrectas o correo no confirmado.';
             else if (err.message.includes('User already registered')) msg = 'Este email ya está registrado.';
             else if (err.message.includes('Password should be')) msg = 'La contraseña es muy débil.';
+            else if (err.message.toLowerCase().includes('invalid') && err.message.toLowerCase().includes('email')) msg = 'El formato del correo electrónico no es válido. Asegúrate de no dejar espacios.';
             else msg = err.message;
 
             setError(msg);
@@ -181,17 +186,27 @@ const AuthPage: React.FC = () => {
                     
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-900">Contraseña</label>
-                        <input
-                            id="password"
-                            type="password"
-                            name="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className={inputClass}
-                            placeholder="••••••••"
-                            required
-                            minLength={6}
-                        />
+                        <div className="relative">
+                            <input
+                                id="password"
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className={inputClass}
+                                placeholder="••••••••"
+                                required
+                                minLength={6}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                            >
+                                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                            </button>
+                        </div>
                         
                         {/* Password Strength Meter (Only for Registration) */}
                         {!isLogin && password.length > 0 && (
