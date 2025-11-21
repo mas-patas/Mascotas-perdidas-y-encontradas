@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { User, Pet, Chat, UserStatus, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';

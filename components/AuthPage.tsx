@@ -1,14 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { GoogleIcon, AppleIcon } from './icons';
+import { GoogleIcon, AppleIcon, WarningIcon, CheckCircleIcon } from './icons';
 
 const AuthPage: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    
+    // Honeypot field (anti-bot)
+    const [website, setWebsite] = useState('');
+
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [failedAttempts, setFailedAttempts] = useState(0);
+    const [lockoutTime, setLockoutTime] = useState<number | null>(null);
+
     const { login, register, loginWithGoogle, loginWithApple, currentUser } = useAuth();
 
     // Auto-redirect if already logged in
@@ -18,29 +26,95 @@ const AuthPage: React.FC = () => {
         }
     }, [currentUser]);
 
+    // Rate Limiting Timer
+    useEffect(() => {
+        if (lockoutTime) {
+            const timer = setInterval(() => {
+                const remaining = Math.ceil((lockoutTime - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    setLockoutTime(null);
+                    setFailedAttempts(0);
+                }
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [lockoutTime]);
+
+    const calculatePasswordStrength = (pass: string) => {
+        let score = 0;
+        if (!pass) return 0;
+        if (pass.length >= 8) score += 1;
+        if (/[A-Z]/.test(pass)) score += 1;
+        if (/[0-9]/.test(pass)) score += 1;
+        if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+        return score;
+    };
+
+    const passwordStrength = calculatePasswordStrength(password);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (loading) return;
+        
+        // 1. Honeypot Check (Security)
+        if (website) {
+            // Silently fail if bot filled the hidden field
+            console.warn("Bot detected via honeypot");
+            return; 
+        }
+
+        // 2. Rate Limiting Check
+        if (lockoutTime) return;
+
         setError('');
+
+        if (!isLogin) {
+            // Registration Validations
+            if (password !== confirmPassword) {
+                setError('Las contraseñas no coinciden.');
+                return;
+            }
+            if (passwordStrength < 3) {
+                setError('La contraseña es muy débil. Usa mayúsculas, números y al menos 8 caracteres.');
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             if (isLogin) {
                 await login(email, password);
+                setFailedAttempts(0);
             } else {
                 await register(email, password);
             }
         } catch (err: any) {
-            setError(err.message || 'Ocurrió un error.');
-            setLoading(false); // Ensure loading is reset on error
+            console.error(err);
+            let msg = 'Ocurrió un error.';
+            
+            // Translate Supabase errors
+            if (err.message.includes('Invalid login credentials')) msg = 'Credenciales incorrectas.';
+            else if (err.message.includes('User already registered')) msg = 'Este email ya está registrado.';
+            else if (err.message.includes('Password should be')) msg = 'La contraseña es muy débil.';
+            else msg = err.message;
+
+            setError(msg);
+            
+            // Increment failed attempts for login
+            if (isLogin) {
+                const newAttempts = failedAttempts + 1;
+                setFailedAttempts(newAttempts);
+                if (newAttempts >= 5) {
+                    setLockoutTime(Date.now() + 30000); // 30 seconds lockout
+                    setError('Demasiados intentos fallidos. Espera 30 segundos.');
+                }
+            }
+        } finally {
+            setLoading(false);
         }
-        // Note: We don't set loading(false) on success here because the app will redirect/reload
-        // and setting it might cause a flicker. However, if redirection is handled by useEffect,
-        // we might want to reset it if the component persists.
-        // For now, rely on useEffect redirect or error catch.
     };
 
     const handleSocialLogin = async (provider: 'google' | 'apple') => {
-        if (loading) return;
+        if (loading || lockoutTime) return;
         setError('');
         setLoading(true);
         try {
@@ -51,6 +125,7 @@ const AuthPage: React.FC = () => {
             }
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error con el inicio de sesión social.');
+        } finally {
             setLoading(false);
         }
     }
@@ -66,13 +141,30 @@ const AuthPage: React.FC = () => {
                         🐾 Mascotas Perdidas y Encontradas
                     </h1>
                     <p className="text-gray-500 mt-2">
-                        {isLogin ? 'Inicia sesión para continuar' : 'Crea una cuenta para empezar'}
+                        {isLogin ? 'Inicia sesión para continuar' : 'Crea una cuenta segura'}
                     </p>
                 </div>
 
-                {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">{error}</div>}
+                {error && (
+                    <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-r flex items-start gap-3" role="alert">
+                        <WarningIcon />
+                        <span className="text-sm font-medium">{error}</span>
+                    </div>
+                )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Honeypot Field (Hidden) */}
+                    <div className="opacity-0 absolute -z-10 h-0 w-0 overflow-hidden">
+                        <input 
+                            type="text" 
+                            name="website" 
+                            value={website}
+                            onChange={(e) => setWebsite(e.target.value)}
+                            tabIndex={-1}
+                            autoComplete="off" 
+                        />
+                    </div>
+
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-900">Email</label>
                         <input
@@ -86,6 +178,7 @@ const AuthPage: React.FC = () => {
                             required
                         />
                     </div>
+                    
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-900">Contraseña</label>
                         <input
@@ -99,14 +192,64 @@ const AuthPage: React.FC = () => {
                             required
                             minLength={6}
                         />
+                        
+                        {/* Password Strength Meter (Only for Registration) */}
+                        {!isLogin && password.length > 0 && (
+                            <div className="mt-2">
+                                <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full transition-all duration-300 ${
+                                            passwordStrength <= 1 ? 'bg-red-500 w-1/4' :
+                                            passwordStrength === 2 ? 'bg-yellow-500 w-2/4' :
+                                            passwordStrength === 3 ? 'bg-blue-500 w-3/4' :
+                                            'bg-green-500 w-full'
+                                        }`} 
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1 text-right">
+                                    {passwordStrength <= 1 ? 'Débil' : 
+                                     passwordStrength === 2 ? 'Regular' : 
+                                     passwordStrength === 3 ? 'Buena' : 'Fuerte'}
+                                </p>
+                                {passwordStrength < 3 && (
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        * Usa mayúsculas, números y símbolos.
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
+
+                    {!isLogin && (
+                        <div>
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-900">Confirmar Contraseña</label>
+                            <input
+                                id="confirmPassword"
+                                type="password"
+                                name="confirmPassword"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className={`${inputClass} ${confirmPassword && confirmPassword !== password ? 'border-red-500 focus:ring-red-500' : ''}`}
+                                placeholder="••••••••"
+                                required
+                            />
+                            {confirmPassword && confirmPassword !== password && (
+                                <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
+                            )}
+                        </div>
+                    )}
+
                     <div>
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading || !!lockoutTime}
+                            className="w-full py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                         >
-                            {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Registrarse')}
+                            {loading ? 'Procesando...' : (
+                                lockoutTime 
+                                    ? `Espera ${Math.ceil((lockoutTime - Date.now()) / 1000)}s` 
+                                    : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')
+                            )}
                         </button>
                     </div>
                 </form>
@@ -121,20 +264,28 @@ const AuthPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                    <button onClick={() => handleSocialLogin('google')} disabled={loading} className={socialButtonClass}>
+                    <button onClick={() => handleSocialLogin('google')} disabled={loading || !!lockoutTime} className={socialButtonClass}>
                         <GoogleIcon />
-                        <span className="font-medium text-gray-900">Continuar con Google</span>
+                        <span className="font-medium text-gray-900">Google</span>
                     </button>
-                    <button onClick={() => handleSocialLogin('apple')} disabled={loading} className={socialButtonClass}>
+                    <button onClick={() => handleSocialLogin('apple')} disabled={loading || !!lockoutTime} className={socialButtonClass}>
                         <AppleIcon />
-                         <span className="font-medium text-gray-900">Continuar con Apple</span>
+                         <span className="font-medium text-gray-900">Apple</span>
                     </button>
                 </div>
 
 
                 <div className="mt-6 text-center">
-                    <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-sm text-brand-primary hover:underline">
-                        {isLogin ? '¿No tienes una cuenta? Regístrate' : '¿Ya tienes una cuenta? Inicia sesión'}
+                    <button 
+                        onClick={() => { 
+                            setIsLogin(!isLogin); 
+                            setError(''); 
+                            setPassword('');
+                            setConfirmPassword('');
+                        }} 
+                        className="text-sm text-brand-primary hover:underline font-medium"
+                    >
+                        {isLogin ? '¿No tienes una cuenta? Regístrate gratis' : '¿Ya tienes una cuenta? Inicia sesión'}
                     </button>
                 </div>
             </div>

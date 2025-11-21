@@ -1,27 +1,28 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Header } from '../components/Header';
-import { PetList } from '../components/PetList';
-import { ReportPetForm } from '../components/ReportPetForm';
-import { PetDetailPage } from '../components/PetDetailPage';
-import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification, Campaign, Comment } from '../types';
-import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, CAMPAIGN_TYPES } from '../constants';
-import { useAuth } from '../contexts/AuthContext';
-import ProfilePage from '../components/ProfilePage';
-import { FilterControls } from '../components/FilterControls';
-import MessagesPage from '../components/MessagesPage';
-import ChatPage from '../components/ChatPage';
-import AdminDashboard from '../components/AdminDashboard';
-import { findMatchingPets } from '../services/geminiService';
-import { PotentialMatchesModal } from '../components/PotentialMatchesModal';
-import { FlyerModal } from '../components/FlyerModal';
-import { ReportAdoptionForm } from '../components/ReportAdoptionForm';
-import AdminUserDetailModal from '../components/AdminUserDetailModal';
-import SupportPage from '../components/SupportPage';
-import CampaignsPage from '../components/CampaignsPage';
-import CampaignDetailPage from '../components/CampaignDetailPage';
-import MapPage from '../components/MapPage';
-import { supabase } from '../services/supabaseClient';
+import { Header } from './components/Header';
+import { PetList } from './components/PetList';
+import { ReportPetForm } from './components/ReportPetForm';
+import { PetDetailPage } from './components/PetDetailPage';
+import type { Pet, PetStatus, AnimalType, PetSize, Chat, Message, User, UserRole, PotentialMatch, UserStatus, OwnedPet, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Notification, Campaign, Comment } from './types';
+import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, CAMPAIGN_TYPES } from './constants';
+import { useAuth } from './contexts/AuthContext';
+import ProfilePage from './components/ProfilePage';
+import { FilterControls } from './components/FilterControls';
+import MessagesPage from './components/MessagesPage';
+import ChatPage from './components/ChatPage';
+import AdminDashboard from './components/AdminDashboard';
+import { findMatchingPets } from './services/geminiService';
+import { PotentialMatchesModal } from './components/PotentialMatchesModal';
+import { FlyerModal } from './components/FlyerModal';
+import { ReportAdoptionForm } from './components/ReportAdoptionForm';
+import AdminUserDetailModal from './components/AdminUserDetailModal';
+import SupportPage from './components/SupportPage';
+import CampaignsPage from './components/CampaignsPage';
+import CampaignDetailPage from './components/CampaignDetailPage';
+import MapPage from './components/MapPage';
+import { supabase } from './services/supabaseClient';
+import { generateUUID } from './utils/uuid';
 
 const App: React.FC = () => {
     const { currentUser, isGhosting, stopGhosting, ghostLogin } = useAuth();
@@ -72,58 +73,176 @@ const App: React.FC = () => {
     // 1. FETCH REAL DATA FROM SUPABASE
     useEffect(() => {
         const fetchData = async () => {
-            // A. Fetch Profiles (Users)
-            const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
-            if (profiles) {
-                const mappedUsers: User[] = profiles.map(p => ({
-                    id: p.id,
-                    email: p.email,
-                    role: p.role || USER_ROLES.USER,
-                    status: p.status || USER_STATUS.ACTIVE,
-                    username: p.username,
-                    firstName: p.first_name,
-                    lastName: p.last_name,
-                    phone: p.phone,
-                    dni: p.dni,
-                    avatarUrl: p.avatar_url,
-                    ownedPets: [],
-                    savedPetIds: []
-                }));
-                setUsers(mappedUsers);
-            }
-            if (profilesError) console.error("Error fetching profiles:", profilesError);
+            try {
+                // Fetch all data in parallel
+                const [
+                    profilesRes,
+                    petsRes,
+                    chatsRes,
+                    messagesRes,
+                    reportsRes,
+                    ticketsRes,
+                    campaignsRes,
+                    notificationsRes,
+                    commentsRes
+                ] = await Promise.all([
+                    supabase.from('profiles').select('*'),
+                    supabase.from('pets').select('*').order('created_at', { ascending: false }),
+                    supabase.from('chats').select('*'),
+                    supabase.from('messages').select('*').order('created_at', { ascending: true }),
+                    supabase.from('reports').select('*').order('created_at', { ascending: false }),
+                    supabase.from('support_tickets').select('*').order('created_at', { ascending: false }),
+                    supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
+                    supabase.from('notifications').select('*').order('created_at', { ascending: false }),
+                    supabase.from('comments').select('*').order('created_at', { ascending: true })
+                ]);
 
-            // B. Fetch Pets
-            const { data: petsData, error: petsError } = await supabase
-                .from('pets')
-                .select('*, profiles(email)')
-                .order('created_at', { ascending: false });
+                // A. Process Profiles
+                let loadedUsers: User[] = [];
+                if (profilesRes.data) {
+                    loadedUsers = profilesRes.data.map(p => ({
+                        id: p.id,
+                        email: p.email,
+                        role: p.role || USER_ROLES.USER,
+                        status: p.status || USER_STATUS.ACTIVE,
+                        username: p.username,
+                        firstName: p.first_name,
+                        lastName: p.last_name,
+                        phone: p.phone,
+                        dni: p.dni,
+                        avatarUrl: p.avatar_url,
+                        ownedPets: p.owned_pets || [],
+                        savedPetIds: p.saved_pet_ids || []
+                    }));
+                    setUsers(loadedUsers);
+                }
 
-            if (petsData) {
-                const mappedPets: Pet[] = petsData.map(p => ({
-                    id: p.id,
-                    userEmail: p.profiles?.email || 'unknown', // Joined email
-                    status: p.status,
-                    name: p.name,
-                    animalType: p.animal_type,
-                    breed: p.breed,
-                    color: p.color,
-                    size: p.size,
-                    location: p.location,
-                    date: p.date,
-                    contact: p.contact,
-                    description: p.description,
-                    imageUrls: p.image_urls || [],
-                    adoptionRequirements: p.adoption_requirements,
-                    shareContactInfo: p.share_contact_info,
-                    contactRequests: p.contact_requests || [],
-                    lat: p.lat,
-                    lng: p.lng,
-                    comments: [] // Comments are pending DB implementation
-                }));
-                setPets(mappedPets);
+                // B. Process Pets & Comments
+                if (petsRes.data) {
+                    const loadedComments = commentsRes.data || [];
+                    const mappedPets: Pet[] = petsRes.data.map(p => {
+                        // Manual Join for User Email using profiles loaded above
+                        const owner = loadedUsers.find(u => u.id === p.user_id);
+                        // Manual Join for Comments
+                        const petComments = loadedComments
+                            .filter(c => c.pet_id === p.id)
+                            .map(c => ({
+                                id: c.id,
+                                userEmail: c.user_email,
+                                userName: c.user_name,
+                                text: c.text,
+                                timestamp: c.created_at
+                            }));
+
+                        return {
+                            id: p.id,
+                            userEmail: owner?.email || 'unknown',
+                            status: p.status,
+                            name: p.name,
+                            animalType: p.animal_type,
+                            breed: p.breed,
+                            color: p.color,
+                            size: p.size,
+                            location: p.location,
+                            date: p.date,
+                            contact: p.contact,
+                            description: p.description,
+                            imageUrls: p.image_urls || [],
+                            adoptionRequirements: p.adoption_requirements,
+                            shareContactInfo: p.share_contact_info,
+                            contactRequests: p.contact_requests || [],
+                            lat: p.lat,
+                            lng: p.lng,
+                            comments: petComments
+                        };
+                    });
+                    setPets(mappedPets);
+                }
+
+                // C. Process Chats & Messages
+                if (chatsRes.data) {
+                    const loadedMessages = messagesRes.data || [];
+                    const mappedChats: Chat[] = chatsRes.data.map(c => {
+                        const chatMessages = loadedMessages
+                            .filter(m => m.chat_id === c.id)
+                            .map(m => ({
+                                senderEmail: m.sender_email,
+                                text: m.text,
+                                timestamp: m.created_at
+                            }));
+                        
+                        return {
+                            id: c.id,
+                            petId: c.pet_id,
+                            participantEmails: c.participant_emails,
+                            messages: chatMessages,
+                            lastReadTimestamps: c.last_read_timestamps || {}
+                        };
+                    });
+                    setChats(mappedChats);
+                }
+
+                // D. Process Other Tables
+                if (reportsRes.data) {
+                    setReports(reportsRes.data.map(r => ({
+                        id: r.id,
+                        reporterEmail: r.reporter_email,
+                        reportedEmail: r.reported_email,
+                        type: r.type as ReportType,
+                        targetId: r.target_id,
+                        reason: r.reason,
+                        details: r.details,
+                        status: r.status,
+                        timestamp: r.created_at,
+                        postSnapshot: r.post_snapshot
+                    })));
+                }
+
+                if (ticketsRes.data) {
+                    setSupportTickets(ticketsRes.data.map(t => ({
+                        id: t.id,
+                        userEmail: t.user_email,
+                        category: t.category,
+                        subject: t.subject,
+                        description: t.description,
+                        status: t.status,
+                        assignedTo: t.assigned_to,
+                        response: t.response,
+                        assignmentHistory: t.assignment_history || [],
+                        timestamp: t.created_at
+                    })));
+                }
+
+                if (campaignsRes.data) {
+                    setCampaigns(campaignsRes.data.map(c => ({
+                        id: c.id,
+                        userEmail: c.user_email,
+                        type: c.type,
+                        title: c.title,
+                        description: c.description,
+                        location: c.location,
+                        date: c.date,
+                        imageUrls: c.image_urls || [],
+                        contactPhone: c.contact_phone,
+                        lat: c.lat,
+                        lng: c.lng
+                    })));
+                }
+
+                if (notificationsRes.data) {
+                    setNotifications(notificationsRes.data.map(n => ({
+                        id: n.id,
+                        userId: n.user_id,
+                        message: n.message,
+                        link: n.link,
+                        isRead: n.is_read,
+                        timestamp: n.created_at
+                    })));
+                }
+
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
             }
-             if (petsError) console.error("Error fetching pets:", petsError);
         };
 
         fetchData();
@@ -255,8 +374,12 @@ const App: React.FC = () => {
         if (!currentUser) return;
 
         try {
-            // Insert into Supabase
-            const { data, error } = await supabase.from('pets').insert({
+            const newPetId = generateUUID();
+            const now = new Date().toISOString();
+
+            // Insert into Supabase with explicit ID and timestamp
+            const { error } = await supabase.from('pets').insert({
+                id: newPetId,
                 user_id: currentUser.id,
                 status: petData.status,
                 name: petData.name,
@@ -273,35 +396,34 @@ const App: React.FC = () => {
                 share_contact_info: petData.shareContactInfo,
                 contact_requests: [],
                 lat: petData.lat,
-                lng: petData.lng
-            }).select('*, profiles(email)').single();
+                lng: petData.lng,
+                created_at: now
+            });
 
             if (error) throw error;
 
-            if (data) {
-                const newPet: Pet = {
-                    id: data.id,
-                    userEmail: data.profiles?.email || currentUser.email,
-                    status: data.status,
-                    name: data.name,
-                    animalType: data.animal_type,
-                    breed: data.breed,
-                    color: data.color,
-                    size: data.size,
-                    location: data.location,
-                    date: data.date,
-                    contact: data.contact,
-                    description: data.description,
-                    imageUrls: data.image_urls || [],
-                    adoptionRequirements: data.adoption_requirements,
-                    shareContactInfo: data.share_contact_info,
-                    contactRequests: data.contact_requests || [],
-                    lat: data.lat,
-                    lng: data.lng,
-                    comments: []
-                };
-                setPets(prev => [newPet, ...prev]);
-            }
+            const newPet: Pet = {
+                id: newPetId,
+                userEmail: currentUser.email,
+                status: petData.status,
+                name: petData.name,
+                animalType: petData.animalType,
+                breed: petData.breed,
+                color: petData.color,
+                size: petData.size,
+                location: petData.location,
+                date: petData.date,
+                contact: petData.contact,
+                description: petData.description,
+                imageUrls: petData.imageUrls || [],
+                adoptionRequirements: petData.adoptionRequirements,
+                shareContactInfo: petData.shareContactInfo,
+                contactRequests: [],
+                lat: petData.lat,
+                lng: petData.lng,
+                comments: []
+            };
+            setPets(prev => [newPet, ...prev]);
 
             setIsReportModalOpen(false);
             setIsAdoptionModalOpen(false);
@@ -310,7 +432,12 @@ const App: React.FC = () => {
 
         } catch (err: any) {
             console.error("Error creating pet:", err);
-            alert("Error al publicar la mascota: " + err.message);
+            const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+            } else {
+                alert("Error al publicar la mascota: " + msg);
+            }
         }
     };
 
@@ -364,168 +491,367 @@ const App: React.FC = () => {
         }
     };
 
-    const handleStartChat = (pet: Pet) => {
-        if (!currentUser) return;
+    const handleStartChat = async (pet: Pet) => {
+        if (!currentUser) {
+            handleNavigate('/login');
+            return;
+        }
         
-        // Check if chat exists
+        if (!pet.userEmail || pet.userEmail === 'unknown') {
+            alert("No se puede contactar al dueño de esta mascota porque su información no está disponible.");
+            return;
+        }
+
+        // Check if chat exists in local state
         const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
         
         if (existingChat) {
             setSelectedChatId(existingChat.id);
             setCurrentView('chat');
         } else {
-            const newChat: Chat = {
-                id: Date.now().toString(),
-                petId: pet.id,
-                participantEmails: [currentUser.email, pet.userEmail],
-                messages: [],
-                lastReadTimestamps: {
-                    [currentUser.email]: new Date().toISOString(),
+            // Create new chat in DB
+            try {
+                const participants = [currentUser.email, pet.userEmail];
+                const newChatId = generateUUID();
+                const now = new Date().toISOString();
+                const timestamps = {
+                    [currentUser.email]: now,
                     [pet.userEmail]: new Date(0).toISOString() 
-                }
-            };
-            setChats(prev => [...prev, newChat]);
-            setSelectedChatId(newChat.id);
-            setCurrentView('chat');
-        }
-    };
-
-    const handleSendMessage = (chatId: string, text: string) => {
-        if (!currentUser) return;
-        const newMessage: Message = {
-            senderEmail: currentUser.email,
-            text,
-            timestamp: new Date().toISOString()
-        };
-        
-        setChats(prev => prev.map(chat => {
-            if (chat.id === chatId) {
-                const updatedChat = {
-                    ...chat,
-                    messages: [...chat.messages, newMessage],
-                    lastReadTimestamps: {
-                        ...chat.lastReadTimestamps,
-                        [currentUser.email]: new Date().toISOString()
-                    }
                 };
                 
-                // Notify recipient
+                const { error } = await supabase.from('chats').insert({
+                    id: newChatId,
+                    pet_id: pet.id,
+                    participant_emails: participants,
+                    last_read_timestamps: timestamps,
+                    created_at: now
+                });
+
+                if (error) throw error;
+
+                const newChat: Chat = {
+                    id: newChatId,
+                    petId: pet.id,
+                    participantEmails: participants,
+                    messages: [],
+                    lastReadTimestamps: timestamps
+                };
+                setChats(prev => [...prev, newChat]);
+                setSelectedChatId(newChatId);
+                setCurrentView('chat');
+                
+            } catch (err: any) {
+                console.error("Error starting chat:", err);
+                const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+                if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                    alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+                } else {
+                    alert("Error al iniciar el chat: " + msg);
+                }
+            }
+        }
+    };
+
+    const handleSendMessage = async (chatId: string, text: string) => {
+        if (!currentUser) return;
+        
+        try {
+            const newMessageId = generateUUID();
+            const now = new Date().toISOString();
+
+            // Insert Message with manual ID and timestamp
+            const { error: msgError } = await supabase.from('messages').insert({
+                id: newMessageId,
+                chat_id: chatId,
+                sender_email: currentUser.email,
+                text: text,
+                created_at: now
+            });
+
+            if (msgError) throw msgError;
+
+            // Update Chat Last Read
+            const chat = chats.find(c => c.id === chatId);
+            const newTimestamps = { ...chat?.lastReadTimestamps, [currentUser.email]: now };
+
+            await supabase.from('chats').update({
+                last_read_timestamps: newTimestamps
+            }).eq('id', chatId);
+
+            const newMessage: Message = {
+                senderEmail: currentUser.email,
+                text: text,
+                timestamp: now
+            };
+            
+            setChats(prev => prev.map(c => {
+                if (c.id === chatId) {
+                    return {
+                        ...c,
+                        messages: [...c.messages, newMessage],
+                        lastReadTimestamps: newTimestamps
+                    };
+                }
+                return c;
+            }));
+            
+            // Notify recipient
+            if (chat) {
                 const recipientEmail = chat.participantEmails.find(e => e !== currentUser.email);
                 if (recipientEmail) {
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: recipientEmail,
+                    const newNotifId = generateUUID();
+                    supabase.from('notifications').insert({
+                        id: newNotifId,
+                        user_id: recipientEmail,
                         message: `Nuevo mensaje de ${currentUser.username || 'un usuario'}`,
                         link: 'messages',
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
+                        is_read: false,
+                        created_at: now
+                    }).then(() => {}); // fire and forget
                 }
-
-                return updatedChat;
             }
-            return chat;
-        }));
-    };
-    
-    const handleMarkChatAsRead = (chatId: string) => {
-        if (!currentUser) return;
-        setChats(prev => prev.map(chat => {
-             if (chat.id === chatId) {
-                 return {
-                     ...chat,
-                     lastReadTimestamps: {
-                         ...chat.lastReadTimestamps,
-                         [currentUser.email]: new Date().toISOString()
-                     }
-                 };
-             }
-             return chat;
-        }));
-    };
-    
-    const handleReport = (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
-        if (!currentUser) return;
-        const newReport: Report = {
-            id: Date.now().toString(),
-            reporterEmail: currentUser.email,
-            reportedEmail: type === 'user' ? targetId : (pets.find(p => p.id === targetId)?.userEmail || ''),
-            type,
-            targetId,
-            reason,
-            details,
-            timestamp: new Date().toISOString(),
-            status: REPORT_STATUS.PENDING,
-            postSnapshot: type === 'post' ? pets.find(p => p.id === targetId) : undefined
-        };
-        setReports(prev => [...prev, newReport]);
-        alert('Reporte enviado exitosamente. Gracias por ayudar a mantener segura la comunidad.');
-    };
 
-    const handleAddSupportTicket = (category: SupportTicketCategory, subject: string, description: string) => {
-        if (!currentUser) return;
-        const newTicket: SupportTicket = {
-            id: Date.now().toString(),
-            userEmail: currentUser.email,
-            category,
-            subject,
-            description,
-            timestamp: new Date().toISOString(),
-            status: SUPPORT_TICKET_STATUS.PENDING,
-        };
-        setSupportTickets(prev => [...prev, newTicket]);
+        } catch (err: any) {
+            console.error("Error sending message:", err);
+            const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+            } else {
+                alert("Error al enviar el mensaje: " + msg);
+            }
+        }
     };
     
-    const handleUpdateSupportTicket = (updatedTicket: SupportTicket) => {
-        setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+    const handleMarkChatAsRead = async (chatId: string) => {
+        if (!currentUser) return;
         
-        // Notify user if status changed or response added
-        const originalTicket = supportTickets.find(t => t.id === updatedTicket.id);
-        if (originalTicket && (originalTicket.status !== updatedTicket.status || (!originalTicket.response && updatedTicket.response))) {
-             const notification: Notification = {
-                id: Date.now().toString(),
-                userId: updatedTicket.userEmail,
-                message: `Tu ticket "${updatedTicket.subject}" ha sido actualizado a: ${updatedTicket.status}`,
-                link: 'support',
-                timestamp: new Date().toISOString(),
-                isRead: false
-            };
-            setNotifications(n => [notification, ...n]);
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return;
+
+        const newTimestamps = {
+            ...chat.lastReadTimestamps,
+            [currentUser.email]: new Date().toISOString()
+        };
+
+        try {
+            await supabase.from('chats').update({
+                last_read_timestamps: newTimestamps
+            }).eq('id', chatId);
+
+            setChats(prev => prev.map(c => {
+                 if (c.id === chatId) {
+                     return { ...c, lastReadTimestamps: newTimestamps };
+                 }
+                 return c;
+            }));
+        } catch (err) {
+            console.error("Error marking read:", err);
         }
     };
-
-    const handleSaveCampaign = (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
+    
+    const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
         if (!currentUser) return;
-        if (idToUpdate) {
-            setCampaigns(prev => prev.map(c => c.id === idToUpdate ? { ...c, ...campaignData } : c));
-        } else {
-            const newCampaign: Campaign = {
-                ...campaignData,
-                id: Date.now().toString(),
-                userEmail: currentUser.email,
-            };
-            setCampaigns(prev => [newCampaign, ...prev]);
+        
+        try {
+            const reportedEmail = type === 'user' ? targetId : (pets.find(p => p.id === targetId)?.userEmail || '');
+            const postSnapshot = type === 'post' ? pets.find(p => p.id === targetId) : undefined;
             
-            // Notify all users about new campaign
-            users.forEach(u => {
-                if (u.email !== currentUser.email) {
-                     const notification: Notification = {
-                        id: Date.now().toString() + Math.random(),
-                        userId: u.email,
-                        message: `Nueva campaña: ${newCampaign.title}`,
-                        link: { type: 'campaign', id: newCampaign.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                }
+            const newReportId = generateUUID();
+            const now = new Date().toISOString();
+
+            const { error } = await supabase.from('reports').insert({
+                id: newReportId,
+                reporter_email: currentUser.email,
+                reported_email: reportedEmail,
+                type,
+                target_id: targetId,
+                reason,
+                details,
+                status: REPORT_STATUS.PENDING,
+                post_snapshot: postSnapshot,
+                created_at: now
             });
+
+            if (error) throw error;
+
+            const newReport: Report = {
+                id: newReportId,
+                reporterEmail: currentUser.email,
+                reportedEmail: reportedEmail,
+                type: type as ReportType,
+                targetId: targetId,
+                reason: reason,
+                details: details,
+                timestamp: now,
+                status: REPORT_STATUS.PENDING,
+                postSnapshot: postSnapshot
+            };
+            setReports(prev => [newReport, ...prev]);
+            alert('Reporte enviado exitosamente.');
+        } catch (err: any) {
+            console.error("Error sending report:", err);
+            const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+            } else {
+                alert("Error al enviar reporte: " + msg);
+            }
         }
     };
 
-    const handleDeleteCampaign = (id: string) => {
-        setCampaigns(prev => prev.filter(c => c.id !== id));
+    const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => {
+        try {
+            const { error } = await supabase.from('reports').update({ status }).eq('id', reportId);
+            if (error) throw error;
+            setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
+        } catch (err: any) {
+            alert("Error actualizando reporte: " + err.message);
+        }
+    };
+
+    const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => {
+        if (!currentUser) return;
+        try {
+            const newTicketId = generateUUID();
+            const now = new Date().toISOString();
+            
+            const { error } = await supabase.from('support_tickets').insert({
+                id: newTicketId,
+                user_email: currentUser.email,
+                category,
+                subject,
+                description,
+                status: SUPPORT_TICKET_STATUS.PENDING,
+                created_at: now
+            });
+
+            if (error) throw error;
+
+            const newTicket: SupportTicket = {
+                id: newTicketId,
+                userEmail: currentUser.email,
+                category: category,
+                subject: subject,
+                description: description,
+                timestamp: now,
+                status: SUPPORT_TICKET_STATUS.PENDING,
+            };
+            setSupportTickets(prev => [newTicket, ...prev]);
+        } catch (err: any) {
+            console.error("Error adding ticket:", err);
+            const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+            } else {
+                alert("Error al crear ticket: " + msg);
+            }
+        }
+    };
+    
+    const handleUpdateSupportTicket = async (updatedTicket: SupportTicket) => {
+        try {
+            const { error } = await supabase.from('support_tickets').update({
+                status: updatedTicket.status,
+                response: updatedTicket.response,
+                assigned_to: updatedTicket.assignedTo,
+                assignment_history: updatedTicket.assignmentHistory
+            }).eq('id', updatedTicket.id);
+
+            if (error) throw error;
+
+            setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+            
+            // Notify user
+            const originalTicket = supportTickets.find(t => t.id === updatedTicket.id);
+            if (originalTicket && (originalTicket.status !== updatedTicket.status || (!originalTicket.response && updatedTicket.response))) {
+                 const newNotifId = generateUUID();
+                 await supabase.from('notifications').insert({
+                    id: newNotifId,
+                    user_id: updatedTicket.userEmail,
+                    message: `Tu ticket "${updatedTicket.subject}" ha sido actualizado a: ${updatedTicket.status}`,
+                    link: 'support',
+                    is_read: false,
+                    created_at: new Date().toISOString()
+                });
+            }
+        } catch (err: any) {
+            alert("Error actualizando ticket: " + err.message);
+        }
+    };
+
+    const handleSaveCampaign = async (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
+        if (!currentUser) return;
+        
+        try {
+            if (idToUpdate) {
+                const { error } = await supabase.from('campaigns').update({
+                    title: campaignData.title,
+                    description: campaignData.description,
+                    type: campaignData.type,
+                    location: campaignData.location,
+                    date: campaignData.date,
+                    image_urls: campaignData.imageUrls,
+                    contact_phone: campaignData.contactPhone,
+                    lat: campaignData.lat,
+                    lng: campaignData.lng
+                }).eq('id', idToUpdate);
+
+                if (error) throw error;
+                setCampaigns(prev => prev.map(c => c.id === idToUpdate ? { ...c, ...campaignData } : c));
+            } else {
+                const newCampaignId = generateUUID();
+                const now = new Date().toISOString();
+                
+                const { error } = await supabase.from('campaigns').insert({
+                    id: newCampaignId,
+                    user_email: currentUser.email,
+                    title: campaignData.title,
+                    description: campaignData.description,
+                    type: campaignData.type,
+                    location: campaignData.location,
+                    date: campaignData.date,
+                    image_urls: campaignData.imageUrls,
+                    contact_phone: campaignData.contactPhone,
+                    lat: campaignData.lat,
+                    lng: campaignData.lng,
+                    created_at: now
+                });
+
+                if (error) throw error;
+
+                const newCampaign: Campaign = {
+                    id: newCampaignId,
+                    userEmail: currentUser.email,
+                    type: campaignData.type,
+                    title: campaignData.title,
+                    description: campaignData.description,
+                    location: campaignData.location,
+                    date: campaignData.date,
+                    imageUrls: campaignData.imageUrls || [],
+                    contactPhone: campaignData.contactPhone,
+                    lat: campaignData.lat,
+                    lng: campaignData.lng
+                };
+                setCampaigns(prev => [newCampaign, ...prev]);
+            }
+        } catch (err: any) {
+            console.error("Error saving campaign:", err);
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Por favor, ejecuta 'NOTIFY pgrst, \"reload schema\";' en el Editor SQL de Supabase.");
+            } else {
+                alert("Error al guardar campaña: " + (err.message || JSON.stringify(err)));
+            }
+        }
+    };
+
+    const handleDeleteCampaign = async (id: string) => {
+        try {
+            const { error } = await supabase.from('campaigns').delete().eq('id', id);
+            if (error) throw error;
+            setCampaigns(prev => prev.filter(c => c.id !== id));
+        } catch (err: any) {
+            alert("Error al eliminar campaña: " + err.message);
+        }
     };
 
     const handleViewUser = (user: User) => {
@@ -539,66 +865,119 @@ const App: React.FC = () => {
         return notifications.filter(n => n.userId === currentUser.email);
     }, [notifications, currentUser]);
 
-    const handleMarkNotificationAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    const handleMarkNotificationAsRead = async (id: string) => {
+        try {
+            await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        } catch (err) {
+            console.error("Error reading notification:", err);
+        }
     };
 
-    const handleMarkAllNotificationsAsRead = () => {
+    const handleMarkAllNotificationsAsRead = async () => {
         if (!currentUser) return;
-        setNotifications(prev => prev.map(n => n.userId === currentUser.email ? { ...n, isRead: true } : n));
+        try {
+            await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.email);
+            setNotifications(prev => prev.map(n => n.userId === currentUser.email ? { ...n, isRead: true } : n));
+        } catch (err) {
+            console.error("Error reading all notifications:", err);
+        }
     };
     
-    const handleRecordContactRequest = (petId: string) => {
+    const handleRecordContactRequest = async (petId: string) => {
         if (!currentUser) return;
-        setPets(prev => prev.map(p => {
-            if (p.id === petId) {
-                const requests = p.contactRequests || [];
-                if (!requests.includes(currentUser.email)) {
-                     // Notify owner
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: p.userEmail,
-                        message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${p.name}`,
-                        link: { type: 'pet', id: p.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
-                    return { ...p, contactRequests: [...requests, currentUser.email] };
-                }
+        
+        const pet = pets.find(p => p.id === petId);
+        if (!pet) return;
+        
+        const currentRequests = pet.contactRequests || [];
+        if (currentRequests.includes(currentUser.email)) return;
+
+        const updatedRequests = [...currentRequests, currentUser.email];
+
+        try {
+            const { error } = await supabase.from('pets').update({
+                contact_requests: updatedRequests
+            }).eq('id', petId);
+
+            if (error) throw error;
+
+            setPets(prev => prev.map(p => p.id === petId ? { ...p, contactRequests: updatedRequests } : p));
+
+            // Notify owner
+            const newNotifId = generateUUID();
+            await supabase.from('notifications').insert({
+                id: newNotifId,
+                user_id: pet.userEmail,
+                message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${pet.name}`,
+                link: { type: 'pet', id: pet.id },
+                is_read: false,
+                created_at: new Date().toISOString()
+            });
+
+        } catch (err: any) {
+            console.error("Error recording contact request:", err);
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos (Contacto): La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en Supabase.");
             }
-            return p;
-        }));
+        }
     };
 
-    const handleAddComment = (petId: string, text: string) => {
+    const handleAddComment = async (petId: string, text: string) => {
         if (!currentUser) return;
-        setPets(prev => prev.map(p => {
-            if (p.id === petId) {
-                const newComment: Comment = {
-                    id: Date.now().toString(),
-                    userEmail: currentUser.email,
-                    userName: currentUser.username || 'Usuario',
-                    text,
-                    timestamp: new Date().toISOString()
-                };
-                
-                if (p.userEmail !== currentUser.email) {
-                    const notification: Notification = {
-                        id: Date.now().toString(),
-                        userId: p.userEmail,
-                        message: `${currentUser.username || 'Un usuario'} comentó en tu publicación de ${p.name}`,
-                        link: { type: 'pet', id: p.id },
-                        timestamp: new Date().toISOString(),
-                        isRead: false
-                    };
-                    setNotifications(n => [notification, ...n]);
+        
+        try {
+            const newCommentId = generateUUID();
+            const now = new Date().toISOString();
+            
+            const { error } = await supabase.from('comments').insert({
+                id: newCommentId,
+                pet_id: petId,
+                user_email: currentUser.email,
+                user_name: currentUser.username || 'Usuario',
+                text: text,
+                created_at: now
+            });
+
+            if (error) throw error;
+
+            const newComment: Comment = {
+                id: newCommentId,
+                userEmail: currentUser.email,
+                userName: currentUser.username || 'Usuario',
+                text: text,
+                timestamp: now
+            };
+
+            setPets(prev => prev.map(p => {
+                if (p.id === petId) {
+                    return { ...p, comments: [...(p.comments || []), newComment] };
                 }
-                
-                return { ...p, comments: [...(p.comments || []), newComment] };
+                return p;
+            }));
+            
+            const pet = pets.find(p => p.id === petId);
+            if (pet && pet.userEmail !== currentUser.email) {
+                 const newNotifId = generateUUID();
+                 await supabase.from('notifications').insert({
+                    id: newNotifId,
+                    user_id: pet.userEmail,
+                    message: `${currentUser.username || 'Un usuario'} comentó en tu publicación de ${pet.name}`,
+                    link: { type: 'pet', id: pet.id },
+                    is_read: false,
+                    created_at: now
+                });
             }
-            return p;
-        }));
+
+        } catch (err: any) {
+            console.error("Error adding comment:", err);
+            const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            if (err.code === 'PGRST204' || (err.message && err.message.includes('schema cache'))) {
+                alert("Error de base de datos: La estructura de la tabla ha cambiado. Ejecuta 'NOTIFY pgrst, \"reload schema\";' en el SQL Editor de Supabase.");
+            } else {
+                alert("Error al agregar comentario: " + msg);
+            }
+        }
     };
 
     const activeChat = chats.find(c => c.id === selectedChatId);
@@ -625,6 +1004,7 @@ const App: React.FC = () => {
                 onReportPet={handleReportPet} 
                 onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)}
                 onNavigate={handleNavigate}
+                onHome={() => { handleNavigate('/'); setFilters({ status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' }); }}
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                 hasUnreadMessages={hasUnreadMessages}
                 notifications={myNotifications}
@@ -645,6 +1025,7 @@ const App: React.FC = () => {
                     onNavigateToAdmin={() => handleNavigate('/admin')}
                     onNavigateToCampaigns={() => handleNavigate('/campanas')}
                     onNavigateToMap={() => handleNavigate('/mapa')}
+                    onClearFilters={() => setFilters({ status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' })}
                 />
 
                 <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
@@ -655,6 +1036,8 @@ const App: React.FC = () => {
                             onViewUser={handleViewUser} 
                             filters={filters}
                             onNavigate={handleNavigate}
+                            onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))}
+                            onReset={() => { setFilters({ status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' }); handleNavigate('/'); }}
                         />
                     )}
                     
@@ -735,7 +1118,7 @@ const App: React.FC = () => {
                             chats={chats}
                             reports={reports}
                             supportTickets={supportTickets}
-                            onUpdateReportStatus={(id, status) => setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r))}
+                            onUpdateReportStatus={handleUpdateReportStatus}
                             onDeletePet={handleDeletePet}
                             onUpdateSupportTicket={handleUpdateSupportTicket}
                             isAiSearchEnabled={isAiSearchEnabled}
@@ -832,16 +1215,37 @@ const App: React.FC = () => {
                              setCurrentView('chat');
                              setIsUserDetailModalOpen(false);
                          } else {
-                             const newChat: Chat = {
-                                 id: Date.now().toString(),
-                                 participantEmails: [currentUser.email, recipientEmail],
-                                 messages: [],
-                                 lastReadTimestamps: { [currentUser.email]: new Date().toISOString(), [recipientEmail]: new Date(0).toISOString() }
+                             // Client-side ID and Timestamp generation for robustness
+                             const newChatId = generateUUID();
+                             const now = new Date().toISOString();
+                             const timestamps = {
+                                [currentUser.email]: now,
+                                [recipientEmail]: new Date(0).toISOString() 
                              };
-                             setChats(prev => [...prev, newChat]);
-                             setSelectedChatId(newChat.id);
-                             setCurrentView('chat');
-                             setIsUserDetailModalOpen(false);
+
+                             supabase.from('chats').insert({
+                                id: newChatId,
+                                participant_emails: [currentUser.email, recipientEmail],
+                                last_read_timestamps: timestamps,
+                                created_at: now
+                             }).then(({ error }) => {
+                                if (!error) {
+                                    const createdChat = { 
+                                        id: newChatId,
+                                        participantEmails: [currentUser.email, recipientEmail],
+                                        messages: [],
+                                        lastReadTimestamps: timestamps
+                                    };
+                                    setChats(prev => [...prev, createdChat]);
+                                    setSelectedChatId(newChatId);
+                                    setCurrentView('chat');
+                                    setIsUserDetailModalOpen(false);
+                                } else {
+                                    console.error("Error creating admin chat:", error);
+                                    const msg = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+                                    alert("Error al iniciar chat: " + msg);
+                                }
+                             });
                          }
                     }}
                     onGhostLogin={ghostLogin}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
@@ -12,6 +13,8 @@ interface PetListProps {
         status: PetStatus | 'Todos';
     };
     onNavigate: (path: string) => void;
+    onSelectStatus: (status: PetStatus) => void;
+    onReset: () => void;
 }
 
 const PetSection: React.FC<{
@@ -20,7 +23,8 @@ const PetSection: React.FC<{
     users: User[];
     onViewUser: (user: User) => void;
     onNavigate: (path: string) => void;
-}> = ({ title, pets, users, onViewUser, onNavigate }) => {
+    onSeeMore: () => void;
+}> = ({ title, pets, users, onViewUser, onNavigate, onSeeMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [cardsPerPage, setCardsPerPage] = useState(4);
     const [gridClass, setGridClass] = useState('grid-cols-4');
@@ -41,16 +45,11 @@ const PetSection: React.FC<{
             setGridClass(newGridClass);
             setCardsPerPage(newCardsPerPage);
 
-            // A more robust way to reset the index to prevent it from going out of bounds
-            // when the number of pets or the page size changes.
             setCurrentIndex(prevIndex => {
-                // If there are fewer pets than can be displayed on one page, always reset to the first page.
                 if (pets.length <= newCardsPerPage) {
                     return 0;
                 }
-                // Calculate the last possible starting index for the carousel.
                 const maxIndex = Math.max(0, pets.length - newCardsPerPage);
-                // If the current index is now out of bounds, clamp it to the last valid index.
                 return Math.min(prevIndex, maxIndex);
             });
         };
@@ -87,9 +86,20 @@ const PetSection: React.FC<{
 
     return (
         <section>
-            <h2 className="text-2xl font-bold text-gray-800 pb-2 border-b-2 border-brand-primary mb-4">{title}</h2>
+            <div className="flex justify-between items-center border-b border-gray-200 mb-4 pb-3">
+                <h2 className="text-2xl font-bold text-gray-800 relative pl-3 before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-6 before:bg-brand-primary before:rounded-full">
+                    {title}
+                </h2>
+                <button 
+                    onClick={onSeeMore}
+                    className="group flex items-center gap-2 text-sm font-bold text-brand-primary bg-brand-light hover:bg-blue-100 px-4 py-2 rounded-full transition-all duration-200"
+                >
+                    Ver más
+                    <span className="transform group-hover:translate-x-1 transition-transform text-lg leading-none">→</span>
+                </button>
+            </div>
             
-            <div className="relative">
+            <div className="relative group/carousel">
                 <div className={`grid ${gridClass} gap-4`}>
                     {visiblePets.map(pet => {
                         const petOwner = users.find(u => u.email === pet.userEmail);
@@ -102,7 +112,7 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handlePrev} 
                             disabled={!canGoPrev} 
-                            className="absolute top-1/2 -translate-y-1/2 left-0 -translate-x-1/2 z-10 p-2 rounded-full bg-brand-primary text-white shadow-lg hover:bg-brand-dark disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="absolute top-1/2 -translate-y-1/2 -left-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
                             aria-label="Anterior"
                         >
                             <ChevronLeftIcon />
@@ -110,7 +120,7 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handleNext} 
                             disabled={!canGoNext} 
-                            className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-1/2 z-10 p-2 rounded-full bg-brand-primary text-white shadow-lg hover:bg-brand-dark disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="absolute top-1/2 -translate-y-1/2 -right-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
                             aria-label="Siguiente"
                         >
                             <ChevronRightIcon />
@@ -123,30 +133,89 @@ const PetSection: React.FC<{
 };
 
 
-export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate }) => {
+export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate, onSelectStatus, onReset }) => {
     
-    // Si se aplica un filtro de estado, mostrar una sola cuadrícula con todos los resultados.
+    // Infinite Scroll State
+    const [displayLimit, setDisplayLimit] = useState(12);
+    const sentinelRef = useRef<HTMLDivElement>(null);
+
+    // Reset limit when filters change
+    useEffect(() => {
+        setDisplayLimit(12);
+    }, [pets]);
+
+    // Infinite Scroll Observer
+    useEffect(() => {
+        if (filters.status === 'Todos') return; // Only active in full list view
+
+        const observer = new IntersectionObserver((entries) => {
+            const target = entries[0];
+            if (target.isIntersecting && displayLimit < pets.length) {
+                setDisplayLimit(prev => prev + 12);
+            }
+        }, {
+            root: null, // viewport
+            rootMargin: '100px',
+            threshold: 0.1
+        });
+
+        if (sentinelRef.current) {
+            observer.observe(sentinelRef.current);
+        }
+
+        return () => {
+            if (sentinelRef.current) observer.unobserve(sentinelRef.current);
+        };
+    }, [pets.length, displayLimit, filters.status]);
+
+
+    // View 1: Specific Category Selected (Infinite Scroll Grid)
     if (filters.status !== 'Todos') {
+        const visiblePets = pets.slice(0, displayLimit);
+
         return (
-             <div className="space-y-10">
-                {pets.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {pets.map(pet => {
-                            const petOwner = users.find(u => u.email === pet.userEmail);
-                            return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
-                        })}
+             <div className="space-y-6">
+                <div>
+                    <button 
+                        onClick={onReset} 
+                        className="flex items-center gap-2 text-gray-500 hover:text-brand-dark hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors mb-2 font-medium"
+                    >
+                        <span className="text-lg leading-none">←</span> Volver al inicio
+                    </button>
+                    <div className="flex justify-between items-end border-b border-gray-200 pb-4">
+                        <h2 className="text-3xl font-bold text-brand-dark">
+                            {filters.status === PET_STATUS.EN_ADOPCION ? 'Mascotas en Adopción' : `Mascotas ${filters.status}s`}
+                        </h2>
+                        <span className="text-gray-500 text-sm font-medium bg-gray-100 px-2 py-1 rounded-md">{pets.length} resultados</span>
                     </div>
+                </div>
+
+                {visiblePets.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {visiblePets.map(pet => {
+                                const petOwner = users.find(u => u.email === pet.userEmail);
+                                return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
+                            })}
+                        </div>
+                        {/* Sentinel for Infinite Scroll */}
+                        {displayLimit < pets.length && (
+                            <div ref={sentinelRef} className="h-10 w-full flex justify-center items-center p-4">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">
                         <p className="text-xl text-gray-500">No se encontraron mascotas con los filtros actuales.</p>
-                        <p className="text-gray-400 mt-2">Intenta ajustar tu búsqueda.</p>
+                        <p className="text-gray-400 mt-2">Intenta ajustar tu búsqueda o limpiar los filtros.</p>
                     </div>
                 )}
             </div>
         )
     }
 
-    // Vista por defecto: secciones separadas con carruseles
+    // View 2: Dashboard / Overview (Carousels per category)
     const lostPets = pets.filter(p => p.status === PET_STATUS.PERDIDO);
     const foundPets = pets.filter(p => p.status === PET_STATUS.ENCONTRADO);
     const sightedPets = pets.filter(p => p.status === PET_STATUS.AVISTADO);
@@ -157,41 +226,56 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         <div className="space-y-10">
             {pets.length > 0 ? (
                 <>
-                    <PetSection 
-                        title="Mascotas Perdidas"
-                        pets={lostPets}
-                        users={users}
-                        onViewUser={onViewUser}
-                        onNavigate={onNavigate}
-                    />
-                     <PetSection 
-                        title="Mascotas Encontradas"
-                        pets={foundPets}
-                        users={users}
-                        onViewUser={onViewUser}
-                        onNavigate={onNavigate}
-                    />
-                    <PetSection 
-                        title="En Adopción"
-                        pets={adoptionPets}
-                        users={users}
-                        onViewUser={onViewUser}
-                        onNavigate={onNavigate}
-                    />
-                     <PetSection 
-                        title="Mascotas Avistadas"
-                        pets={sightedPets}
-                        users={users}
-                        onViewUser={onViewUser}
-                        onNavigate={onNavigate}
-                    />
-                     <PetSection 
-                        title="Historias de Éxito (Reunidos)"
-                        pets={reunitedPets}
-                        users={users}
-                        onViewUser={onViewUser}
-                        onNavigate={onNavigate}
-                    />
+                    {lostPets.length > 0 && (
+                        <PetSection 
+                            title="Mascotas Perdidas"
+                            pets={lostPets}
+                            users={users}
+                            onViewUser={onViewUser}
+                            onNavigate={onNavigate}
+                            onSeeMore={() => onSelectStatus(PET_STATUS.PERDIDO)}
+                        />
+                    )}
+                    {foundPets.length > 0 && (
+                         <PetSection 
+                            title="Mascotas Encontradas"
+                            pets={foundPets}
+                            users={users}
+                            onViewUser={onViewUser}
+                            onNavigate={onNavigate}
+                            onSeeMore={() => onSelectStatus(PET_STATUS.ENCONTRADO)}
+                        />
+                    )}
+                    {adoptionPets.length > 0 && (
+                        <PetSection 
+                            title="En Adopción"
+                            pets={adoptionPets}
+                            users={users}
+                            onViewUser={onViewUser}
+                            onNavigate={onNavigate}
+                            onSeeMore={() => onSelectStatus(PET_STATUS.EN_ADOPCION)}
+                        />
+                    )}
+                    {sightedPets.length > 0 && (
+                         <PetSection 
+                            title="Mascotas Avistadas"
+                            pets={sightedPets}
+                            users={users}
+                            onViewUser={onViewUser}
+                            onNavigate={onNavigate}
+                            onSeeMore={() => onSelectStatus(PET_STATUS.AVISTADO)}
+                        />
+                    )}
+                    {reunitedPets.length > 0 && (
+                         <PetSection 
+                            title="Historias de Éxito (Reunidos)"
+                            pets={reunitedPets}
+                            users={users}
+                            onViewUser={onViewUser}
+                            onNavigate={onNavigate}
+                            onSeeMore={() => onSelectStatus(PET_STATUS.REUNIDO)}
+                        />
+                    )}
                 </>
             ) : (
                 <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">

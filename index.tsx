@@ -26,8 +26,14 @@ const AppRouter: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-brand-light">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-brand-light gap-4">
                 <p className="text-gray-600 text-lg">Cargando...</p>
+                <button 
+                    onClick={() => window.location.reload()} 
+                    className="px-4 py-2 text-sm text-brand-primary border border-brand-primary rounded-lg hover:bg-blue-50"
+                >
+                    Recargar página
+                </button>
             </div>
         );
     }

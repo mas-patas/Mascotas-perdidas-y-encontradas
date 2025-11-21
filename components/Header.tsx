@@ -11,6 +11,7 @@ interface HeaderProps {
     onReportPet: (status: PetStatus) => void;
     onOpenAdoptionModal: () => void;
     onNavigate: (path: string) => void;
+    onHome: () => void;
     onToggleSidebar: () => void;
     hasUnreadMessages: boolean;
     notifications: Notification[];
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
     onReportPet, 
     onOpenAdoptionModal, 
     onNavigate,
+    onHome,
     onToggleSidebar, 
     hasUnreadMessages,
     notifications,
@@ -108,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <MenuIcon />
                     </button>
                  )}
-                 <h1 className="text-2xl font-bold tracking-wider cursor-pointer" onClick={() => onNavigate('/')}>
+                 <h1 className="text-2xl font-bold tracking-wider cursor-pointer" onClick={onHome}>
                     PETS
                 </h1>
             </div>
@@ -159,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                     
                     {/* Inicio */}
-                    <button onClick={() => onNavigate('/')} className={navButtonClass} aria-label="Inicio">
+                    <button onClick={onHome} className={navButtonClass} aria-label="Inicio">
                         <HomeIcon />
                         <span className="hidden md:inline">Inicio</span>
                     </button>

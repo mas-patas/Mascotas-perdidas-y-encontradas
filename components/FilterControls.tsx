@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import type { PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
-import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon, MegaphoneIcon, MapIcon } from './icons';
+import { HomeIcon, UserIcon, ChatBubbleIcon, AdminIcon, LogoutIcon, MegaphoneIcon, MapIcon, TrashIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -28,6 +28,7 @@ interface FilterControlsProps {
     onNavigateToAdmin: () => void;
     onNavigateToCampaigns: () => void;
     onNavigateToMap: () => void;
+    onClearFilters: () => void;
 }
 
 const statusOptions: (PetStatus | 'Todos')[] = ['Todos', PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
@@ -46,7 +47,8 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     onNavigateToMessages,
     onNavigateToAdmin,
     onNavigateToCampaigns,
-    onNavigateToMap
+    onNavigateToMap,
+    onClearFilters
 }) => {
     
     const [breeds, setBreeds] = useState<string[]>(['Todos']);
@@ -120,7 +122,17 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 {/* Filters Section */}
                 {showFilters ? (
                     <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-gray-700 pt-6">
-                        <h3 className="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Filtros</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Filtros</h3>
+                            <button 
+                                onClick={onClearFilters}
+                                className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                                title="Limpiar todos los filtros"
+                            >
+                                <TrashIcon /> Limpiar
+                            </button>
+                        </div>
+                        
                         <div className="space-y-4">
                             <div>
                                 <label htmlFor="status-filter" className="block text-sm font-medium text-gray-300 mb-1">Estado:</label>
