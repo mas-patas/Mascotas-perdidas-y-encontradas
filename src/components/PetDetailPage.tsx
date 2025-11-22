@@ -13,7 +13,7 @@ import { usePets } from '../hooks/usePets';
 interface PetDetailPageProps {
     pet?: Pet;
     onClose: () => void;
-    onStartChat: (pet: Pet) => Promise<void> | void;
+    onStartChat: (pet: Pet) => void;
     onEdit: (pet: Pet) => void;
     onDelete: (petId: string) => void;
     onGenerateFlyer: (pet: Pet) => void;
@@ -223,7 +223,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [contactLoading, setContactLoading] = useState(false);
     
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
@@ -315,19 +314,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const handleRevealContact = () => {
         if (!currentUser) return;
         onRecordContactRequest(pet.id);
-    };
-
-    const handleContactClick = async () => {
-        if (!currentUser) {
-            navigate('/login');
-            return;
-        }
-        setContactLoading(true);
-        try {
-            await onStartChat(pet);
-        } finally {
-            setContactLoading(false);
-        }
     };
     
     const getStatusStyles = () => {
@@ -746,25 +732,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
                                 {(!isOwner) && (
                                     <button
-                                        onClick={handleContactClick}
-                                        disabled={contactLoading}
-                                        className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed ${
+                                        onClick={() => currentUser ? onStartChat(pet) : navigate('/login')}
+                                        className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
                                             currentUser 
                                             ? 'bg-brand-primary text-white hover:bg-brand-dark' 
                                             : 'bg-blue-400 text-white hover:bg-blue-500'
                                         }`}
                                     >
-                                        {contactLoading ? (
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        ) : (
-                                            <ChatBubbleIcon />
-                                        )}
-                                        <span>
-                                            {contactLoading 
-                                                ? 'Cargando...' 
-                                                : (currentUser ? 'Contactar por Mensaje' : 'Inicia sesión para contactar')
-                                            }
-                                        </span>
+                                        <ChatBubbleIcon />
+                                        <span>{currentUser ? 'Contactar por Mensaje' : 'Inicia sesión para contactar'}</span>
                                     </button>
                                 )}
 

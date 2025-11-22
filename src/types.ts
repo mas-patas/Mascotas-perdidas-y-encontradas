@@ -55,8 +55,8 @@ export interface Comment {
     userName: string;
     text: string;
     timestamp: string;
-    parentId?: string | null;
-    likes?: string[];
+    parentId?: string | null; // ID of the parent comment if this is a reply
+    likes?: string[]; // Array of User IDs who liked this comment
 }
 
 export interface Pet {

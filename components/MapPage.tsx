@@ -4,16 +4,17 @@ import type { Pet } from '../types';
 import { PET_STATUS } from '../constants';
 import { locationCoordinates } from '../data/locations';
 import { SearchIcon, CrosshairIcon, ChevronDownIcon } from './icons';
+import { supabase } from '../services/supabaseClient';
 
 interface MapPageProps {
-    pets: Pet[];
+    pets: Pet[]; // Kept for type compatibility, but we'll load full data internally
     onNavigate: (path: string) => void;
 }
 
-const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
+const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
-    const markerClusterGroupRef = useRef<any>(null); // Ref for the cluster group
+    const markerClusterGroupRef = useRef<any>(null);
     const [isFiltersOpen, setIsFiltersOpen] = useState(true);
     const [visibleStatuses, setVisibleStatuses] = useState({
         [PET_STATUS.PERDIDO]: true,
@@ -23,10 +24,12 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
     });
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [mapPets, setMapPets] = useState<Pet[]>([]);
+    const [isLoadingMapData, setIsLoadingMapData] = useState(true);
 
     // Helper to add small random offset to prevent stacking
     const getJitteredCoords = (lat: number, lng: number) => {
-        const jitter = 0.0005; // Reduced jitter since we have clustering now
+        const jitter = 0.0005;
         return {
             lat: lat + (Math.random() - 0.5) * jitter,
             lng: lng + (Math.random() - 0.5) * jitter
@@ -77,6 +80,49 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
         });
     };
 
+    // Fetch ALL pets with coordinates for the map (ignoring pagination)
+    useEffect(() => {
+        const fetchMapData = async () => {
+            setIsLoadingMapData(true);
+            try {
+                // We only need specific fields for the map pins to keep it light
+                const { data, error } = await supabase
+                    .from('pets')
+                    .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls')
+                    .not('lat', 'is', null) // Only pets with coordinates
+                    .not('lng', 'is', null);
+
+                if (error) throw error;
+
+                // Map to Pet type (simplified)
+                const mappedPets: Pet[] = (data || []).map(p => ({
+                    id: p.id,
+                    userEmail: '', // Not needed for map pin
+                    status: p.status,
+                    name: p.name,
+                    animalType: p.animal_type,
+                    breed: p.breed,
+                    color: p.color,
+                    location: p.location,
+                    date: '',
+                    contact: '',
+                    description: '',
+                    imageUrls: p.image_urls || [],
+                    lat: p.lat,
+                    lng: p.lng
+                }));
+
+                setMapPets(mappedPets);
+            } catch (err) {
+                console.error("Error loading map pins:", err);
+            } finally {
+                setIsLoadingMapData(false);
+            }
+        };
+
+        fetchMapData();
+    }, []);
+
     useEffect(() => {
         if (!mapRef.current) return;
 
@@ -96,7 +142,6 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
         
         // Initialize Marker Cluster Group if not exists
         if (!markerClusterGroupRef.current) {
-            // Check if the plugin is loaded
             if (L.markerClusterGroup) {
                 markerClusterGroupRef.current = L.markerClusterGroup({
                     showCoverageOnHover: false,
@@ -104,12 +149,11 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
                 });
                 mapInstance.current.addLayer(markerClusterGroupRef.current);
             } else {
-                console.warn("Leaflet.markercluster plugin not loaded. Markers will not be clustered.");
-                // Fallback: just add layers directly to map if plugin missing (shouldn't happen with correct index.html)
+                console.warn("Leaflet.markercluster plugin not loaded.");
             }
         }
 
-        // Clear existing markers from the cluster group
+        // Clear existing markers
         if (markerClusterGroupRef.current) {
             markerClusterGroupRef.current.clearLayers();
         } else {
@@ -142,19 +186,16 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
         // Prepare Markers
         const markersToAdd: any[] = [];
 
-        pets.forEach(pet => {
-            // Filter check
+        mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses]) return;
 
-            // 1. Use real coords if available
             let lat = pet.lat;
             let lng = pet.lng;
 
-            // 2. If not, try to guess based on city/district name (fallback)
+            // Fallback for pets without exact coords (should be rare due to query filter, but kept for safety)
             if (!lat || !lng) {
                 const locationText = pet.location || "";
                 let foundCity = Object.keys(locationCoordinates).find(city => locationText.includes(city));
-                
                 if (foundCity) {
                     const baseCoords = locationCoordinates[foundCity];
                     const jittered = getJitteredCoords(baseCoords.lat, baseCoords.lng);
@@ -168,7 +209,7 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
                 const marker = L.marker([lat, lng], { icon: createCustomIcon(pet.status, iconSVG) })
                     .bindPopup(`
                         <div class="text-center min-w-[150px]">
-                            <img src="${pet.imageUrls[0]}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
+                            <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
                             <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
                             <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block
                                 ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : 
@@ -187,17 +228,24 @@ const MapPage: React.FC<MapPageProps> = ({ pets, onNavigate }) => {
             }
         });
 
-        // Add all markers to cluster group (or map directly if plugin missing)
         if (markerClusterGroupRef.current) {
             markerClusterGroupRef.current.addLayers(markersToAdd);
         } else {
             markersToAdd.forEach(m => m.addTo(mapInstance.current));
         }
 
-    }, [pets, visibleStatuses]);
+    }, [mapPets, visibleStatuses]); // Update when mapPets (server data) changes
 
     return (
         <div className="h-full flex flex-col relative">
+            {/* Loading Overlay */}
+            {isLoadingMapData && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 z-[2000] flex flex-col items-center justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-primary mb-2"></div>
+                    <p className="text-brand-primary font-semibold">Cargando mapa...</p>
+                </div>
+            )}
+
             {/* Top Bar Overlay for Controls */}
             <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col sm:flex-row justify-between items-start pointer-events-none gap-4">
                 
