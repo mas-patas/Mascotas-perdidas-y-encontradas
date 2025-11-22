@@ -128,7 +128,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Escribe un mensaje..."
-                        className="flex-1 p-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm bg-white"
+                        className="flex-1 p-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm bg-white text-gray-900"
                     />
                     <button type="submit" className="bg-brand-primary text-white rounded-full p-3 hover:bg-brand-dark transition-colors shadow-md disabled:opacity-50" disabled={!newMessage.trim()}>
                         <SendIcon />
