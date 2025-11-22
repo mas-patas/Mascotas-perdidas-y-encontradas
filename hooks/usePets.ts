@@ -96,10 +96,6 @@ export const usePets = ({ filters }: UsePetsProps) => {
     const fetchPets = async ({ pageParam = 0 }) => {
         if (filters.status === 'Todos') {
             // DASHBOARD MODE (Simplified for 'Todos' view - usually shows recent from categories)
-            // Note: useInfiniteQuery logic expects consistent pagination, but Dashboard view in original
-            // app loaded specifically 8 from each category. 
-            // For cleaner React Query integration, we will load a mixed feed sorted by date.
-            
             const from = pageParam * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
 
@@ -180,14 +176,6 @@ export const usePets = ({ filters }: UsePetsProps) => {
 
     return { 
         pets, 
-        setPets: (newPets: any) => {
-             // Warning: Direct mutation of React Query cache via setPets wrapper 
-             // is complex. For now, we rely on refetching/invalidation.
-             // However, for optimistic UI updates in the old app logic, we might need this.
-             // We will leave it empty as RQ handles state, or implement queryClient.setQueryData if strictly needed.
-             // For the migration, we encourage using the 'pets' array derived from data.
-             console.warn("setPets was called but React Query manages state now.");
-        },
         loading: isLoading, 
         hasMore: hasNextPage, 
         loadMore: fetchNextPage 

@@ -9,11 +9,12 @@ import ConfirmationModal from './ConfirmationModal';
 import { ReportModal } from './ReportModal';
 import { formatTime } from '../utils/formatters';
 import { usePets } from '../hooks/usePets';
+import { supabase } from '../services/supabaseClient';
 
 interface PetDetailPageProps {
     pet?: Pet;
     onClose: () => void;
-    onStartChat: (pet: Pet) => Promise<void> | void;
+    onStartChat: (pet: Pet) => void;
     onEdit: (pet: Pet) => void;
     onDelete: (petId: string) => void;
     onGenerateFlyer: (pet: Pet) => void;
@@ -207,14 +208,13 @@ const CommentListAndInput: React.FC<{
 };
 
 export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onClose, onStartChat, onEdit, onDelete, onGenerateFlyer, onUpdateStatus, users, onViewUser, onReport, onRecordContactRequest, onAddComment, onLikeComment }) => {
-    // 1. HOOK DECLARATIONS (Must be unconditional)
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { currentUser } = useAuth();
     const { pets, loading: petsLoading } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' } });
     
     // Find pet from props or list
-    const pet = propPet || pets.find(p => p.id === id);
+    const [pet, setPet] = useState<Pet | undefined>(propPet || pets.find(p => p.id === id));
     
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -228,59 +228,112 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
 
-    // 2. EFFECTS
-    // Loading State Effect
+    // Fetch pet directly if not in list (e.g., deep link)
     useEffect(() => {
-        if (pet || !petsLoading) {
+        const foundPet = pets.find(p => p.id === id);
+        if (foundPet) {
+            setPet(foundPet);
+            setIsLoading(false);
+        } else if (id && !propPet && !petsLoading) {
+            // Try fetching single pet
+            setIsLoading(true);
+            supabase.from('pets').select('*').eq('id', id).single()
+                .then(({ data, error }) => {
+                    if (data && !error) {
+                        // Helper to format similar to hook
+                        const p = data;
+                        const formatted: Pet = {
+                            id: p.id,
+                            userEmail: 'loading...', // Will be enriched or ignored for simple view
+                            status: p.status,
+                            name: p.name,
+                            animalType: p.animal_type,
+                            breed: p.breed,
+                            color: p.color,
+                            size: p.size,
+                            location: p.location,
+                            date: p.date,
+                            contact: p.contact,
+                            description: p.description,
+                            imageUrls: p.image_urls || [],
+                            adoptionRequirements: p.adoption_requirements,
+                            shareContactInfo: p.share_contact_info,
+                            contactRequests: p.contact_requests || [],
+                            lat: p.lat,
+                            lng: p.lng,
+                            comments: []
+                        };
+                        setPet(formatted);
+                    }
+                    setIsLoading(false);
+                });
+        } else if (propPet) {
             setIsLoading(false);
         }
-    }, [pet, petsLoading]);
+    }, [id, pets, petsLoading, propPet]);
 
     // Map Effect
     useEffect(() => {
-        if (!pet || !pet.lat || !pet.lng || !miniMapRef.current || miniMapInstance.current) return;
+        // Race condition fix: ensure loading is done AND container exists
+        if (isLoading || !pet || !pet.lat || !pet.lng || !miniMapRef.current) return;
 
         const L = (window as any).L;
         if (!L) return;
 
-        miniMapInstance.current = L.map(miniMapRef.current, {
-            center: [pet.lat, pet.lng],
-            zoom: 15,
-            zoomControl: true,
-            dragging: true,
-            scrollWheelZoom: false
-        });
+        // Clean up existing instance to avoid duplicates/errors on re-render
+        if (miniMapInstance.current) {
+            miniMapInstance.current.remove();
+            miniMapInstance.current = null;
+        }
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(miniMapInstance.current);
+        try {
+            miniMapInstance.current = L.map(miniMapRef.current, {
+                center: [pet.lat, pet.lng],
+                zoom: 15,
+                zoomControl: true,
+                dragging: true,
+                scrollWheelZoom: false
+            });
 
-        let statusClass = 'lost'; 
-        if (pet.status === PET_STATUS.ENCONTRADO) statusClass = 'found';
-        else if (pet.status === PET_STATUS.AVISTADO) statusClass = 'sighted';
-        else if (pet.status === PET_STATUS.EN_ADOPCION) statusClass = 'adoption';
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(miniMapInstance.current);
 
-        const dogIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM8 14s1.5 2 4 2 4-2 4-2M9 10h6"/><path d="M12 14v6a2 2 0 002 2h2a2 2 0 00-2-2h-2M12 14v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2h2"/><path d="M5 8a3 3 0 016 0c0 1.5-3 4-3 4s-3-2.5-3-4zM19 8a3 3 0 00-6 0c0 1.5 3 4 3 4s3-2.5 3-4z"/></svg>`;
-        const catIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM9 12s1.5 2 3 2 3-2 3-2M9 9h6"/><path d="M20 12c0 4-4 8-8 8s-8-4-8-8 4-8 8-8 8 4 8 8zM5 8l-2 2M19 8l2 2"/></svg>`;
-        const otherIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-8 8c0 4.418 3.582 8 8 8s8-3.582 8-8-3.582-8-8-8-8 3.582-8 8zm0 0h16" /></svg>`;
+            let statusClass = 'lost'; 
+            if (pet.status === PET_STATUS.ENCONTRADO) statusClass = 'found';
+            else if (pet.status === PET_STATUS.AVISTADO) statusClass = 'sighted';
+            else if (pet.status === PET_STATUS.EN_ADOPCION) statusClass = 'adoption';
 
-        const iconSVG = pet.animalType === ANIMAL_TYPES.PERRO ? dogIconSVG : (pet.animalType === ANIMAL_TYPES.GATO ? catIconSVG : otherIconSVG);
+            const dogIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM8 14s1.5 2 4 2 4-2 4-2M9 10h6"/><path d="M12 14v6a2 2 0 002 2h2a2 2 0 00-2-2h-2M12 14v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2h2"/><path d="M5 8a3 3 0 016 0c0 1.5-3 4-3 4s-3-2.5-3-4zM19 8a3 3 0 00-6 0c0 1.5 3 4 3 4s3-2.5 3-4z"/></svg>`;
+            const catIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM9 12s1.5 2 3 2 3-2 3-2M9 9h6"/><path d="M20 12c0 4-4 8-8 8s-8-4-8-8 4-8 8-8 8 4 8 8zM5 8l-2 2M19 8l2 2"/></svg>`;
+            const otherIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-8 8c0 4.418 3.582 8 8 8s8-3.582 8-8-3.582-8-8-8-8 3.582-8 8zm0 0h16" /></svg>`;
 
-        const icon = L.divIcon({
-            className: 'custom-div-icon',
-            html: `<div class='marker-pin ${statusClass}'></div>${iconSVG}`,
-            iconSize: [30, 42],
-            iconAnchor: [15, 42]
-        });
+            const iconSVG = pet.animalType === ANIMAL_TYPES.PERRO ? dogIconSVG : (pet.animalType === ANIMAL_TYPES.GATO ? catIconSVG : otherIconSVG);
 
-        L.marker([pet.lat, pet.lng], { icon }).addTo(miniMapInstance.current);
-    }, [pet]);
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class='marker-pin ${statusClass}'></div>${iconSVG}`,
+                iconSize: [30, 42],
+                iconAnchor: [15, 42]
+            });
 
-    // 3. EARLY RETURNS
+            L.marker([pet.lat, pet.lng], { icon }).addTo(miniMapInstance.current);
+
+            // Force resize to ensure tiles load if container size changed
+            setTimeout(() => {
+                miniMapInstance.current?.invalidateSize();
+            }, 200);
+
+        } catch (err) {
+            console.error("Error initializing map:", err);
+        }
+
+    }, [pet, isLoading]); // Dependency on isLoading is key
+
     if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div></div>;
     if (!pet) return <div className="text-center py-10">Mascota no encontrada</div>;
 
-    // 4. DERIVED DATA AND HELPERS
+    // Helpers
     const petOwner = users.find(u => u.email === pet.userEmail);
     const isOwner = currentUser?.email === pet.userEmail;
     const canModerate = currentUser && ([USER_ROLES.MODERATOR, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] as UserRole[]).includes(currentUser.role);
@@ -746,25 +799,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
                                 {(!isOwner) && (
                                     <button
-                                        onClick={handleContactClick}
-                                        disabled={contactLoading}
-                                        className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed ${
+                                        onClick={() => currentUser ? onStartChat(pet) : navigate('/login')}
+                                        className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
                                             currentUser 
                                             ? 'bg-brand-primary text-white hover:bg-brand-dark' 
                                             : 'bg-blue-400 text-white hover:bg-blue-500'
                                         }`}
                                     >
-                                        {contactLoading ? (
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        ) : (
-                                            <ChatBubbleIcon />
-                                        )}
-                                        <span>
-                                            {contactLoading 
-                                                ? 'Cargando...' 
-                                                : (currentUser ? 'Contactar por Mensaje' : 'Inicia sesión para contactar')
-                                            }
-                                        </span>
+                                        <ChatBubbleIcon />
+                                        <span>{currentUser ? 'Contactar por Mensaje' : 'Inicia sesión para contactar'}</span>
                                     </button>
                                 )}
 

@@ -237,6 +237,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     // Map Effect
     useEffect(() => {
+        // Add isLoading check to prevent running before ref is mounted
+        if (isLoading) return;
         if (!pet || !pet.lat || !pet.lng || !miniMapRef.current || miniMapInstance.current) return;
 
         const L = (window as any).L;
@@ -273,7 +275,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         });
 
         L.marker([pet.lat, pet.lng], { icon }).addTo(miniMapInstance.current);
-    }, [pet]);
+
+        // Fix for map not sizing correctly initially
+        setTimeout(() => {
+            if (miniMapInstance.current) {
+                miniMapInstance.current.invalidateSize();
+            }
+        }, 200);
+
+    }, [pet, isLoading]); // CRITICAL: Added isLoading to dependencies
 
     // 3. EARLY RETURNS
     if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div></div>;
