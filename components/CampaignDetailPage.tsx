@@ -50,6 +50,14 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
         }
     })();
 
+    // Logic to simplify location: Take first 3 parts (Street, District, City usually)
+    const simplifiedLocation = (() => {
+        if (!campaign.location) return 'Ubicación no especificada';
+        const parts = campaign.location.split(',');
+        if (parts.length <= 3) return campaign.location;
+        return parts.slice(0, 3).map(p => p.trim()).join(', ');
+    })();
+
     useEffect(() => {
         if (campaign.lat && campaign.lng && miniMapRef.current && !miniMapInstance.current) {
              const L = (window as any).L;
@@ -94,39 +102,59 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
 
     return (
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto">
-            <div className="p-4">
-                <button onClick={onClose} className="text-sm text-brand-primary hover:underline">&larr; Volver a Campañas</button>
+            <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-lg shadow-sm">
+                <button 
+                    onClick={onClose} 
+                    className="group flex items-center gap-2 px-5 py-2 bg-white text-gray-700 font-bold rounded-full shadow-sm border border-gray-200 hover:shadow-md hover:text-brand-primary hover:border-brand-primary transition-all duration-300"
+                >
+                    <span className="transform group-hover:-translate-x-1 transition-transform duration-300">
+                        <ChevronLeftIcon /> 
+                    </span>
+                    Volver a Campañas
+                </button>
             </div>
             <div className="p-6 md:p-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full border-2 ${typeColor}`}>
-                            {campaign.type || 'Campaña'}
+                {/* Header Section */}
+                <div className="mb-8 border-b border-gray-100 pb-6">
+                    {/* 1. Title & Badge Row */}
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
+                            {campaign.title}
+                        </h1>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider border shadow-sm w-fit ${typeColor}`}>
+                            {campaign.type}
                         </span>
-                        <h1 className="text-4xl font-bold text-brand-dark mt-2">{campaign.title}</h1>
                     </div>
-                     <div className="flex-shrink-0">
-                        <div className="flex items-center gap-2 text-gray-700">
-                            <CalendarIcon />
-                            <span className="font-semibold">{formattedDate}</span>
+
+                    {/* 2. Date */}
+                    <div className="flex items-center gap-3 text-gray-700 mb-3">
+                        <div className="p-2 bg-blue-50 text-brand-primary rounded-full shadow-sm">
+                            <CalendarIcon className="h-5 w-5" />
                         </div>
-                        <div className="flex items-center gap-2 text-gray-700 mt-1">
-                            <LocationMarkerIcon />
-                            <span className="font-semibold">{campaign.location}</span>
+                        <span className="text-lg font-medium capitalize">{formattedDate}</span>
+                    </div>
+
+                    {/* 3. Simplified Location */}
+                    <div className="flex items-start gap-3 text-gray-700">
+                        <div className="p-2 bg-gray-100 text-gray-600 rounded-full mt-0.5 shadow-sm">
+                            <LocationMarkerIcon className="h-5 w-5" />
                         </div>
-                        {campaign.contactPhone && (
-                             <div className="flex items-center gap-2 text-gray-700 mt-2 bg-white border border-gray-200 shadow-sm px-3 py-1 rounded-lg">
-                                <div className="bg-green-100 p-1 rounded-full text-green-600">
-                                    <PhoneIcon className="h-4 w-4" />
-                                </div>
-                                <span className="font-bold text-gray-800">{campaign.contactPhone}</span>
+                        <span className="text-lg leading-snug pt-1.5">{simplifiedLocation}</span>
+                    </div>
+                    
+                    {/* Optional Contact Phone */}
+                    {campaign.contactPhone && (
+                        <div className="flex items-center gap-3 mt-3">
+                            <div className="p-2 bg-green-50 text-green-600 rounded-full shadow-sm">
+                                <PhoneIcon className="h-5 w-5" />
                             </div>
-                        )}
-                    </div>
+                            <span className="font-bold text-gray-800 text-lg">{campaign.contactPhone}</span>
+                        </div>
+                    )}
                 </div>
                 
                 {/* Image Gallery */}
-                <div className="relative w-full mb-4">
+                <div className="relative w-full mb-8">
                     <img 
                         src={images[currentImageIndex]} 
                         alt={campaign.title}
@@ -162,7 +190,10 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
 
                 {/* Description */}
                 <div className="prose max-w-none text-gray-800 mt-6">
-                    <p className="whitespace-pre-wrap break-words">{campaign.description}</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">Detalles del Evento</h3>
+                    <p className="whitespace-pre-wrap break-words leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100">
+                        {campaign.description}
+                    </p>
                 </div>
 
                 {/* Mini Map Section */}

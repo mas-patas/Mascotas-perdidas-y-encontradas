@@ -69,8 +69,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         checkUser();
 
-        // 1. Safety Timeout - Ensure app loads even if Supabase hangs. 
-        // Reduced to 2500ms to make the app feel more responsive on errors.
+        // 1. Safety Timeout - Ensure app loads even if Supabase hangs (Cold Start).
+        // Increased to 6000ms to allow time for the database to wake up on first load.
         const safetyTimeout = setTimeout(() => {
             if (mounted) {
                 setLoading(prevLoading => {
@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     return prevLoading;
                 });
             }
-        }, 2500);
+        }, 6000);
 
         // 3. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {

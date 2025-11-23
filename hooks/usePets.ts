@@ -155,8 +155,8 @@ export const usePets = ({ filters }: UsePetsProps) => {
         queryFn: fetchPets,
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
-        retry: 1,
         staleTime: 1000 * 60 * 1, // 1 minute stale time
+        // Removed explicit retry: 1 to use global default (3)
     });
 
     // Realtime Subscription to invalidate queries

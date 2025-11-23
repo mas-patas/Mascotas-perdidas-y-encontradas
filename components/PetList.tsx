@@ -152,7 +152,7 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handlePrev} 
                             disabled={!canGoPrev} 
-                            className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
+                            className="absolute top-1/2 -translate-y-1/2 -left-2 md:-left-4 z-20 p-2 rounded-full bg-white text-brand-primary shadow-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100"
                             aria-label="Anterior"
                         >
                             <ChevronLeftIcon />
@@ -160,7 +160,7 @@ const PetSection: React.FC<{
                         <button 
                             onClick={handleNext} 
                             disabled={!canGoNext} 
-                            className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-4 z-10 p-2 rounded-full bg-white text-brand-primary shadow-lg border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all opacity-0 group-hover/carousel:opacity-100"
+                            className="absolute top-1/2 -translate-y-1/2 -right-2 md:-right-4 z-20 p-2 rounded-full bg-white text-brand-primary shadow-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100"
                             aria-label="Siguiente"
                         >
                             <ChevronRightIcon />
