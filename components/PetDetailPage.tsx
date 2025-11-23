@@ -22,7 +22,7 @@ interface PetDetailPageProps {
     users: User[];
     onViewUser: (user: User) => void;
     onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string) => void;
-    onRecordContactRequest: (petId: string) => void;
+    onRecordContactRequest: (petId: string) => Promise<void>;
     onAddComment: (petId: string, text: string, parentId?: string) => Promise<void>;
     onLikeComment: (petId: string, commentId: string) => void;
 }
@@ -240,6 +240,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [contactLoading, setContactLoading] = useState(false);
+    const [isRevealingContact, setIsRevealingContact] = useState(false);
     
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
@@ -399,9 +400,21 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         setReportTarget(null);
     };
     
-    const handleRevealContact = () => {
+    const handleRevealContact = async () => {
         if (!currentUser) return;
-        onRecordContactRequest(pet.id);
+        setIsRevealingContact(true);
+        try {
+            await onRecordContactRequest(pet.id);
+            // Optimistic update for immediate feedback if network is slow or cache not yet invalid
+            setPet(prev => prev ? ({
+                ...prev,
+                contactRequests: [...(prev.contactRequests || []), currentUser.email]
+            }) : prev);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsRevealingContact(false);
+        }
     };
 
     const handleContactClick = async () => {
@@ -862,14 +875,24 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                                 (!isOwner) && (
                                                     <button
                                                         onClick={() => currentUser ? handleRevealContact() : navigate('/login')}
+                                                        disabled={isRevealingContact}
                                                         className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
                                                             currentUser 
-                                                            ? 'bg-green-700 text-white hover:bg-green-800'
+                                                            ? 'bg-green-700 text-white hover:bg-green-800 disabled:bg-green-400'
                                                             : 'bg-green-500 text-white hover:bg-green-600'
                                                         }`}
                                                     >
-                                                        <PhoneIcon />
-                                                        <span>{currentUser ? 'Mostrar Información de Contacto' : 'Inicia sesión para ver contacto'}</span>
+                                                        {isRevealingContact ? (
+                                                            <>
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                                <span>Procesando...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <PhoneIcon />
+                                                                <span>{currentUser ? 'Mostrar Información de Contacto' : 'Inicia sesión para ver contacto'}</span>
+                                                            </>
+                                                        )}
                                                     </button>
                                                 )
                                             )}

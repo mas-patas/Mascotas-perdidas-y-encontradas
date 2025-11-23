@@ -710,33 +710,56 @@ const App: React.FC = () => {
         }
     };
     
-    const handleRecordContactRequest = async (petId: string) => {
+    const handleRecordContactRequest = async (petId: string): Promise<void> => {
         if (!currentUser) return;
-        const pet = pets.find(p => p.id === petId);
-        if (!pet) return;
-        const currentRequests = pet.contactRequests || [];
-        if (currentRequests.includes(currentUser.email)) return;
-        const updatedRequests = [...currentRequests, currentUser.email];
+
         try {
-            const { error } = await supabase.from('pets').update({
-                contact_requests: updatedRequests
-            }).eq('id', petId);
-            if (error) throw error;
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            const ownerId = getUserIdByEmail(pet.userEmail);
-            if (ownerId) {
+            // 1. Get current state from DB to ensure we are atomic-ish and handle missing local state
+            const { data: petData, error: fetchError } = await supabase
+                .from('pets')
+                .select('id, contact_requests, user_id, name')
+                .eq('id', petId)
+                .single();
+            
+            if (fetchError || !petData) {
+                console.error("Pet not found for contact request", fetchError);
+                return;
+            }
+
+            const currentRequests: string[] = petData.contact_requests || [];
+            
+            // If already requested, do nothing
+            if (currentRequests.includes(currentUser.email)) return;
+
+            const updatedRequests = [...currentRequests, currentUser.email];
+
+            // 2. Update DB
+            const { error: updateError } = await supabase
+                .from('pets')
+                .update({ contact_requests: updatedRequests })
+                .eq('id', petId);
+
+            if (updateError) throw updateError;
+
+            // 3. Invalidate queries to refresh UI
+            await queryClient.invalidateQueries({ queryKey: ['pets'] });
+
+            // 4. Send Notification
+            const ownerId = petData.user_id;
+            if (ownerId && ownerId !== currentUser.id) { // Don't notify self
                 const newNotifId = generateUUID();
                 await supabase.from('notifications').insert({
                     id: newNotifId,
                     user_id: ownerId,
-                    message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${pet.name}`,
-                    link: { type: 'pet', id: pet.id },
+                    message: `${currentUser.username || 'Un usuario'} ha visto tu información de contacto para ${petData.name}`,
+                    link: { type: 'pet', id: petId },
                     is_read: false,
                     created_at: new Date().toISOString()
                 });
             }
         } catch (err: any) {
             console.error("Error recording contact request:", err);
+            // alert("No se pudo registrar la solicitud de contacto."); // Optional
         }
     };
 
