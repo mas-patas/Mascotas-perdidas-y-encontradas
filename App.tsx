@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { PetList } from './components/PetList';
@@ -57,6 +57,7 @@ const ProtectedRoute = ({ children, roles }: { children?: React.ReactNode, roles
 const App: React.FC = () => {
     const { currentUser, ghostLogin } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
     
     // State from Hooks
@@ -88,6 +89,13 @@ const App: React.FC = () => {
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
+
+    // Auto-close sidebar on Map view
+    useEffect(() => {
+        if (location.pathname === '/mapa') {
+            setIsSidebarOpen(false);
+        }
+    }, [location.pathname]);
 
     // Check for expired pets and 30-day status check
     useEffect(() => {

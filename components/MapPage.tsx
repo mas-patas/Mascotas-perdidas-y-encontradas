@@ -15,6 +15,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markerClusterGroupRef = useRef<any>(null);
+    const boundaryLayerRef = useRef<any>(null);
     const [isFiltersOpen, setIsFiltersOpen] = useState(true);
     const [visibleStatuses, setVisibleStatuses] = useState({
         [PET_STATUS.PERDIDO]: true,
@@ -47,13 +48,39 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         setIsSearching(true);
         try {
             const query = `${searchQuery}, Peru`; // Bias to Peru
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&polygon_geojson=1&limit=1`);
             const data = await response.json();
             
             if (data && data.length > 0) {
-                const { lat, lon } = data[0];
-                if (mapInstance.current) {
-                    mapInstance.current.flyTo([parseFloat(lat), parseFloat(lon)], 14);
+                const result = data[0];
+                const { lat, lon, geojson } = result;
+                const L = (window as any).L;
+
+                if (mapInstance.current && L) {
+                    // Remove previous boundary if exists
+                    if (boundaryLayerRef.current) {
+                        mapInstance.current.removeLayer(boundaryLayerRef.current);
+                        boundaryLayerRef.current = null;
+                    }
+
+                    // If GeoJSON polygon data is present, draw it
+                    if (geojson && (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon')) {
+                        boundaryLayerRef.current = L.geoJSON(geojson, {
+                            style: {
+                                color: 'red',
+                                weight: 3,
+                                opacity: 0.8,
+                                fillOpacity: 0.1,
+                                fillColor: 'red'
+                            }
+                        }).addTo(mapInstance.current);
+                        
+                        // Zoom to fit the polygon
+                        mapInstance.current.fitBounds(boundaryLayerRef.current.getBounds());
+                    } else {
+                        // Standard flyTo if no polygon (e.g. a point address)
+                        mapInstance.current.flyTo([parseFloat(lat), parseFloat(lon)], 14);
+                    }
                 }
             } else {
                 alert('No se encontró la ubicación.');
@@ -82,50 +109,79 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
 
     // Fetch ALL pets with coordinates for the map (ignoring pagination)
     useEffect(() => {
+        let mounted = true;
+
         const fetchMapData = async () => {
-            setIsLoadingMapData(true);
-            const nowIso = new Date().toISOString();
+            if (mounted) setIsLoadingMapData(true);
+            const now = new Date();
+            const nowIso = now.toISOString();
 
             try {
-                // Filter pets where expires_at is in the future
-                const { data, error } = await supabase
+                // Attempt 1: Try to fetch with expires_at filter (Best Case)
+                let { data, error } = await supabase
                     .from('pets')
                     .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at')
                     .not('lat', 'is', null)
                     .not('lng', 'is', null)
                     .gt('expires_at', nowIso);
 
-                if (error) throw error;
+                if (error) {
+                    console.warn("Map: Primary fetch failed (likely schema mismatch), using fallback.", error.message);
+                    
+                    // Attempt 2: Fallback fetch (If expires_at column is missing)
+                    // We fetch without expires_at in the select list to avoid error
+                    const { data: fallbackData, error: fallbackError } = await supabase
+                        .from('pets')
+                        .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at')
+                        .not('lat', 'is', null)
+                        .not('lng', 'is', null);
 
-                // Map to Pet type (simplified)
-                const mappedPets: Pet[] = (data || []).map(p => ({
-                    id: p.id,
-                    userEmail: '', // Not needed for map pin
-                    status: p.status,
-                    name: p.name,
-                    animalType: p.animal_type,
-                    breed: p.breed,
-                    color: p.color,
-                    location: p.location,
-                    date: '',
-                    contact: '',
-                    description: '',
-                    imageUrls: p.image_urls || [],
-                    lat: p.lat,
-                    lng: p.lng,
-                    createdAt: p.created_at,
-                    expiresAt: p.expires_at
-                }));
+                    if (fallbackError) throw fallbackError;
 
-                setMapPets(mappedPets);
+                    // Perform client-side filtering for expiration (60 days)
+                    data = (fallbackData || []).filter((p: any) => {
+                        const created = new Date(p.created_at);
+                        const expires = new Date(created.getTime() + (60 * 24 * 60 * 60 * 1000));
+                        return expires > now;
+                    });
+                }
+
+                if (mounted) {
+                    // Map to Pet type
+                    const mappedPets: Pet[] = (data || []).map((p: any) => ({
+                        id: p.id,
+                        userEmail: '', // Not needed for map pin
+                        status: p.status,
+                        name: p.name,
+                        animalType: p.animal_type,
+                        breed: p.breed,
+                        color: p.color,
+                        location: p.location,
+                        date: '',
+                        contact: '',
+                        description: '',
+                        imageUrls: p.image_urls || [],
+                        lat: p.lat,
+                        lng: p.lng,
+                        createdAt: p.created_at,
+                        expiresAt: p.expires_at
+                    }));
+
+                    setMapPets(mappedPets);
+                }
             } catch (err) {
                 console.error("Error loading map pins:", err);
+                // We don't alert here to avoid annoying popups, just log
             } finally {
-                setIsLoadingMapData(false);
+                if (mounted) setIsLoadingMapData(false);
             }
         };
 
         fetchMapData();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -252,10 +308,10 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             )}
 
             {/* Top Bar Overlay for Controls */}
-            <div className="absolute top-4 left-4 right-4 z-10 flex flex-col sm:flex-row justify-between items-start pointer-events-none gap-4">
+            <div className="absolute top-4 left-4 right-4 z-[10] flex flex-col sm:flex-row justify-between items-start pointer-events-none gap-4">
                 
                 {/* Search Bar */}
-                <div className="pointer-events-auto w-full sm:w-80 bg-white rounded-lg shadow-lg overflow-hidden flex z-10">
+                <div className="pointer-events-auto w-full sm:w-80 bg-white rounded-lg shadow-lg overflow-hidden flex z-[10]">
                     <form onSubmit={handleSearch} className="flex w-full">
                         <input 
                             type="text" 
@@ -271,7 +327,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Filters Toggle */}
-                <div className="pointer-events-auto bg-white rounded-lg shadow-lg overflow-hidden z-10">
+                <div className="pointer-events-auto bg-white rounded-lg shadow-lg overflow-hidden z-[10]">
                     <button 
                         onClick={() => setIsFiltersOpen(!isFiltersOpen)} 
                         className="w-full flex items-center justify-between gap-3 p-3 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700"
@@ -307,7 +363,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             </div>
 
             {/* Bottom Right Controls */}
-            <div className="absolute bottom-8 right-4 z-10 flex flex-col gap-2 pointer-events-auto">
+            <div className="absolute bottom-8 right-4 z-[10] flex flex-col gap-2 pointer-events-auto">
                 <button 
                     onClick={handleMyLoc}
                     className="bg-white p-2.5 rounded shadow-lg hover:bg-gray-100 text-brand-primary flex items-center justify-center"
