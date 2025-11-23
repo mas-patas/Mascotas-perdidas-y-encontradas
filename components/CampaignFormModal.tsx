@@ -19,6 +19,15 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
     const isUpdatingFromMapRef = useRef(false);
+    
+    // Safety guard against unmounted state updates
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -59,6 +68,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
     // Initialize Map
     useEffect(() => {
         const timer = setTimeout(() => {
+            if (!isMounted.current) return;
             if (!mapRef.current || !isOpen) return;
             
             const L = (window as any).L;
@@ -66,14 +76,15 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             
             // Update function for reverse geocoding
             const updateAddressFromCoords = async (latitude: number, longitude: number) => {
+                if (!isMounted.current) return;
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                     const data = await response.json();
-                    if (data && data.display_name) {
+                    if (data && data.display_name && isMounted.current) {
                         isUpdatingFromMapRef.current = true;
                         // Use display_name for campaigns as it's more descriptive for events
                         setLocation(data.display_name);
-                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                        setTimeout(() => { if(isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                     }
                 } catch (err) {
                     console.error("Reverse geocoding error", err);
@@ -96,6 +107,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                             draggable: true 
                         }).addTo(mapInstance.current);
                          markerInstance.current.on('dragend', (event: any) => {
+                            if (!isMounted.current) return;
                             const position = event.target.getLatLng();
                             setLat(position.lat);
                             setLng(position.lng);
@@ -131,6 +143,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                     draggable: true 
                 }).addTo(mapInstance.current);
                  markerInstance.current.on('dragend', (event: any) => {
+                    if (!isMounted.current) return;
                     const position = event.target.getLatLng();
                     setLat(position.lat);
                     setLng(position.lng);
@@ -139,6 +152,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             }
 
             mapInstance.current.on('click', (e: any) => {
+                if (!isMounted.current) return;
                 const { lat, lng } = e.latlng;
                 
                 if (markerInstance.current) {
@@ -150,6 +164,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                     }).addTo(mapInstance.current);
                     
                     markerInstance.current.on('dragend', (event: any) => {
+                        if (!isMounted.current) return;
                         const position = event.target.getLatLng();
                         setLat(position.lat);
                         setLng(position.lng);
@@ -162,12 +177,18 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
             });
             
             setTimeout(() => {
-                mapInstance.current.invalidateSize();
+                if (isMounted.current && mapInstance.current) mapInstance.current.invalidateSize();
             }, 200);
 
         }, 100);
 
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
     }, [isOpen]);
 
 
@@ -176,12 +197,13 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
         if (!location || isUpdatingFromMapRef.current) return;
 
         const timeoutId = setTimeout(async () => {
+            if (!isMounted.current) return;
             try {
                 const query = `${location}, Peru`;
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
                 const data = await response.json();
 
-                if (data && data.length > 0) {
+                if (data && data.length > 0 && isMounted.current) {
                     const { lat, lon } = data[0];
                     const newLat = parseFloat(lat);
                     const newLng = parseFloat(lon);
@@ -209,6 +231,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                                 draggable: true 
                             }).addTo(mapInstance.current);
                              markerInstance.current.on('dragend', (event: any) => {
+                                if (!isMounted.current) return;
                                 const position = event.target.getLatLng();
                                 setLat(position.lat);
                                 setLng(position.lng);
@@ -252,12 +275,16 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                         newImages.push(publicUrl);
                     }
                 }
-                setImagePreviews(prev => [...prev, ...newImages]);
+                if (isMounted.current) {
+                    setImagePreviews(prev => [...prev, ...newImages]);
+                }
             } catch (err: any) {
                 console.error("Error uploading image:", err);
-                setError("Error al subir la imagen. Intenta de nuevo.");
+                if (isMounted.current) {
+                    setError("Error al subir la imagen. Intenta de nuevo.");
+                }
             } finally {
-                setIsUploading(false);
+                if (isMounted.current) setIsUploading(false);
             }
         }
     };
@@ -274,6 +301,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
+                if (!isMounted.current) return;
                 const { latitude, longitude } = position.coords;
                 
                 setLat(latitude);
@@ -295,6 +323,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                          });
                         markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
                          markerInstance.current.on('dragend', (event: any) => {
+                             if (!isMounted.current) return;
                              const pos = event.target.getLatLng();
                              setLat(pos.lat);
                              setLng(pos.lng);
@@ -305,10 +334,10 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ isOpen, onClose, 
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                     const data = await response.json();
-                    if (data && data.display_name) {
+                    if (data && data.display_name && isMounted.current) {
                         isUpdatingFromMapRef.current = true;
                         setLocation(data.display_name);
-                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                     }
                 } catch (error) {
                     console.error("Error reversing location", error);

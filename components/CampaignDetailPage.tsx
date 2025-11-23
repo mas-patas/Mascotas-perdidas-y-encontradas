@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import type { Campaign } from '../types';
 import { CalendarIcon, LocationMarkerIcon, ChevronLeftIcon, ChevronRightIcon, PhoneIcon, GoogleMapsIcon, WazeIcon } from './icons';
 import { useAppData } from '../hooks/useAppData';
@@ -102,6 +103,15 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
 
     return (
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto">
+            <Helmet>
+                <title>{campaign.title} - Campañas Pets</title>
+                <meta name="description" content={`${campaign.type}: ${campaign.title} el ${formattedDate} en ${simplifiedLocation}.`} />
+                <meta property="og:title" content={`${campaign.title} - Pets`} />
+                <meta property="og:description" content={`${campaign.type} en ${simplifiedLocation}. ${campaign.description.substring(0, 100)}...`} />
+                <meta property="og:image" content={images[0] || 'https://placehold.co/600x400/EEE/31343C?text=Campañas'} />
+                <meta property="og:type" content="website" />
+            </Helmet>
+
             <div className="p-4 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-lg shadow-sm">
                 <button 
                     onClick={onClose} 

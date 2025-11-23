@@ -116,8 +116,16 @@ const CampaignSection: React.FC<{
 };
 
 const CampaignsPage: React.FC<CampaignsPageProps> = ({ campaigns, onNavigate }) => {
-    const sterilizationCampaigns = campaigns.filter(c => c.type === CAMPAIGN_TYPES.ESTERILIZACION);
-    const adoptionCampaigns = campaigns.filter(c => c.type === CAMPAIGN_TYPES.ADOPCION);
+    // Filter active campaigns only for public view
+    const now = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const yesterdayISO = yesterday.toISOString().split('T')[0];
+
+    const activeCampaigns = campaigns.filter(c => c.date >= yesterdayISO);
+
+    const sterilizationCampaigns = activeCampaigns.filter(c => c.type === CAMPAIGN_TYPES.ESTERILIZACION);
+    const adoptionCampaigns = activeCampaigns.filter(c => c.type === CAMPAIGN_TYPES.ADOPCION);
 
     return (
         <div className="space-y-8">

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
+import { departments } from '../data/locations';
 import { HomeIcon, MegaphoneIcon, MapIcon, TrashIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,7 +15,8 @@ type Filters = {
     breed: string,
     color1: string,
     color2: string,
-    size: PetSize | 'Todos'
+    size: PetSize | 'Todos',
+    department: string
 };
 
 interface FilterControlsProps {
@@ -70,7 +72,9 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     };
     
     const selectClass = "w-full p-2 border border-gray-500 rounded-md focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition bg-sidebar-dark bg-opacity-50 text-white disabled:opacity-50 disabled:cursor-not-allowed";
-    const showAdvancedFilters = filters.type === ANIMAL_TYPES.PERRO || filters.type === ANIMAL_TYPES.GATO;
+    
+    // Allow advanced filters if Perro, Gato, or Otro is selected
+    const showAdvancedFilters = filters.type === ANIMAL_TYPES.PERRO || filters.type === ANIMAL_TYPES.GATO || filters.type === ANIMAL_TYPES.OTRO;
     
     const navLinkClass = (isActive: boolean) => `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-semibold' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`;
 
@@ -146,6 +150,20 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                 >
                                     {typeOptions.map(type => (
                                         <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="department-filter" className="block text-sm font-medium text-gray-300 mb-1">Departamento:</label>
+                                <select
+                                    id="department-filter"
+                                    value={filters.department}
+                                    onChange={(e) => setFilters(f => ({ ...f, department: e.target.value }))}
+                                    className={selectClass}
+                                >
+                                    <option value="Todos">Todos</option>
+                                    {departments.map(dept => (
+                                        <option key={dept} value={dept}>{dept}</option>
                                     ))}
                                 </select>
                             </div>

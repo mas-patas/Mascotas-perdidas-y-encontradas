@@ -11,10 +11,15 @@ const timeoutPromise = (ms: number, errorMessage: string) => {
 export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quality = 0.6): Promise<string> => {
     const compressionLogic = new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(file);
+        
         reader.onload = (event) => {
+            if (!event.target?.result) {
+                reject(new Error("Failed to read file data"));
+                return;
+            }
             const img = new Image();
-            img.src = event.target?.result as string;
+            img.src = event.target.result as string;
+            
             img.onload = () => {
                 try {
                     const canvas = document.createElement('canvas');
@@ -50,15 +55,26 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quali
                     ctx.drawImage(img, 0, 0, width, height);
                     
                     // Convert to base64 string with compression (image/jpeg)
+                    // Some browsers might throw if canvas is tainted, though unlikely with local file
                     const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
                     resolve(compressedBase64);
                 } catch (e) {
-                    reject(e);
+                    console.error("Compression logic error", e);
+                    // Fallback: resolve with original if canvas fails, or reject if severe
+                    reject(new Error("Error procesando la imagen. Intente con otra."));
                 }
             };
-            img.onerror = (err) => reject(new Error("Error al cargar la imagen para compresión."));
+            
+            img.onerror = () => reject(new Error("Error al cargar la imagen para compresión."));
         };
-        reader.onerror = (err) => reject(new Error("Error al leer el archivo."));
+        
+        reader.onerror = () => reject(new Error("Error al leer el archivo."));
+        
+        try {
+            reader.readAsDataURL(file);
+        } catch (e) {
+            reject(e);
+        }
     });
 
     // Race between compression and a 10-second timeout
@@ -83,9 +99,6 @@ export const uploadImage = async (file: File, bucket: string = 'pet-images'): Pr
         const fileExt = 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         
-        // Check session (optional depending on RLS, but good practice)
-        const { data: { session } } = await supabase.auth.getSession();
-        
         // 4. Attempt Upload to Supabase with a timeout race
         const uploadPromise = supabase.storage
             .from(bucket)
@@ -94,16 +107,16 @@ export const uploadImage = async (file: File, bucket: string = 'pet-images'): Pr
                 upsert: false
             });
 
-        const { error: uploadError } = await Promise.race([
+        const result = await Promise.race([
             uploadPromise,
-            // Allow 15 seconds for network upload, else timeout
-            timeoutPromise(15000, "La subida a la nube tardó demasiado.") as any 
+            // Allow 20 seconds for network upload, else timeout
+            timeoutPromise(20000, "La subida a la nube tardó demasiado.") as any 
         ]);
 
-        if (uploadError) {
-            console.warn("Supabase Storage Error (falling back to Base64):", uploadError.message);
+        // Check if result is valid and contains error (it might be undefined if timeout wins/throws)
+        if (result && result.error) {
+            console.warn("Supabase Storage Error (falling back to Base64):", result.error.message);
             // FALLBACK: If bucket doesn't exist or fails, return the Base64 string directly.
-            // This allows the app to function even without Storage setup (storing image in DB text field).
             return base64; 
         }
 

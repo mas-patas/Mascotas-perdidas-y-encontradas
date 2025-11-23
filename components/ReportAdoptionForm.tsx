@@ -43,6 +43,15 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
     const isUpdatingFromMapRef = useRef(false);
+    
+    // Safety guard against unmounted state updates
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const [formData, setFormData] = useState<AdoptionFormData>({
         name: '',
@@ -81,6 +90,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     // Initialize Map
     useEffect(() => {
         const timer = setTimeout(() => {
+            if (!isMounted.current) return;
             if (!mapRef.current) return;
             
             const L = (window as any).L;
@@ -103,11 +113,12 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             });
 
             const updateAddressFromCoords = async (lat: number, lng: number) => {
+                if (!isMounted.current) return;
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                     const data = await response.json();
                     
-                    if (data && data.address) {
+                    if (data && data.address && isMounted.current) {
                          const addr = data.address;
                          const road = addr.road || '';
                         const number = addr.house_number || '';
@@ -169,7 +180,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                             district: newDist || (newProv ? '' : prev.district)
                         }));
 
-                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                     }
                 } catch (err) {
                     console.error("Reverse geocoding error", err);
@@ -177,12 +188,14 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             };
 
             const onDragEnd = (event: any) => {
+                if (!isMounted.current) return;
                 const position = event.target.getLatLng();
                 setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
                 updateAddressFromCoords(position.lat, position.lng);
             };
 
             mapInstance.current.on('click', (e: any) => {
+                if (!isMounted.current) return;
                 const { lat, lng } = e.latlng;
                 if (markerInstance.current) {
                     markerInstance.current.setLatLng([lat, lng]);
@@ -195,11 +208,17 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             });
             
              setTimeout(() => {
-                mapInstance.current.invalidateSize();
+                if (isMounted.current && mapInstance.current) mapInstance.current.invalidateSize();
             }, 200);
         }, 100);
 
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
     }, []);
 
     // Center map when Dept/Prov changes
@@ -219,6 +238,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
         if (!formData.address || isUpdatingFromMapRef.current) return;
 
         const timeoutId = setTimeout(async () => {
+            if (!isMounted.current) return;
             try {
                 const queryParts = [formData.address, formData.district, formData.province, formData.department, 'Peru'].filter(part => part && part.trim() !== '');
                 const query = queryParts.join(', ');
@@ -228,7 +248,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
                 const data = await response.json();
 
-                if (data && data.length > 0) {
+                if (data && data.length > 0 && isMounted.current) {
                     const { lat, lon } = data[0];
                     const newLat = parseFloat(lat);
                     const newLng = parseFloat(lon);
@@ -256,6 +276,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                             }).addTo(mapInstance.current);
                             
                             markerInstance.current.on('dragend', (event: any) => {
+                                if (!isMounted.current) return;
                                 const position = event.target.getLatLng();
                                 setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
                             });
@@ -274,19 +295,21 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     useEffect(() => {
         if (formData.animalType === ANIMAL_TYPES.PERRO) {
             setBreeds(dogBreeds);
-            setFormData(prev => ({ ...prev, breed: dogBreeds[0] }));
+            if (!isUpdatingFromMapRef.current) setFormData(prev => ({ ...prev, breed: dogBreeds[0] }));
             setCustomAnimalType('');
         } else if (formData.animalType === ANIMAL_TYPES.GATO) {
             setBreeds(catBreeds);
-            setFormData(prev => ({ ...prev, breed: catBreeds[0] }));
+            if (!isUpdatingFromMapRef.current) setFormData(prev => ({ ...prev, breed: catBreeds[0] }));
             setCustomAnimalType('');
         } else {
             setBreeds(['Otro']);
-            setFormData(prev => ({ ...prev, breed: 'Otro' }));
+            if (!isUpdatingFromMapRef.current) setFormData(prev => ({ ...prev, breed: 'Otro' }));
         }
-        setColor1('');
-        setColor2('');
-        setColor3('');
+        if (!isUpdatingFromMapRef.current) {
+            setColor1('');
+            setColor2('');
+            setColor3('');
+        }
     }, [formData.animalType]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -342,12 +365,16 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                         newImages.push(publicUrl);
                     }
                 }
-                setImagePreviews(prev => [...prev, ...newImages]);
+                if (isMounted.current) {
+                    setImagePreviews(prev => [...prev, ...newImages]);
+                }
             } catch (err: any) {
                 console.error("Error uploading image:", err);
-                setError("Error al subir la imagen. Intenta de nuevo.");
+                if (isMounted.current) {
+                    setError("Error al subir la imagen. Intenta de nuevo.");
+                }
             } finally {
-                setIsUploading(false);
+                if (isMounted.current) setIsUploading(false);
             }
         }
     };
@@ -364,6 +391,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
+                if (!isMounted.current) return;
                 const { latitude, longitude } = position.coords;
                 
                 setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
@@ -384,6 +412,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                          });
                         markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
                          markerInstance.current.on('dragend', (event: any) => {
+                             if (!isMounted.current) return;
                              const pos = event.target.getLatLng();
                              setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }));
                          });
@@ -393,7 +422,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                     const data = await response.json();
-                    if (data && data.address) {
+                    if (data && data.address && isMounted.current) {
                         const addr = data.address;
                         const road = addr.road || '';
                         const number = addr.house_number || '';
@@ -456,7 +485,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                                  district: newDist || (newProv ? '' : prev.district)
                              }));
                              
-                             setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                             setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                         }
                     }
                 } catch (error) {
@@ -498,12 +527,15 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
         }
         
         let finalDescription = formData.description;
+        let typeLabel = formData.animalType as string;
+
         if (formData.animalType === ANIMAL_TYPES.OTRO) {
             if (!customAnimalType.trim()) {
                 setError("Por favor, especifica el tipo de animal.");
                 return;
             }
-            finalDescription = `[Tipo: ${customAnimalType.trim()}] ${formData.description}`;
+            typeLabel = customAnimalType.trim();
+            finalDescription = `[Tipo: ${typeLabel}] ${formData.description}`;
         }
 
         let finalBreed = formData.breed;
@@ -515,9 +547,11 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             finalBreed = customBreed.trim();
         }
 
+        const generatedName = formData.name.trim() || `${typeLabel} En Adopción`;
+
         const petToSubmit: Omit<Pet, 'id' | 'userEmail'> = {
             status: PET_STATUS.EN_ADOPCION,
-            name: formData.name || 'Sin Nombre',
+            name: generatedName,
             animalType: formData.animalType,
             breed: finalBreed,
             size: formData.size as PetSize,

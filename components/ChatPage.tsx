@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Chat, Pet, User } from '../types';
@@ -26,7 +24,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     // In a real app we'd use a context or fetch for single chat
     // For now we'll assume the list passed from parent is fresh enough or reuse the hook
     const { chats } = useAppData();
-    const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' } });
+    const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
 
     const chat = propChat || chats.find(c => c.id === id);
     const pet = propPet || (chat && chat.petId ? pets.find(p => p.id === chat.petId) : undefined);

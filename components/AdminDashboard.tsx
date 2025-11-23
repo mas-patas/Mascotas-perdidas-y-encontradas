@@ -147,7 +147,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
     const [ticketStatusFilter, setTicketStatusFilter] = useState<SupportTicketStatus | 'all'>('all');
     const [ticketCategoryFilter, setTicketCategoryFilter] = useState<SupportTicketCategory | 'all'>('all');
 
-    
+    // Campaign filters
+    const [campaignFilter, setCampaignFilter] = useState<'all' | 'upcoming' | 'expired'>('all');
+    const [campaignPage, setCampaignPage] = useState(1);
+    const CAMPAIGNS_PER_PAGE = 15;
+
     const [searchQuery, setSearchQuery] = useState('');
     const [reportSearchQuery, setReportSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -764,17 +768,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
             }
         };
         
-        // Robust handling: treat campaigns as an array even if null/undefined is passed
-        // AND filter out nulls just in case
+        // Robust handling
         const safeCampaigns = (Array.isArray(campaigns) ? campaigns : []).filter(c => c && c.id);
+
+        // Filter logic
+        const filteredCampaigns = safeCampaigns.filter(c => {
+            const campaignDate = new Date(c.date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const isExpired = campaignDate < today;
+
+            if (campaignFilter === 'upcoming') return !isExpired;
+            if (campaignFilter === 'expired') return isExpired;
+            return true; // 'all'
+        });
+
+        // Pagination Logic
+        const totalCampaignPages = Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE);
+        const paginatedCampaigns = filteredCampaigns.slice(
+            (campaignPage - 1) * CAMPAIGNS_PER_PAGE,
+            campaignPage * CAMPAIGNS_PER_PAGE
+        );
+
+        // Status Helper
+        const getCampaignStatus = (dateStr: string) => {
+            const cDate = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            if (cDate < today) {
+                return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">Expirado</span>;
+            }
+            return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">Próximo</span>;
+        };
     
         return (
             <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <h3 className="text-xl font-bold text-gray-800">Gestión de Campañas</h3>
-                    <button onClick={handleOpenCreateModal} className="py-2 px-4 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark flex items-center gap-2">
-                        <MegaphoneIcon /> Crear Campaña
-                    </button>
+                    <div className="flex gap-4 items-center">
+                        <select 
+                            value={campaignFilter} 
+                            onChange={(e) => { setCampaignFilter(e.target.value as any); setCampaignPage(1); }}
+                            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary text-sm"
+                        >
+                            <option value="all">Todas</option>
+                            <option value="upcoming">Próximas</option>
+                            <option value="expired">Expiradas</option>
+                        </select>
+                        <button onClick={handleOpenCreateModal} className="py-2 px-4 bg-brand-primary text-white font-semibold rounded-lg hover:bg-brand-dark flex items-center gap-2 text-sm">
+                            <MegaphoneIcon /> Crear Campaña
+                        </button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full bg-white border">
@@ -784,11 +830,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Tipo</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Fecha</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Lugar</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Estado Actual</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 text-gray-900">
-                            {safeCampaigns.map(campaign => (
+                            {paginatedCampaigns.map(campaign => (
                                 <tr key={campaign.id} className="hover:bg-gray-50">
                                     <td className="py-4 px-4 text-sm font-medium">
                                         <button 
@@ -800,23 +847,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                     </td>
                                     <td className="py-4 px-4 whitespace-nowrap text-sm">{campaign.type}</td>
                                     <td className="py-4 px-4 whitespace-nowrap text-sm">{formatDateSafe(campaign.date)}</td>
-                                    <td className="py-4 px-4 text-sm">{campaign.location}</td>
-                                    <td className="py-4 px-4 whitespace-nowrap text-sm font-medium flex gap-4">
-                                        <button onClick={() => handleOpenEditModal(campaign)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1">
-                                            <EditIcon /> Editar
+                                    <td className="py-4 px-4 text-sm truncate max-w-[200px]" title={campaign.location}>{campaign.location}</td>
+                                    <td className="py-4 px-4 whitespace-nowrap text-sm">
+                                        {getCampaignStatus(campaign.date)}
+                                    </td>
+                                    <td className="py-4 px-4 whitespace-nowrap text-sm font-medium flex gap-3">
+                                        <button onClick={() => handleOpenEditModal(campaign)} className="text-blue-600 hover:text-blue-900 flex items-center gap-1" title="Editar">
+                                            <EditIcon />
                                         </button>
-                                        <button onClick={() => setCampaignToDelete(campaign)} className="text-red-600 hover:text-red-900 flex items-center gap-1">
-                                            <TrashIcon /> Eliminar
+                                        <button onClick={() => setCampaignToDelete(campaign)} className="text-red-600 hover:text-red-900 flex items-center gap-1" title="Eliminar">
+                                            <TrashIcon />
                                         </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    {safeCampaigns.length === 0 && (
-                        <p className="text-center py-10 text-gray-500">No se han creado campañas.</p>
+                    {filteredCampaigns.length === 0 && (
+                        <p className="text-center py-10 text-gray-500">No se encontraron campañas.</p>
                     )}
                 </div>
+
+                {/* Campaign Pagination */}
+                {totalCampaignPages > 1 && (
+                    <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <span className="text-sm text-gray-700">
+                            Mostrando <span className="font-medium">{paginatedCampaigns.length}</span> de <span className="font-medium">{filteredCampaigns.length}</span> campañas
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCampaignPage(p => Math.max(1, p - 1))}
+                                disabled={campaignPage === 1}
+                                className="px-3 py-1 border-transparent rounded-md text-sm text-white bg-brand-primary hover:bg-brand-dark disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Anterior
+                            </button>
+                            <span className="text-sm text-gray-700">
+                                Página {campaignPage} de {totalCampaignPages}
+                            </span>
+                            <button
+                                onClick={() => setCampaignPage(p => Math.min(totalCampaignPages, p + 1))}
+                                disabled={campaignPage === totalCampaignPages}
+                                className="px-3 py-1 border-transparent rounded-md text-sm text-white bg-brand-primary hover:bg-brand-dark disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Siguiente
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {isCampaignModalOpen && (
                     <CampaignFormModal 
                         isOpen={isCampaignModalOpen}

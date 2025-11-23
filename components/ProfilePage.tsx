@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,11 +9,12 @@ import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
 import { uploadImage } from '../utils/imageUtils';
+import { supabase } from '../services/supabaseClient';
 
 
 interface ProfilePageProps {
     user: User;
-    reportedPets: Pet[];
+    reportedPets: Pet[]; // Keeping for fallback, but will load own data
     allPets: Pet[];
     users: User[];
     onBack: () => void;
@@ -22,8 +24,8 @@ interface ProfilePageProps {
     onRenewPet?: (pet: Pet) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
-    const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet } = useAuth();
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propReportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
+    const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet, currentUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
     const [editingOwnedPet, setEditingOwnedPet] = useState<OwnedPet | null>(null);
@@ -37,13 +39,57 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         avatarUrl: user.avatarUrl || '',
     });
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    // 1. Fetch 'My Pets' (Reported) - Includes Expired Pets
+    // This ensures the profile owner sees EVERYTHING they posted, even if it's hidden from the main feed.
+    const { data: myReportedPets = [], isLoading: isLoadingMyPets } = useQuery({
+        queryKey: ['myPets', user.id],
+        enabled: !!user.id,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pets')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            
+            // Enrich/Format
+            return data.map((p: any) => ({
+                id: p.id,
+                userEmail: user.email,
+                status: p.status,
+                name: p.name,
+                animalType: p.animal_type,
+                breed: p.breed,
+                color: p.color,
+                size: p.size,
+                location: p.location,
+                date: p.date,
+                contact: p.contact,
+                description: p.description,
+                imageUrls: p.image_urls || [],
+                adoptionRequirements: p.adoption_requirements,
+                shareContactInfo: p.share_contact_info,
+                contactRequests: p.contact_requests || [],
+                lat: p.lat,
+                lng: p.lng,
+                comments: [], // Comments not needed for list view
+                expiresAt: p.expires_at,
+                createdAt: p.created_at
+            })) as Pet[];
+        }
+    });
+
+    // Use the fetched data if available, otherwise fallback to props (though props filter out expired)
+    const displayedReportedPets = myReportedPets.length > 0 || isLoadingMyPets ? myReportedPets : propReportedPets;
 
     const savedPets = useMemo(() => allPets.filter(p => user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
 
     // Helper to check if a reported pet is expired
     const isPetExpired = (pet: Pet) => {
-        if (!pet.expiresAt) return false; // Assuming older posts without expiry don't expire yet
+        if (!pet.expiresAt) return false; 
         return new Date(pet.expiresAt) < new Date();
     };
 
@@ -57,14 +103,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         if (file) {
              try {
                 // Upload to Supabase Storage and get URL
-                setLoading(true);
+                setLoadingProfile(true);
                 const publicUrl = await uploadImage(file);
                 setEditableUser(prev => ({ ...prev, avatarUrl: publicUrl }));
             } catch (err) {
                  console.error("Error uploading avatar:", err);
                 setError("Error al procesar la imagen de perfil.");
             } finally {
-                setLoading(false);
+                setLoadingProfile(false);
             }
         }
     };
@@ -78,7 +124,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
             setError("El número de teléfono debe tener 9 dígitos y empezar con 9.");
             return;
         }
-        setLoading(true);
+        setLoadingProfile(true);
         setError('');
         try {
             await updateUserProfile({
@@ -91,7 +137,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
         } catch (err: any) {
             setError(err.message || 'Error al actualizar el perfil.');
         } finally {
-            setLoading(false);
+            setLoadingProfile(false);
         }
     };
     
@@ -160,14 +206,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                                         {(editableUser.firstName || '?').charAt(0).toUpperCase()}
                                     </div>
                                 )}
-                                {loading ? (
+                                {loadingProfile ? (
                                     <p className="mt-2 text-sm text-center text-gray-500">Subiendo...</p>
                                 ) : (
                                     <>
                                         <label htmlFor="avatar-upload" className="mt-2 block text-sm text-center text-brand-primary hover:underline cursor-pointer">
                                             Cambiar foto
                                         </label>
-                                        <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={loading} />
+                                        <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={loadingProfile} />
                                     </>
                                 )}
                             </div>
@@ -195,9 +241,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-2">
-                            <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300" disabled={loading}>Cancelar</button>
-                            <button onClick={handleSaveProfile} disabled={loading} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50">
-                                {loading ? 'Guardando...' : 'Guardar Cambios'}
+                            <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300" disabled={loadingProfile}>Cancelar</button>
+                            <button onClick={handleSaveProfile} disabled={loadingProfile} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50">
+                                {loadingProfile ? 'Guardando...' : 'Guardar Cambios'}
                             </button>
                         </div>
                     </div>
@@ -290,22 +336,24 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
             </div>
 
             <div className="space-y-4">
-                <h3 className="text-2xl font-semibold text-gray-700">Mis publicaciones</h3>
-                {reportedPets.length > 0 ? (
+                <h3 className="text-2xl font-semibold text-gray-700">Mis reportes</h3>
+                {isLoadingMyPets ? (
+                    <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
+                ) : displayedReportedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {reportedPets.map(pet => {
+                        {displayedReportedPets.map(pet => {
                             const expired = isPetExpired(pet);
                             return (
                                 <div key={pet.id} className="relative">
                                     {expired && (
-                                        <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-xl border-2 border-red-200">
+                                        <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-xl border-2 border-red-200 backdrop-blur-sm">
                                             <p className="text-red-600 font-bold mb-2 text-lg uppercase">Expirado</p>
                                             {onRenewPet && (
                                                 <button 
                                                     onClick={() => onRenewPet(pet)}
                                                     className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse"
                                                 >
-                                                    <SparklesIcon /> Renovar
+                                                    <SparklesIcon /> Renovar Publicación
                                                 </button>
                                             )}
                                         </div>

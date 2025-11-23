@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon, WarningIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
@@ -52,8 +52,9 @@ const PetSection: React.FC<{
                 newGridClass = 'grid-cols-3';
             }
             
-            setGridClass(newGridClass);
-            setCardsPerPage(newCardsPerPage);
+            // Guard against unnecessary state updates (React 310/185 prevention)
+            setGridClass(prev => prev !== newGridClass ? newGridClass : prev);
+            setCardsPerPage(prev => prev !== newCardsPerPage ? newCardsPerPage : prev);
 
             setCurrentIndex(prevIndex => {
                 if (pets.length <= newCardsPerPage) {
@@ -65,9 +66,16 @@ const PetSection: React.FC<{
         };
 
         window.addEventListener('resize', updateLayout);
-        updateLayout(); // Initial call
+        
+        // FIX: Defer initial update to prevent "update inside render" error
+        const timer = setTimeout(() => {
+            updateLayout(); 
+        }, 0);
 
-        return () => window.removeEventListener('resize', updateLayout);
+        return () => {
+            window.removeEventListener('resize', updateLayout);
+            clearTimeout(timer);
+        };
     }, [pets.length]);
 
 
@@ -127,10 +135,10 @@ const PetSection: React.FC<{
                 </h2>
                 <button 
                     onClick={onSeeMore}
-                    className="group flex items-center gap-2 text-sm font-bold text-brand-primary bg-brand-light hover:bg-blue-100 px-4 py-2 rounded-full transition-all duration-200"
+                    className="bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 text-sm group"
                 >
-                    Ver más
-                    <span className="transform group-hover:translate-x-1 transition-transform text-lg leading-none">→</span>
+                    <span>Ver más</span>
+                    <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
                 </button>
             </div>
             
@@ -236,9 +244,10 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                 <div>
                     <button 
                         onClick={onReset} 
-                        className="flex items-center gap-2 text-gray-500 hover:text-brand-dark hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors mb-2 font-medium"
+                        className="bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 text-sm mb-4"
                     >
-                        <span className="text-lg leading-none">←</span> Volver al inicio
+                        <ChevronLeftIcon />
+                        Volver al inicio
                     </button>
                     <div className="flex justify-between items-end border-b border-gray-200 pb-4">
                         <h2 className="text-3xl font-bold text-brand-dark">
@@ -262,15 +271,39 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                             })}
                         </div>
-                        {/* Sentinel for Infinite Scroll */}
-                        {hasMore && (
-                            <div ref={sentinelRef} className="h-10 w-full flex justify-center items-center p-4">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
-                            </div>
-                        )}
-                        {!hasMore && pets.length > 10 && (
-                            <p className="text-center text-gray-400 text-sm py-4">No hay más resultados.</p>
-                        )}
+                        
+                        {/* Infinite Scroll Logic + Manual Button */}
+                        <div className="flex flex-col items-center justify-center py-8 gap-4">
+                            {hasMore && (
+                                <>
+                                    {/* Sentinel for auto-loading on scroll */}
+                                    <div ref={sentinelRef} className="h-1 w-full opacity-0"></div>
+                                    
+                                    {/* Manual Button for UX preference */}
+                                    <button 
+                                        onClick={() => loadMore && loadMore()}
+                                        disabled={isLoading}
+                                        className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-brand-primary font-bold py-2 px-6 rounded-full shadow-sm transition-all transform hover:scale-105 active:scale-95"
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
+                                                <span>Cargando...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <PlusIcon />
+                                                <span>Cargar más mascotas</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                            
+                            {!hasMore && pets.length > 10 && (
+                                <p className="text-gray-400 text-sm">Has llegado al final de la lista.</p>
+                            )}
+                        </div>
                     </>
                 ) : (
                     <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">

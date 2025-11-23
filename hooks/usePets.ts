@@ -5,7 +5,7 @@ import { supabase } from '../services/supabaseClient';
 import { PET_STATUS } from '../constants';
 import type { Pet, PetStatus, AnimalType, PetSize, Comment } from '../types';
 
-const PAGE_SIZE = 12;
+const LIST_PAGE_SIZE = 12;
 
 interface UsePetsProps {
     filters: {
@@ -15,6 +15,7 @@ interface UsePetsProps {
         color1: string;
         color2: string;
         size: PetSize | 'Todos';
+        department: string;
     };
 }
 
@@ -22,8 +23,11 @@ interface UsePetsProps {
 const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
     if (rawPets.length === 0) return [];
 
-    const petIds = rawPets.map(p => p.id);
-    const userIds = [...new Set(rawPets.map(p => p.user_id).filter(Boolean))];
+    // Deduplicate IDs just in case, though logic shouldn't produce duplicates
+    const uniquePets = Array.from(new Map(rawPets.map(p => [p.id, p])).values());
+    
+    const petIds = uniquePets.map(p => p.id);
+    const userIds = [...new Set(uniquePets.map(p => p.user_id).filter(Boolean))];
 
     // Fetch Profiles to get Emails
     const { data: profiles } = await supabase
@@ -49,7 +53,7 @@ const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
         .select('comment_id, user_id')
         .in('comment_id', commentIds);
 
-    return rawPets.map(p => {
+    return uniquePets.map(p => {
         const owner = profiles?.find(u => u.id === p.user_id);
         const petComments = comments
             ?.filter(c => c.pet_id === p.id)
@@ -99,26 +103,67 @@ export const usePets = ({ filters }: UsePetsProps) => {
         const nowIso = new Date().toISOString();
         
         if (filters.status === 'Todos') {
-            // DASHBOARD MODE
-            const from = pageParam * PAGE_SIZE;
-            const to = from + PAGE_SIZE - 1;
+            // DASHBOARD MODE: Parallel Queries for "Top 10" of each category
+            // Only fetch if it's the first page (pageParam 0). Dashboard doesn't support infinite scroll the same way.
+            if (pageParam > 0) return { data: [], nextCursor: undefined };
 
-            const { data, count, error } = await supabase
-                .from('pets')
-                .select('*', { count: 'exact' })
-                // Filter: Show only if expires_at is in the future
-                .gt('expires_at', nowIso)
-                .order('created_at', { ascending: false })
-                .range(from, to);
+            const categories = [
+                PET_STATUS.PERDIDO,
+                PET_STATUS.ENCONTRADO,
+                PET_STATUS.AVISTADO,
+                PET_STATUS.EN_ADOPCION,
+                PET_STATUS.REUNIDO
+            ];
 
-            if (error) throw error;
-            const enriched = await enrichPets(data || []);
-            return { data: enriched, nextCursor: (from + (data?.length || 0) < (count || 0)) ? pageParam + 1 : undefined };
+            const promises = categories.map(status => {
+                let query = supabase
+                    .from('pets')
+                    .select('*')
+                    .eq('status', status)
+                    .gt('expires_at', nowIso);
+                
+                // Apply filters to dashboard queries as well
+                if (filters.department !== 'Todos') {
+                    query = query.ilike('location', `%${filters.department}%`);
+                }
+                if (filters.type !== 'Todos') {
+                    query = query.eq('animal_type', filters.type);
+                }
+
+                return query.order('created_at', { ascending: false }).limit(10);
+            });
+
+            try {
+                const results = await Promise.all(promises);
+                
+                // Combine all results
+                let combinedRawData: any[] = [];
+                results.forEach(result => {
+                    if (result.data) {
+                        combinedRawData = [...combinedRawData, ...result.data];
+                    }
+                });
+
+                const enriched = await enrichPets(combinedRawData);
+                
+                // Sort combined result by date just in case, though UI separates them
+                enriched.sort((a, b) => {
+                    const dateA = new Date(a.createdAt || 0).getTime();
+                    const dateB = new Date(b.createdAt || 0).getTime();
+                    return dateB - dateA;
+                });
+
+                return { data: enriched, nextCursor: undefined }; // No next cursor for mixed dashboard
+            } catch (error) {
+                console.error("Error fetching dashboard pets", error);
+                throw error;
+            }
 
         } else {
-            // FILTERED LIST MODE
-            const from = pageParam * PAGE_SIZE;
-            const to = from + PAGE_SIZE - 1;
+            // FILTERED LIST MODE (Specific Category) - Standard Pagination
+            const pageSize = LIST_PAGE_SIZE;
+            const from = pageParam * pageSize;
+            const to = from + pageSize - 1;
 
             let query = supabase.from('pets').select('*', { count: 'exact' });
 
@@ -131,6 +176,7 @@ export const usePets = ({ filters }: UsePetsProps) => {
             if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
             if (filters.size !== 'Todos') query = query.eq('size', filters.size);
             if (filters.color1 !== 'Todos') query = query.ilike('color', `%${filters.color1}%`);
+            if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
             
             query = query.order('created_at', { ascending: false }).range(from, to);
 
@@ -156,7 +202,6 @@ export const usePets = ({ filters }: UsePetsProps) => {
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
         staleTime: 1000 * 60 * 1, // 1 minute stale time
-        // Removed explicit retry: 1 to use global default (3)
     });
 
     // Realtime Subscription to invalidate queries

@@ -49,6 +49,15 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
     const isUpdatingFromMapRef = useRef(false); // Lock to prevent loop
+    
+    // Safety guard against unmounted state updates
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const [formData, setFormData] = useState<FormDataState>({
         status: initialStatus,
@@ -93,6 +102,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     // Initialize Map
     useEffect(() => {
         const timer = setTimeout(() => {
+            if (!isMounted.current) return;
             if (!mapRef.current) return;
             
             const L = (window as any).L;
@@ -115,11 +125,12 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             });
 
             const updateAddressFromCoords = async (lat: number, lng: number) => {
+                if (!isMounted.current) return;
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                     const data = await response.json();
                     
-                    if (data && data.address) {
+                    if (data && data.address && isMounted.current) {
                         const addr = data.address;
                         const road = addr.road || '';
                         const number = addr.house_number || '';
@@ -186,7 +197,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             district: newDist || (newProv ? '' : prev.district)
                         }));
 
-                        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000); // Release lock
+                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000); // Release lock
                     }
                 } catch (err) {
                     console.error("Reverse geocoding error", err);
@@ -194,6 +205,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             };
 
             const onDragEnd = (event: any) => {
+                if (!isMounted.current) return;
                 const position = event.target.getLatLng();
                 setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
                 updateAddressFromCoords(position.lat, position.lng);
@@ -208,6 +220,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             }
 
             mapInstance.current.on('click', (e: any) => {
+                if (!isMounted.current) return;
                 const { lat, lng } = e.latlng;
                 if (markerInstance.current) {
                     markerInstance.current.setLatLng([lat, lng]);
@@ -219,10 +232,16 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 updateAddressFromCoords(lat, lng);
             });
             
-            setTimeout(() => mapInstance.current.invalidateSize(), 200);
+            setTimeout(() => { if(isMounted.current) mapInstance.current.invalidateSize(); }, 200);
         }, 100);
 
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
     }, []); 
 
     // Forward Geocoding (Address -> Coords)
@@ -230,6 +249,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         if (!formData.address || isUpdatingFromMapRef.current) return;
 
         const timeoutId = setTimeout(async () => {
+            if (!isMounted.current) return;
             try {
                 // Construct cleaner query to avoid empty parts
                 const queryParts = [formData.address, formData.district, formData.province, formData.department, 'Peru'].filter(part => part && part.trim() !== '');
@@ -240,7 +260,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
                 const data = await response.json();
 
-                if (data && data.length > 0) {
+                if (data && data.length > 0 && isMounted.current) {
                     const { lat, lon } = data[0];
                     const newLat = parseFloat(lat);
                     const newLng = parseFloat(lon);
@@ -272,7 +292,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             } catch (error) {
                 console.error("Geocoding error:", error);
             }
-        }, 1000); 
+        }, 1500); // Increased debounce to 1.5s to avoid excessive requests during typing
 
         return () => clearTimeout(timeoutId);
     }, [formData.address, formData.district, formData.province, formData.department]);
@@ -453,12 +473,17 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         newImages.push(publicUrl);
                     }
                 }
-                setImagePreviews(prev => [...prev, ...newImages]);
+                if (isMounted.current) {
+                    setImagePreviews(prev => [...prev, ...newImages]);
+                }
             } catch (err: any) {
                 console.error("Error uploading image:", err);
-                setError("Error al subir la imagen. Intenta de nuevo.");
+                if (isMounted.current) {
+                    setError("Error al subir la imagen: " + (err.message || "Intentelo de nuevo."));
+                    e.target.value = '';
+                }
             } finally {
-                setIsUploading(false);
+                if (isMounted.current) setIsUploading(false);
             }
         }
     };
@@ -477,12 +502,12 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         setIsGenerating(true);
         try {
             const description = await generatePetDescription(formData.animalType, formData.breed, finalColor);
-            setFormData(prev => ({ ...prev, description }));
+            if (isMounted.current) setFormData(prev => ({ ...prev, description }));
         } catch (err) {
             console.error(err);
             setError('No se pudo generar la descripción. Inténtalo de nuevo.');
         } finally {
-            setIsGenerating(false);
+            if (isMounted.current) setIsGenerating(false);
         }
     };
 
@@ -494,6 +519,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
+                if (!isMounted.current) return;
                 const { latitude, longitude } = position.coords;
                 
                 setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
@@ -514,6 +540,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                          });
                         markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
                          markerInstance.current.on('dragend', (event: any) => {
+                             if (!isMounted.current) return;
                              const pos = event.target.getLatLng();
                              setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }));
                          });
@@ -523,7 +550,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                     const data = await response.json();
-                    if (data && data.address) {
+                    if (data && data.address && isMounted.current) {
                         const addr = data.address;
                         const road = addr.road || '';
                         const number = addr.house_number || '';
@@ -582,7 +609,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                  district: newDist || (newProv ? '' : prev.district)
                              }));
                              
-                             setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
+                             setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                         }
                     }
                 } catch (error) {
@@ -619,12 +646,15 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         }
         
         let finalDescription = formData.description;
+        let typeLabel = formData.animalType as string;
+
         if (formData.animalType === ANIMAL_TYPES.OTRO) {
             if (!customAnimalType.trim()) {
                 setError("Por favor, especifica el tipo de animal.");
                 return;
             }
-            finalDescription = `[Tipo: ${customAnimalType.trim()}] ${formData.description}`;
+            typeLabel = customAnimalType.trim();
+            finalDescription = `[Tipo: ${typeLabel}] ${formData.description}`;
         }
         
         let finalBreed = formData.breed;
@@ -636,9 +666,18 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             finalBreed = customBreed.trim();
         }
 
+        let generatedName = formData.name;
+        if (!isPerdido) {
+            // For Found/Sighted, generate descriptive name like "Perro Encontrado"
+            generatedName = `${typeLabel} ${formData.status}`;
+        } else if (!generatedName.trim()) {
+             // Fallback if name is missing for Lost pets
+             generatedName = 'Desconocido';
+        }
+
         const petToSubmit: Omit<Pet, 'id' | 'userEmail'> = {
             status: formData.status,
-            name: isPerdido ? (formData.name || 'Desconocido') : 'Desconocido',
+            name: generatedName,
             animalType: formData.animalType,
             breed: finalBreed,
             size: formData.size as PetSize,

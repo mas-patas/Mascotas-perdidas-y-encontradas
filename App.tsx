@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
@@ -33,6 +33,9 @@ import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
 import { usePets } from './hooks/usePets';
 
+// Stable empty array to prevent hook dependency loops
+const EMPTY_PETS_ARRAY: Pet[] = [];
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles }: { children?: React.ReactNode, roles?: UserRole[] }) => {
     const { currentUser, loading } = useAuth();
@@ -61,7 +64,8 @@ const App: React.FC = () => {
     const queryClient = useQueryClient();
     
     // State from Hooks
-    const { filters, setFilters, resetFilters } = usePetFilters([]);
+    // Use stable empty array to avoid re-memoization loops
+    const { filters, setFilters, resetFilters } = usePetFilters(EMPTY_PETS_ARRAY);
     const { pets, loading: petsLoading, loadMore, hasMore, isError: petsError, refetch: refetchPets } = usePets({ filters });
     const { 
         users, setUsers, 
@@ -90,6 +94,9 @@ const App: React.FC = () => {
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
 
+    // Guard ref to prevent infinite loops in checkStatuses
+    const hasCheckedStatusRef = useRef<string | null>(null);
+
     // Auto-close sidebar on Map view
     useEffect(() => {
         if (location.pathname === '/mapa') {
@@ -98,20 +105,36 @@ const App: React.FC = () => {
     }, [location.pathname]);
 
     // Check for expired pets and 30-day status check
+    // FIXED: Using useRef to ensure this logic runs strictly ONCE per user session
     useEffect(() => {
         if (!currentUser) return;
+        
+        // If we have already checked for this user, skip to prevent infinite loops
+        if (hasCheckedStatusRef.current === currentUser.id) return;
 
         const checkStatuses = async () => {
+            // Mark as checked immediately to prevent re-entry during async op
+            hasCheckedStatusRef.current = currentUser.id;
+
             const now = new Date();
-            // Fetch user's pets
+            
+            // 1. Fetch user's pets
             const { data: userPets } = await supabase
                 .from('pets')
                 .select('id, name, expires_at, created_at, status')
                 .eq('user_id', currentUser.id);
 
-            if (!userPets) return;
+            if (!userPets || userPets.length === 0) return;
 
-            userPets.forEach(async (pet) => {
+            // 2. Fetch existing notifications relevant to checks to avoid using stale 'notifications' prop
+            const { data: existingNotifs } = await supabase
+                .from('notifications')
+                .select('link')
+                .eq('user_id', currentUser.id);
+
+            let newNotificationAdded = false;
+
+            for (const pet of userPets) {
                 let expirationDate;
                 let createdDate = new Date(pet.created_at);
 
@@ -126,8 +149,8 @@ const App: React.FC = () => {
 
                 // 1. Expiration Check (60 Days)
                 if (isExpired) {
-                    const alreadyNotified = notifications.some(n => 
-                        (typeof n.link === 'object' && n.link.type === 'pet-renew' && n.link.id === pet.id)
+                    const alreadyNotified = existingNotifs?.some(n => 
+                        (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id)
                     );
 
                     if (!alreadyNotified) {
@@ -140,15 +163,14 @@ const App: React.FC = () => {
                             is_read: false,
                             created_at: now.toISOString()
                         });
+                        newNotificationAdded = true;
                     }
                 }
 
                 // 2. 30-Day Status Check (Only for Lost Pets)
-                // Trigger if it's roughly 30 days old (between 29 and 32 to ensure we catch it)
-                // and hasn't expired yet.
                 if (pet.status === PET_STATUS.PERDIDO && daysSinceCreation >= 30 && daysSinceCreation < 60 && !isExpired) {
-                     const alreadyChecked = notifications.some(n => 
-                        (typeof n.link === 'object' && n.link.type === 'pet-status-check' && n.link.id === pet.id)
+                     const alreadyChecked = existingNotifs?.some(n => 
+                        (typeof n.link === 'object' && n.link?.type === 'pet-status-check' && n.link?.id === pet.id)
                     );
 
                     if (!alreadyChecked) {
@@ -161,13 +183,19 @@ const App: React.FC = () => {
                             is_read: false,
                             created_at: now.toISOString()
                         });
+                        newNotificationAdded = true;
                     }
                 }
-            });
+            }
+
+            if (newNotificationAdded) {
+                // Force refresh notifications
+                queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            }
         };
 
         checkStatuses();
-    }, [currentUser?.id, notifications]); 
+    }, [currentUser?.id]); // Only run when user changes/logs in
 
     const getUserIdByEmail = (email: string): string | undefined => {
         const user = users.find(u => u.email === email);
@@ -207,6 +235,10 @@ const App: React.FC = () => {
                 if (error) throw error;
 
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
+                // Also invalidate myPets to update profile list
+                if (currentUser) {
+                    queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+                }
                 setIsReportModalOpen(false);
              } catch (err: any) {
                  alert('Error al actualizar: ' + err.message);
@@ -266,6 +298,7 @@ const App: React.FC = () => {
             if (error) throw error;
 
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
 
             const newNotifId = generateUUID();
             await supabase.from('notifications').insert({
@@ -301,7 +334,10 @@ const App: React.FC = () => {
 
             if (error) throw error;
 
+            // IMPORTANT: Invalidate both general list AND profile specific list so UI updates instantly
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+            
             setPetToRenew(null); // Close modal
             alert(`La publicación de ${pet.name} ha sido renovada por 60 días más.`);
             
@@ -321,6 +357,8 @@ const App: React.FC = () => {
             if (error) throw error;
             
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            if (currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+
             setPetToRenew(null);
             setPetToStatusCheck(null);
             alert("¡Qué alegría! Tu mascota ha sido marcada como reunida.");
@@ -340,6 +378,7 @@ const App: React.FC = () => {
             if (error) throw error;
             
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            if (currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
             navigate('/');
         } catch (err: any) {
             alert("Error al eliminar: " + err.message);
@@ -351,12 +390,12 @@ const App: React.FC = () => {
             const { error } = await supabase.from('pets').update({ status }).eq('id', petId);
             if (error) throw error;
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            if (currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
         } catch (err: any) {
             alert("Error al actualizar estado: " + err.message);
         }
     };
 
-    // ... [Keep existing User/Role/Chat handlers unchanged] ...
     const handleUpdateUserStatus = async (email: string, status: UserStatus) => {
         try {
             const { error } = await supabase.from('profiles').update({ status }).eq('email', email);
@@ -515,7 +554,6 @@ const App: React.FC = () => {
         }
     };
 
-    // ... [Keep existing handlers: handleUpdateReportStatus, handleAddSupportTicket, etc.] ...
     const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => {
         try {
             const { error } = await supabase.from('reports').update({ status }).eq('id', reportId);
@@ -743,6 +781,7 @@ const App: React.FC = () => {
 
             // 3. Invalidate queries to refresh UI
             await queryClient.invalidateQueries({ queryKey: ['pets'] });
+            await queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
 
             // 4. Send Notification
             const ownerId = petData.user_id;
@@ -779,6 +818,7 @@ const App: React.FC = () => {
             });
             if (error) throw error;
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
             const pet = pets.find(p => p.id === petId);
             if (pet && pet.userEmail !== currentUser.email) {
                  const ownerId = getUserIdByEmail(pet.userEmail);
@@ -827,9 +867,11 @@ const App: React.FC = () => {
             if (isLiked) {
                 await supabase.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
+                queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
             } else {
                 await supabase.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
+                queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
             }
         } catch (err) {
             console.error("Error toggling like:", err);

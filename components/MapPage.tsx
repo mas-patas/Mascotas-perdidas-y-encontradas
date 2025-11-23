@@ -1,13 +1,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import type { Pet } from '../types';
+import type { Pet, Campaign } from '../types';
 import { PET_STATUS } from '../constants';
 import { locationCoordinates } from '../data/locations';
 import { SearchIcon, CrosshairIcon, ChevronDownIcon } from './icons';
 import { supabase } from '../services/supabaseClient';
 
 interface MapPageProps {
-    pets: Pet[]; // Kept for type compatibility, but we'll load full data internally
+    pets: Pet[]; // Kept for type compatibility
     onNavigate: (path: string) => void;
 }
 
@@ -22,10 +22,12 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         [PET_STATUS.ENCONTRADO]: true,
         [PET_STATUS.AVISTADO]: true,
         [PET_STATUS.EN_ADOPCION]: true,
+        'CAMPAIGNS': true,
     });
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [mapPets, setMapPets] = useState<Pet[]>([]);
+    const [mapCampaigns, setMapCampaigns] = useState<Campaign[]>([]);
     const [isLoadingMapData, setIsLoadingMapData] = useState(true);
 
     // Helper to add small random offset to prevent stacking
@@ -107,7 +109,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         });
     };
 
-    // Fetch ALL pets with coordinates for the map (ignoring pagination)
+    // Fetch ALL pets and campaigns with coordinates for the map
     useEffect(() => {
         let mounted = true;
 
@@ -117,40 +119,44 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             const nowIso = now.toISOString();
 
             try {
-                // Attempt 1: Try to fetch with expires_at filter (Best Case)
-                let { data, error } = await supabase
+                // 1. Fetch Pets
+                let { data: petData, error: petError } = await supabase
                     .from('pets')
                     .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at')
                     .not('lat', 'is', null)
                     .not('lng', 'is', null)
                     .gt('expires_at', nowIso);
 
-                if (error) {
-                    console.warn("Map: Primary fetch failed (likely schema mismatch), using fallback.", error.message);
-                    
-                    // Attempt 2: Fallback fetch (If expires_at column is missing)
-                    // We fetch without expires_at in the select list to avoid error
+                // 2. Fetch Campaigns
+                const { data: campaignData, error: campaignError } = await supabase
+                    .from('campaigns')
+                    .select('*')
+                    .not('lat', 'is', null)
+                    .not('lng', 'is', null)
+                    .gte('date', nowIso.split('T')[0]); // Only future or today campaigns
+
+                if (petError) {
+                    console.warn("Map: Primary pet fetch failed, using fallback.", petError.message);
                     const { data: fallbackData, error: fallbackError } = await supabase
                         .from('pets')
                         .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at')
                         .not('lat', 'is', null)
                         .not('lng', 'is', null);
 
-                    if (fallbackError) throw fallbackError;
-
-                    // Perform client-side filtering for expiration (60 days)
-                    data = (fallbackData || []).filter((p: any) => {
-                        const created = new Date(p.created_at);
-                        const expires = new Date(created.getTime() + (60 * 24 * 60 * 60 * 1000));
-                        return expires > now;
-                    });
+                    if (!fallbackError && fallbackData) {
+                        petData = fallbackData.filter((p: any) => {
+                            const created = new Date(p.created_at);
+                            const expires = new Date(created.getTime() + (60 * 24 * 60 * 60 * 1000));
+                            return expires > now;
+                        });
+                    }
                 }
 
                 if (mounted) {
                     // Map to Pet type
-                    const mappedPets: Pet[] = (data || []).map((p: any) => ({
+                    const mappedPets: Pet[] = (petData || []).map((p: any) => ({
                         id: p.id,
-                        userEmail: '', // Not needed for map pin
+                        userEmail: '',
                         status: p.status,
                         name: p.name,
                         animalType: p.animal_type,
@@ -167,11 +173,25 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         expiresAt: p.expires_at
                     }));
 
+                    const mappedCampaigns: Campaign[] = (campaignData || []).map((c: any) => ({
+                        id: c.id,
+                        userEmail: c.user_email,
+                        type: c.type,
+                        title: c.title,
+                        description: c.description,
+                        location: c.location,
+                        date: c.date,
+                        imageUrls: c.image_urls || [],
+                        contactPhone: c.contact_phone,
+                        lat: c.lat,
+                        lng: c.lng
+                    }));
+
                     setMapPets(mappedPets);
+                    setMapCampaigns(mappedCampaigns);
                 }
             } catch (err) {
-                console.error("Error loading map pins:", err);
-                // We don't alert here to avoid annoying popups, just log
+                console.error("Error loading map data:", err);
             } finally {
                 if (mounted) setIsLoadingMapData(false);
             }
@@ -184,6 +204,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         };
     }, []);
 
+    // 1. Map Initialization and Cleanup Effect
     useEffect(() => {
         if (!mapRef.current) return;
 
@@ -192,27 +213,45 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
 
         // Initialize map if not already done
         if (!mapInstance.current) {
-            mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView([-12.046374, -77.042793], 12); // Default to Lima
+            const map = L.map(mapRef.current, { zoomControl: false }).setView([-12.046374, -77.042793], 12); // Default to Lima
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(mapInstance.current);
+            }).addTo(map);
             
-            L.control.zoom({ position: 'bottomright' }).addTo(mapInstance.current);
-        }
-        
-        // Initialize Marker Cluster Group if not exists
-        if (!markerClusterGroupRef.current) {
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            
+            mapInstance.current = map;
+
+            // Initialize Marker Cluster Group
             if (L.markerClusterGroup) {
                 markerClusterGroupRef.current = L.markerClusterGroup({
                     showCoverageOnHover: false,
                     maxClusterRadius: 50,
                 });
-                mapInstance.current.addLayer(markerClusterGroupRef.current);
+                map.addLayer(markerClusterGroupRef.current);
             } else {
                 console.warn("Leaflet.markercluster plugin not loaded.");
             }
         }
+
+        // Cleanup on unmount
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+                markerClusterGroupRef.current = null;
+                boundaryLayerRef.current = null;
+            }
+        };
+    }, []);
+
+    // 2. Marker Updates Effect
+    useEffect(() => {
+        if (!mapInstance.current) return; // Wait for map init
+
+        const L = (window as any).L;
+        if (!L) return;
 
         // Clear existing markers
         if (markerClusterGroupRef.current) {
@@ -226,15 +265,19 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         }
 
         // Define custom icon HTML generator
-        const createCustomIcon = (status: string, iconSVG: string) => {
+        const createCustomIcon = (status: string, iconSVG: string, isCampaign = false) => {
             let statusClass = 'lost';
-            if (status === PET_STATUS.ENCONTRADO) statusClass = 'found';
+            if (isCampaign) statusClass = 'sighted'; 
+            else if (status === PET_STATUS.ENCONTRADO) statusClass = 'found';
             else if (status === PET_STATUS.AVISTADO) statusClass = 'sighted';
             else if (status === PET_STATUS.EN_ADOPCION) statusClass = 'adoption';
 
+            // Override background for campaigns to distinct indigo
+            const styleOverride = isCampaign ? 'background-color: #4F46E5;' : '';
+
             return L.divIcon({
                 className: 'custom-div-icon',
-                html: `<div class='marker-pin ${statusClass}'></div>${iconSVG}`,
+                html: `<div class='marker-pin ${statusClass}' style='${styleOverride}'></div>${iconSVG}`,
                 iconSize: [30, 42],
                 iconAnchor: [15, 42]
             });
@@ -243,17 +286,17 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         const dogIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM8 14s1.5 2 4 2 4-2 4-2M9 10h6"/><path d="M12 14v6a2 2 0 002 2h2a2 2 0 00-2-2h-2M12 14v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2h2"/><path d="M5 8a3 3 0 016 0c0 1.5-3 4-3 4s-3-2.5-3-4zM19 8a3 3 0 00-6 0c0 1.5 3 4 3 4s3-2.5 3-4z"/></svg>`;
         const catIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM9 12s1.5 2 3 2 3-2 3-2M9 9h6"/><path d="M20 12c0 4-4 8-8 8s-8-4-8-8 4-8 8-8 8 4 8 8zM5 8l-2 2M19 8l2 2"/></svg>`;
         const otherIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-8 8c0 4.418 3.582 8 8 8s8-3.582 8-8-3.582-8-8-8-8 3.582-8 8zm0 0h16" /></svg>`;
+        const megaphoneIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.136A1.76 1.76 0 015.882 11H3a1 1 0 01-1-1V8a1 1 0 011-1h2.882a1.76 1.76 0 011.649.931l2.147 6.136-1.09-3.115A1.76 1.76 0 0110.232 5h1.232c1.026 0 1.943.684 2.247 1.647L15 12l-1.09-3.115"/></svg>`;
 
-        // Prepare Markers
         const markersToAdd: any[] = [];
 
+        // Add Pets
         mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses]) return;
 
             let lat = pet.lat;
             let lng = pet.lng;
 
-            // Fallback for pets without exact coords
             if (!lat || !lng) {
                 const locationText = pet.location || "";
                 let foundCity = Object.keys(locationCoordinates).find(city => locationText.includes(city));
@@ -289,13 +332,37 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             }
         });
 
+        // Add Campaigns
+        if (visibleStatuses['CAMPAIGNS']) {
+            mapCampaigns.forEach(campaign => {
+                if (campaign.lat && campaign.lng) {
+                    const marker = L.marker([campaign.lat, campaign.lng], { icon: createCustomIcon('campaign', megaphoneIconSVG, true) })
+                        .bindPopup(`
+                            <div class="text-center min-w-[180px]">
+                                <img src="${campaign.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
+                                <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">
+                                    ${campaign.type}
+                                </span>
+                                <p class="text-xs text-gray-600 mb-1">📅 ${new Date(campaign.date).toLocaleDateString()}</p>
+                                <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
+                                <button onclick="window.location.hash = '#/campanas/${campaign.id}'" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">
+                                    Ver Campaña
+                                </button>
+                            </div>
+                        `);
+                    markersToAdd.push(marker);
+                }
+            });
+        }
+
         if (markerClusterGroupRef.current) {
             markerClusterGroupRef.current.addLayers(markersToAdd);
         } else {
             markersToAdd.forEach(m => m.addTo(mapInstance.current));
         }
 
-    }, [mapPets, visibleStatuses]); 
+    }, [mapPets, mapCampaigns, visibleStatuses]); 
 
     return (
         <div className="h-full flex flex-col relative">
@@ -344,7 +411,8 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                                 { id: PET_STATUS.PERDIDO, label: 'Perdidos', color: 'bg-red-500' },
                                 { id: PET_STATUS.ENCONTRADO, label: 'Encontrados', color: 'bg-green-500' },
                                 { id: PET_STATUS.AVISTADO, label: 'Avistados', color: 'bg-blue-500' },
-                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-purple-500' }
+                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-purple-500' },
+                                { id: 'CAMPAIGNS', label: 'Campañas', color: 'bg-indigo-600' }
                             ].map(status => (
                                 <label key={status.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                     <input 

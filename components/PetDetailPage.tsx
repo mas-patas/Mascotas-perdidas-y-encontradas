@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon } from './icons';
 import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
@@ -227,7 +228,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { currentUser } = useAuth();
-    const { pets, loading: petsLoading } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos' } });
+    const { pets, loading: petsLoading } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
     
     // Find pet from props or list
     const [pet, setPet] = useState<Pet | undefined>(propPet || pets.find(p => p.id === id));
@@ -625,6 +626,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     return (
         <>
+            <Helmet>
+                <title>{pet.status === PET_STATUS.PERDIDO ? 'SE BUSCA:' : pet.status} {title} - Pets</title>
+                <meta name="description" content={`${pet.status}: ${title}, ${pet.breed} en ${pet.location}. Ayúdanos a encontrarlo.`} />
+                <meta property="og:title" content={`${pet.status}: ${title} - Pets`} />
+                <meta property="og:description" content={`${pet.breed} - ${pet.color}. Visto en ${pet.location}. ${pet.description.substring(0, 100)}...`} />
+                <meta property="og:image" content={pet.imageUrls[0] || 'https://placehold.co/600x400/EEE/31343C?text=Mascotas'} />
+                <meta property="og:type" content="website" />
+            </Helmet>
+
             <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl mx-auto">
                 {/* Header - Back Button */}
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -816,14 +826,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg transition-colors font-medium text-xs border border-gray-300"
                                     >
                                         <GoogleMapsIcon />
-                                        Google Maps
+                                        Ver en Google Maps
                                     </button>
                                     <button 
                                         onClick={openInWaze}
                                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg transition-colors font-medium text-xs border border-blue-200"
                                     >
                                         <WazeIcon />
-                                        Waze
+                                        Ver en Waze
                                     </button>
                                 </div>
                             </div>

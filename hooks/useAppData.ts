@@ -38,7 +38,13 @@ export const useAppData = () => {
     const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
         queryKey: ['campaigns'],
         queryFn: async () => {
-            const { data } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
+            // Fetch ALL campaigns (history included) for Admin purposes.
+            // Public views will filter based on date locally.
+            const { data } = await supabase
+                .from('campaigns')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
             if (!data) return [];
             return data.map((c: any) => ({
                 id: c.id,
