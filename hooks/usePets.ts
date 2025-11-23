@@ -134,11 +134,17 @@ export const usePets = ({ filters }: UsePetsProps) => {
             });
 
             try {
-                const results = await Promise.all(promises);
+                // Add timeout to prevent infinite hanging on cold starts
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Dashboard request timed out')), 12000)
+                );
+
+                const resultsPromise = Promise.all(promises);
+                const results = await Promise.race([resultsPromise, timeoutPromise]) as any[];
                 
                 // Combine all results
                 let combinedRawData: any[] = [];
-                results.forEach(result => {
+                results.forEach((result: any) => {
                     if (result.data) {
                         combinedRawData = [...combinedRawData, ...result.data];
                     }
@@ -155,8 +161,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
 
                 return { data: enriched, nextCursor: undefined }; // No next cursor for mixed dashboard
             } catch (error) {
-                console.error("Error fetching dashboard pets", error);
-                throw error;
+                console.warn("Warning: Dashboard fetch issue (non-critical):", error);
+                // Return empty data instead of crashing the app so the user can still navigate
+                return { data: [], nextCursor: undefined };
             }
 
         } else {
@@ -180,11 +187,25 @@ export const usePets = ({ filters }: UsePetsProps) => {
             
             query = query.order('created_at', { ascending: false }).range(from, to);
 
-            const { data, count, error } = await query;
-            if (error) throw error;
+            try {
+                // Explicit timeout race
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('List request timed out')), 12000)
+                );
 
-            const enriched = await enrichPets(data || []);
-            return { data: enriched, nextCursor: (from + (data?.length || 0) < (count || 0)) ? pageParam + 1 : undefined };
+                const queryPromise = query.then(({ data, count, error }) => {
+                    if (error) throw error;
+                    return { data, count };
+                });
+
+                const { data, count } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+                const enriched = await enrichPets(data || []);
+                return { data: enriched, nextCursor: (from + (data?.length || 0) < (count || 0)) ? pageParam + 1 : undefined };
+            } catch (error) {
+                console.warn("Warning: List fetch issue:", error);
+                return { data: [], nextCursor: undefined };
+            }
         }
     };
 
@@ -202,6 +223,7 @@ export const usePets = ({ filters }: UsePetsProps) => {
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
         staleTime: 1000 * 60 * 1, // 1 minute stale time
+        retry: 1
     });
 
     // Realtime Subscription to invalidate queries
