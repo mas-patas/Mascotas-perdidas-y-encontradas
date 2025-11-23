@@ -79,6 +79,8 @@ export interface Pet {
     lat?: number; // Coordenada Latitud
     lng?: number; // Coordenada Longitud
     comments?: Comment[];
+    expiresAt?: string; // ISO String for 60-day expiration
+    createdAt?: string; // ISO String creation date
 }
 
 export type ReportPostSnapshot = Pet;

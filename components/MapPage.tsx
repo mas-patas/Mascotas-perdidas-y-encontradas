@@ -84,13 +84,16 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     useEffect(() => {
         const fetchMapData = async () => {
             setIsLoadingMapData(true);
+            const nowIso = new Date().toISOString();
+
             try {
-                // We only need specific fields for the map pins to keep it light
+                // Filter pets where expires_at is in the future
                 const { data, error } = await supabase
                     .from('pets')
-                    .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls')
-                    .not('lat', 'is', null) // Only pets with coordinates
-                    .not('lng', 'is', null);
+                    .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at')
+                    .not('lat', 'is', null)
+                    .not('lng', 'is', null)
+                    .gt('expires_at', nowIso);
 
                 if (error) throw error;
 
@@ -109,7 +112,9 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                     description: '',
                     imageUrls: p.image_urls || [],
                     lat: p.lat,
-                    lng: p.lng
+                    lng: p.lng,
+                    createdAt: p.created_at,
+                    expiresAt: p.expires_at
                 }));
 
                 setMapPets(mappedPets);
@@ -192,7 +197,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             let lat = pet.lat;
             let lng = pet.lng;
 
-            // Fallback for pets without exact coords (should be rare due to query filter, but kept for safety)
+            // Fallback for pets without exact coords
             if (!lat || !lng) {
                 const locationText = pet.location || "";
                 let foundCity = Object.keys(locationCoordinates).find(city => locationText.includes(city));
@@ -234,7 +239,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             markersToAdd.forEach(m => m.addTo(mapInstance.current));
         }
 
-    }, [mapPets, visibleStatuses]); // Update when mapPets (server data) changes
+    }, [mapPets, visibleStatuses]); 
 
     return (
         <div className="h-full flex flex-col relative">
@@ -247,15 +252,15 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             )}
 
             {/* Top Bar Overlay for Controls */}
-            <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col sm:flex-row justify-between items-start pointer-events-none gap-4">
+            <div className="absolute top-4 left-4 right-4 z-10 flex flex-col sm:flex-row justify-between items-start pointer-events-none gap-4">
                 
                 {/* Search Bar */}
-                <div className="pointer-events-auto w-full sm:w-80 bg-white rounded-lg shadow-lg overflow-hidden flex">
+                <div className="pointer-events-auto w-full sm:w-80 bg-white rounded-lg shadow-lg overflow-hidden flex z-10">
                     <form onSubmit={handleSearch} className="flex w-full">
                         <input 
                             type="text" 
                             placeholder="Buscar zona (ej. Miraflores)" 
-                            className="flex-grow p-3 text-sm outline-none text-gray-700"
+                            className="flex-grow p-3 text-sm outline-none text-black bg-white"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -266,7 +271,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Filters Toggle */}
-                <div className="pointer-events-auto bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="pointer-events-auto bg-white rounded-lg shadow-lg overflow-hidden z-10">
                     <button 
                         onClick={() => setIsFiltersOpen(!isFiltersOpen)} 
                         className="w-full flex items-center justify-between gap-3 p-3 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700"
@@ -302,7 +307,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             </div>
 
             {/* Bottom Right Controls */}
-            <div className="absolute bottom-8 right-4 z-[1000] flex flex-col gap-2 pointer-events-auto">
+            <div className="absolute bottom-8 right-4 z-10 flex flex-col gap-2 pointer-events-auto">
                 <button 
                     onClick={handleMyLoc}
                     className="bg-white p-2.5 rounded shadow-lg hover:bg-gray-100 text-brand-primary flex items-center justify-center"

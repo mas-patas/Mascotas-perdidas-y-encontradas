@@ -45,43 +45,56 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         let mounted = true;
 
-        // 1. Safety Timeout - Reduced to 3s for better UX
-        const safetyTimeout = setTimeout(() => {
-            if (mounted && loading) {
-                console.warn("Supabase auth check timed out. Forcing app load.");
-                setLoading(false);
-            }
-        }, 3000);
-
-        // 2. Check active session
         const checkUser = async () => {
             try {
+                // Attempt to get session
                 const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    await fetchProfile(session.user.email!, session.user.id);
-                } else {
-                    setCurrentUser(null);
+                
+                if (mounted) {
+                    if (session?.user) {
+                        await fetchProfile(session.user.email!, session.user.id);
+                    } else {
+                        setCurrentUser(null);
+                        setLoading(false);
+                    }
                 }
             } catch (error) {
                 console.error("Error checking session:", error);
-                setCurrentUser(null);
-            } finally {
                 if (mounted) {
+                    setCurrentUser(null);
                     setLoading(false);
-                    clearTimeout(safetyTimeout);
                 }
             }
         };
 
         checkUser();
 
+        // 1. Safety Timeout - Ensure app loads even if Supabase hangs. 
+        // Reduced to 2500ms to make the app feel more responsive on errors.
+        const safetyTimeout = setTimeout(() => {
+            if (mounted) {
+                setLoading(prevLoading => {
+                    if (prevLoading) {
+                        console.warn("Supabase auth check timed out. Forcing app load in public mode.");
+                        return false;
+                    }
+                    return prevLoading;
+                });
+            }
+        }, 2500);
+
         // 3. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user) {
-                await fetchProfile(session.user.email!, session.user.id);
-            } else {
-                setCurrentUser(null);
-                setLoading(false);
+            if (mounted) {
+                if (session?.user) {
+                    // Only fetch profile if we don't have it or it's a different user
+                    if (!currentUser || currentUser.id !== session.user.id) {
+                        await fetchProfile(session.user.email!, session.user.id);
+                    }
+                } else {
+                    setCurrentUser(null);
+                    setLoading(false);
+                }
             }
         });
 
@@ -121,6 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (!insertError) {
                         return fetchProfile(email, uid, retryCount + 1);
                     } else {
+                         // Even if self-healing fails, provide basic object so app works
                          setCurrentUser({
                             id: uid,
                             email,
@@ -129,6 +143,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                          });
                     }
                 } else {
+                    // Error accessing profile (e.g. network), fall back to session data
+                    console.error("Profile fetch error:", error);
                     setCurrentUser({
                         id: uid,
                         email,
@@ -156,6 +172,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
         } catch (err) {
             console.error("Error fatal en fetchProfile:", err);
+            // Final fallback
+            setCurrentUser({ id: uid, email, role: USER_ROLES.USER });
         } finally {
             setLoading(false);
         }

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, WarningIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
@@ -18,6 +18,8 @@ interface PetListProps {
     loadMore?: () => void;
     hasMore?: boolean;
     isLoading: boolean;
+    isError?: boolean;
+    onRetry?: () => void;
 }
 
 const PetSection: React.FC<{
@@ -181,13 +183,13 @@ const PetSection: React.FC<{
 };
 
 
-export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading }) => {
+export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading, isError, onRetry }) => {
     
     const sentinelRef = useRef<HTMLDivElement>(null);
 
     // Infinite Scroll Observer triggers server fetch via loadMore prop
     useEffect(() => {
-        if (filters.status === 'Todos' || !hasMore || !loadMore || isLoading) return;
+        if (filters.status === 'Todos' || !hasMore || !loadMore || isLoading || isError) return;
 
         const observer = new IntersectionObserver((entries) => {
             const target = entries[0];
@@ -207,8 +209,25 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         return () => {
             if (sentinelRef.current) observer.unobserve(sentinelRef.current);
         };
-    }, [hasMore, loadMore, filters.status, isLoading]);
+    }, [hasMore, loadMore, filters.status, isLoading, isError]);
 
+    if (isError) {
+        return (
+            <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md border border-red-100">
+                <div className="text-red-500 mb-4 flex justify-center">
+                    <WarningIcon />
+                </div>
+                <p className="text-xl text-gray-800 font-semibold">Hubo un problema al cargar las mascotas.</p>
+                <p className="text-gray-500 mt-2 mb-6">Por favor, revisa tu conexión o intenta nuevamente.</p>
+                <button 
+                    onClick={onRetry} 
+                    className="bg-brand-primary text-white px-6 py-2 rounded-full font-bold hover:bg-brand-dark transition-colors shadow-md"
+                >
+                    Reintentar
+                </button>
+            </div>
+        );
+    }
 
     // View 1: Specific Category Selected (Infinite Scroll Grid)
     if (filters.status !== 'Todos') {

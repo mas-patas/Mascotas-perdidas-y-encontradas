@@ -85,7 +85,9 @@ const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
             contactRequests: p.contact_requests || [],
             lat: p.lat,
             lng: p.lng,
-            comments: petComments
+            comments: petComments,
+            expiresAt: p.expires_at,
+            createdAt: p.created_at
         };
     });
 };
@@ -94,14 +96,18 @@ export const usePets = ({ filters }: UsePetsProps) => {
     const queryClient = useQueryClient();
 
     const fetchPets = async ({ pageParam = 0 }) => {
+        const nowIso = new Date().toISOString();
+        
         if (filters.status === 'Todos') {
-            // DASHBOARD MODE (Simplified for 'Todos' view - usually shows recent from categories)
+            // DASHBOARD MODE
             const from = pageParam * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
 
             const { data, count, error } = await supabase
                 .from('pets')
                 .select('*', { count: 'exact' })
+                // Filter: Show only if expires_at is in the future
+                .gt('expires_at', nowIso)
                 .order('created_at', { ascending: false })
                 .range(from, to);
 
@@ -117,6 +123,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
             let query = supabase.from('pets').select('*', { count: 'exact' });
 
             query = query.eq('status', filters.status);
+            
+            // Filter: Show only if expires_at is in the future
+            query = query.gt('expires_at', nowIso);
             
             if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
             if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
@@ -139,12 +148,15 @@ export const usePets = ({ filters }: UsePetsProps) => {
         hasNextPage,
         isFetchingNextPage,
         isLoading,
-        isError
+        isError,
+        refetch
     } = useInfiniteQuery({
         queryKey: ['pets', filters],
         queryFn: fetchPets,
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
+        retry: 1,
+        staleTime: 1000 * 60 * 1, // 1 minute stale time
     });
 
     // Realtime Subscription to invalidate queries
@@ -178,6 +190,8 @@ export const usePets = ({ filters }: UsePetsProps) => {
         pets, 
         loading: isLoading, 
         hasMore: hasNextPage, 
-        loadMore: fetchNextPage 
+        loadMore: fetchNextPage,
+        isError,
+        refetch
     };
 };

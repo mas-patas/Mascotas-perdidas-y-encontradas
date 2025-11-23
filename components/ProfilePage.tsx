@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import type { User, Pet, OwnedPet } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
-import { EditIcon, PlusIcon, TrashIcon } from './icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -19,9 +19,10 @@ interface ProfilePageProps {
     onReportOwnedPetAsLost: (pet: OwnedPet) => void;
     onNavigate: (path: string) => void;
     onViewUser: (user: User) => void;
+    onRenewPet?: (pet: Pet) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
@@ -39,6 +40,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
     const [loading, setLoading] = useState(false);
 
     const savedPets = useMemo(() => allPets.filter(p => user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
+
+    // Helper to check if a reported pet is expired
+    const isPetExpired = (pet: Pet) => {
+        if (!pet.expiresAt) return false; // Assuming older posts without expiry don't expire yet
+        return new Date(pet.expiresAt) < new Date();
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -286,9 +293,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets, allPets, 
                 <h3 className="text-2xl font-semibold text-gray-700">Mis publicaciones</h3>
                 {reportedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {reportedPets.map(pet => (
-                            <PetCard key={pet.id} pet={pet} owner={user} onViewUser={onViewUser} onNavigate={onNavigate} />
-                        ))}
+                        {reportedPets.map(pet => {
+                            const expired = isPetExpired(pet);
+                            return (
+                                <div key={pet.id} className="relative">
+                                    {expired && (
+                                        <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-xl border-2 border-red-200">
+                                            <p className="text-red-600 font-bold mb-2 text-lg uppercase">Expirado</p>
+                                            {onRenewPet && (
+                                                <button 
+                                                    onClick={() => onRenewPet(pet)}
+                                                    className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse"
+                                                >
+                                                    <SparklesIcon /> Renovar
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                    <PetCard pet={pet} owner={user} onViewUser={onViewUser} onNavigate={onNavigate} />
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">

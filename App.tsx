@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
@@ -24,6 +24,8 @@ import SupportPage from './components/SupportPage';
 import CampaignsPage from './components/CampaignsPage';
 import CampaignDetailPage from './components/CampaignDetailPage';
 import MapPage from './components/MapPage';
+import { RenewModal } from './components/RenewModal';
+import { StatusCheckModal } from './components/StatusCheckModal';
 import { supabase } from './services/supabaseClient';
 import { generateUUID } from './utils/uuid';
 
@@ -59,7 +61,7 @@ const App: React.FC = () => {
     
     // State from Hooks
     const { filters, setFilters, resetFilters } = usePetFilters([]);
-    const { pets, loading: petsLoading, loadMore, hasMore } = usePets({ filters });
+    const { pets, loading: petsLoading, loadMore, hasMore, isError: petsError, refetch: refetchPets } = usePets({ filters });
     const { 
         users, setUsers, 
         chats, setChats, 
@@ -79,11 +81,85 @@ const App: React.FC = () => {
     const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
     const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
     const [selectedPetForModal, setSelectedPetForModal] = useState<Pet | null>(null);
+    const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
+    const [petToStatusCheck, setPetToStatusCheck] = useState<Pet | null>(null);
     
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
+
+    // Check for expired pets and 30-day status check
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const checkStatuses = async () => {
+            const now = new Date();
+            // Fetch user's pets
+            const { data: userPets } = await supabase
+                .from('pets')
+                .select('id, name, expires_at, created_at, status')
+                .eq('user_id', currentUser.id);
+
+            if (!userPets) return;
+
+            userPets.forEach(async (pet) => {
+                let expirationDate;
+                let createdDate = new Date(pet.created_at);
+
+                if (pet.expires_at) {
+                    expirationDate = new Date(pet.expires_at);
+                } else {
+                    expirationDate = new Date(createdDate.getTime() + (60 * 24 * 60 * 60 * 1000));
+                }
+
+                const isExpired = now > expirationDate;
+                const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
+
+                // 1. Expiration Check (60 Days)
+                if (isExpired) {
+                    const alreadyNotified = notifications.some(n => 
+                        (typeof n.link === 'object' && n.link.type === 'pet-renew' && n.link.id === pet.id)
+                    );
+
+                    if (!alreadyNotified) {
+                        const newNotifId = generateUUID();
+                        await supabase.from('notifications').insert({
+                            id: newNotifId,
+                            user_id: currentUser.id,
+                            message: `Tu publicación de "${pet.name}" ha expirado. Haz clic para renovarla.`,
+                            link: { type: 'pet-renew', id: pet.id }, 
+                            is_read: false,
+                            created_at: now.toISOString()
+                        });
+                    }
+                }
+
+                // 2. 30-Day Status Check (Only for Lost Pets)
+                // Trigger if it's roughly 30 days old (between 29 and 32 to ensure we catch it)
+                // and hasn't expired yet.
+                if (pet.status === PET_STATUS.PERDIDO && daysSinceCreation >= 30 && daysSinceCreation < 60 && !isExpired) {
+                     const alreadyChecked = notifications.some(n => 
+                        (typeof n.link === 'object' && n.link.type === 'pet-status-check' && n.link.id === pet.id)
+                    );
+
+                    if (!alreadyChecked) {
+                        const newNotifId = generateUUID();
+                        await supabase.from('notifications').insert({
+                            id: newNotifId,
+                            user_id: currentUser.id,
+                            message: `¿Has encontrado a ${pet.name}? Han pasado 30 días.`,
+                            link: { type: 'pet-status-check', id: pet.id },
+                            is_read: false,
+                            created_at: now.toISOString()
+                        });
+                    }
+                }
+            });
+        };
+
+        checkStatuses();
+    }, [currentUser?.id, notifications]); 
 
     const getUserIdByEmail = (email: string): string | undefined => {
         const user = users.find(u => u.email === email);
@@ -152,7 +228,9 @@ const App: React.FC = () => {
 
         try {
             const newPetId = generateUUID();
-            const now = new Date().toISOString();
+            const now = new Date();
+            // Explicitly calculate expiration date for the DB column
+            const expirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
 
             const { error } = await supabase.from('pets').insert({
                 id: newPetId,
@@ -173,7 +251,8 @@ const App: React.FC = () => {
                 contact_requests: [],
                 lat: petData.lat,
                 lng: petData.lng,
-                created_at: now
+                created_at: now.toISOString(),
+                expires_at: expirationDate.toISOString() // REQUIRED: Set expiration
             });
 
             if (error) throw error;
@@ -184,10 +263,10 @@ const App: React.FC = () => {
             await supabase.from('notifications').insert({
                 id: newNotifId,
                 user_id: currentUser.id,
-                message: `Has publicado exitosamente el reporte de "${petData.name}".`,
+                message: `Has publicado exitosamente el reporte de "${petData.name}". Estará activo por 60 días.`,
                 link: { type: 'pet', id: newPetId },
                 is_read: false,
-                created_at: now
+                created_at: now.toISOString()
             });
 
             setIsReportModalOpen(false);
@@ -199,6 +278,52 @@ const App: React.FC = () => {
             console.error("Error creating pet:", err);
             alert("Error al publicar la mascota: " + err.message);
         }
+    };
+
+    const handleRenewPet = async (pet: Pet) => {
+        if (!currentUser) return;
+        try {
+            const now = new Date();
+            const newExpirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000)); // +60 days from now
+
+            const { error } = await supabase.from('pets').update({
+                expires_at: newExpirationDate.toISOString(),
+                created_at: now.toISOString() // Also update created_at to bump to top of lists
+            }).eq('id', pet.id);
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            setPetToRenew(null); // Close modal
+            alert(`La publicación de ${pet.name} ha sido renovada por 60 días más.`);
+            
+        } catch (err: any) {
+            console.error("Error renewing pet:", err);
+            alert("Error al renovar la publicación: " + err.message);
+        }
+    };
+
+    const handleMarkAsFound = async (pet: Pet) => {
+        try {
+            const { error } = await supabase.from('pets').update({ 
+                status: PET_STATUS.REUNIDO 
+                // We intentionally don't update expires_at here, or we could extend it slightly to show off the success
+            }).eq('id', pet.id);
+
+            if (error) throw error;
+            
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            setPetToRenew(null);
+            setPetToStatusCheck(null);
+            alert("¡Qué alegría! Tu mascota ha sido marcada como reunida.");
+        } catch (err: any) {
+            alert("Error al actualizar estado: " + err.message);
+        }
+    };
+
+    const handleKeepLooking = () => {
+        setPetToStatusCheck(null);
+        alert("Lamentamos mucho que aún no te hayas reunido con tu mascota. Seguiremos difundiendo tu publicación.");
     };
 
     const handleDeletePet = async (petId: string) => {
@@ -223,11 +348,11 @@ const App: React.FC = () => {
         }
     };
 
+    // ... [Keep existing User/Role/Chat handlers unchanged] ...
     const handleUpdateUserStatus = async (email: string, status: UserStatus) => {
         try {
             const { error } = await supabase.from('profiles').update({ status }).eq('email', email);
             if (error) throw error;
-            
             setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u));
         } catch (err: any) {
             alert("Error al actualizar estado: " + err.message);
@@ -238,7 +363,6 @@ const App: React.FC = () => {
         try {
             const { error } = await supabase.from('profiles').update({ role }).eq('email', email);
             if (error) throw error;
-
             setUsers(prev => prev.map(u => u.email === email ? { ...u, role } : u));
         } catch (err: any) {
             alert("Error al actualizar rol: " + err.message);
@@ -250,14 +374,11 @@ const App: React.FC = () => {
             navigate('/login');
             return;
         }
-        
         if (!pet.userEmail || pet.userEmail === 'unknown') {
             alert("No se puede contactar al dueño de esta mascota porque su información no está disponible.");
             return;
         }
-
         const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
-        
         if (existingChat) {
             navigate(`/chat/${existingChat.id}`);
         } else {
@@ -269,7 +390,6 @@ const App: React.FC = () => {
                     [currentUser.email]: now,
                     [pet.userEmail]: new Date(0).toISOString()
                 };
-
                 const { error } = await supabase.from('chats').insert({
                     id: newChatId,
                     pet_id: pet.id,
@@ -277,9 +397,7 @@ const App: React.FC = () => {
                     last_read_timestamps: timestamps,
                     created_at: now
                 });
-                
                 if (error) throw error;
-                
                 const newChat: Chat = {
                     id: newChatId,
                     petId: pet.id,
@@ -289,7 +407,6 @@ const App: React.FC = () => {
                 };
                 setChats(prev => [...prev, newChat]);
                 navigate(`/chat/${newChatId}`);
-
             } catch (err: any) { 
                 console.error("Error starting chat:", err);
                 alert("Error al iniciar el chat: " + (err.message || JSON.stringify(err)));
@@ -299,11 +416,9 @@ const App: React.FC = () => {
 
     const handleSendMessage = useCallback(async (chatId: string, text: string) => {
         if (!currentUser) return;
-        
         try {
             const newMessageId = generateUUID();
             const now = new Date().toISOString();
-
             const { error: msgError } = await supabase.from('messages').insert({
                 id: newMessageId,
                 chat_id: chatId,
@@ -311,10 +426,7 @@ const App: React.FC = () => {
                 text: text,
                 created_at: now
             });
-
             if (msgError) throw msgError;
-
-            // Optimistic update handled via realtime primarily, but can be added here if needed
         } catch (err: any) {
             console.error("Error sending message:", err);
             alert("Error al enviar el mensaje: " + err.message);
@@ -323,34 +435,25 @@ const App: React.FC = () => {
     
     const handleMarkChatAsRead = useCallback(async (chatId: string) => {
         if (!currentUser) return;
-        
         setChats(prev => {
             const chat = prev.find(c => c.id === chatId);
             if (!chat) return prev;
-
             const lastMsg = chat.messages[chat.messages.length - 1];
             const lastMsgTime = lastMsg ? new Date(lastMsg.timestamp).getTime() : 0;
             const nowTime = Date.now();
             const safeReadTime = new Date(Math.max(nowTime, lastMsgTime + 1)).toISOString();
-
             const currentReadTime = chat.lastReadTimestamps[currentUser.email];
             if (currentReadTime && new Date(currentReadTime).getTime() >= new Date(safeReadTime).getTime()) {
                 return prev;
             }
-
             const newTimestamps = { ...chat.lastReadTimestamps, [currentUser.email]: safeReadTime };
-            
-            supabase.from('chats').update({
-                last_read_timestamps: newTimestamps
-            }).eq('id', chatId).then();
-
+            supabase.from('chats').update({ last_read_timestamps: newTimestamps }).eq('id', chatId).then();
             return prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: newTimestamps } : c);
         });
     }, [currentUser]);
     
     const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
         if (!currentUser) return;
-        
         try {
             let reportedEmail = '';
             if (type === 'user') {
@@ -359,11 +462,9 @@ const App: React.FC = () => {
                 const pet = pets.find(p => p.id === targetId);
                 reportedEmail = pet?.userEmail || '';
             }
-
             const postSnapshot = type === 'post' ? pets.find(p => p.id === targetId) : undefined;
             const newReportId = generateUUID();
             const now = new Date().toISOString();
-
             const { error } = await supabase.from('reports').insert({
                 id: newReportId,
                 reporter_email: currentUser.email,
@@ -376,9 +477,7 @@ const App: React.FC = () => {
                 post_snapshot: postSnapshot,
                 created_at: now
             });
-
             if (error) throw error;
-
             const newReport: Report = {
                 id: newReportId,
                 reporterEmail: currentUser.email,
@@ -392,7 +491,6 @@ const App: React.FC = () => {
                 postSnapshot
             };
             setReports(prev => [newReport, ...prev]);
-            
             const newNotifId = generateUUID();
             await supabase.from('notifications').insert({
                 id: newNotifId,
@@ -402,7 +500,6 @@ const App: React.FC = () => {
                 is_read: false,
                 created_at: now
             });
-
             alert('Reporte enviado exitosamente.');
         } catch (err: any) {
             console.error("Error sending report:", err);
@@ -410,12 +507,12 @@ const App: React.FC = () => {
         }
     };
 
+    // ... [Keep existing handlers: handleUpdateReportStatus, handleAddSupportTicket, etc.] ...
     const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => {
         try {
             const { error } = await supabase.from('reports').update({ status }).eq('id', reportId);
             if (error) throw error;
             setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
-            
             const report = reports.find(r => r.id === reportId);
             if (report) {
                 const reporterId = getUserIdByEmail(report.reporterEmail);
@@ -431,7 +528,6 @@ const App: React.FC = () => {
                     });
                 }
             }
-
         } catch (err: any) {
             alert("Error actualizando reporte: " + err.message);
         }
@@ -442,7 +538,6 @@ const App: React.FC = () => {
         try {
             const newTicketId = generateUUID();
             const now = new Date().toISOString();
-            
             const { error } = await supabase.from('support_tickets').insert({
                 id: newTicketId,
                 user_email: currentUser.email,
@@ -452,9 +547,7 @@ const App: React.FC = () => {
                 status: SUPPORT_TICKET_STATUS.PENDING,
                 created_at: now
             });
-
             if (error) throw error;
-
             const newTicket: SupportTicket = {
                 id: newTicketId,
                 userEmail: currentUser.email,
@@ -465,7 +558,6 @@ const App: React.FC = () => {
                 status: SUPPORT_TICKET_STATUS.PENDING,
             };
             setSupportTickets(prev => [newTicket, ...prev]);
-            
             const newNotifId = generateUUID();
             await supabase.from('notifications').insert({
                 id: newNotifId,
@@ -475,7 +567,6 @@ const App: React.FC = () => {
                 is_read: false,
                 created_at: now
             });
-
         } catch (err: any) {
             console.error("Error adding ticket:", err);
             alert("Error al crear ticket: " + err.message);
@@ -490,11 +581,8 @@ const App: React.FC = () => {
                 assigned_to: updatedTicket.assignedTo,
                 assignment_history: updatedTicket.assignmentHistory
             }).eq('id', updatedTicket.id);
-
             if (error) throw error;
-
             setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
-            
             const originalTicket = supportTickets.find(t => t.id === updatedTicket.id);
             if (originalTicket && (originalTicket.status !== updatedTicket.status || (!originalTicket.response && updatedTicket.response))) {
                  const ticketUserId = getUserIdByEmail(updatedTicket.userEmail);
@@ -517,7 +605,6 @@ const App: React.FC = () => {
 
     const handleSaveCampaign = async (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => {
         if (!currentUser) return;
-        
         try {
             if (idToUpdate) {
                 const { error } = await supabase.from('campaigns').update({
@@ -531,13 +618,11 @@ const App: React.FC = () => {
                     lat: campaignData.lat,
                     lng: campaignData.lng
                 }).eq('id', idToUpdate);
-
                 if (error) throw error;
                 setCampaigns(prev => prev.map(c => c.id === idToUpdate ? { ...c, ...campaignData } : c));
             } else {
                 const newCampaignId = generateUUID();
                 const now = new Date().toISOString();
-                
                 const { error } = await supabase.from('campaigns').insert({
                     id: newCampaignId,
                     user_email: currentUser.email,
@@ -552,9 +637,7 @@ const App: React.FC = () => {
                     lng: campaignData.lng,
                     created_at: now
                 });
-
                 if (error) throw error;
-
                 const newCampaign: Campaign = {
                     id: newCampaignId,
                     userEmail: currentUser.email,
@@ -569,7 +652,6 @@ const App: React.FC = () => {
                     lng: campaignData.lng
                 };
                 setCampaigns(prev => [newCampaign, ...prev]);
-                
                 const newNotifId = generateUUID();
                 await supabase.from('notifications').insert({
                     id: newNotifId,
@@ -622,24 +704,17 @@ const App: React.FC = () => {
     
     const handleRecordContactRequest = async (petId: string) => {
         if (!currentUser) return;
-        
         const pet = pets.find(p => p.id === petId);
         if (!pet) return;
-        
         const currentRequests = pet.contactRequests || [];
         if (currentRequests.includes(currentUser.email)) return;
-
         const updatedRequests = [...currentRequests, currentUser.email];
-
         try {
             const { error } = await supabase.from('pets').update({
                 contact_requests: updatedRequests
             }).eq('id', petId);
-
             if (error) throw error;
-
             queryClient.invalidateQueries({ queryKey: ['pets'] });
-
             const ownerId = getUserIdByEmail(pet.userEmail);
             if (ownerId) {
                 const newNotifId = generateUUID();
@@ -652,7 +727,6 @@ const App: React.FC = () => {
                     created_at: new Date().toISOString()
                 });
             }
-
         } catch (err: any) {
             console.error("Error recording contact request:", err);
         }
@@ -660,11 +734,9 @@ const App: React.FC = () => {
 
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if (!currentUser) return;
-        
         try {
             const newCommentId = generateUUID();
             const now = new Date().toISOString();
-            
             const { error } = await supabase.from('comments').insert({
                 id: newCommentId,
                 pet_id: petId,
@@ -674,11 +746,8 @@ const App: React.FC = () => {
                 parent_id: parentId || null,
                 created_at: now
             });
-
             if (error) throw error;
-
             queryClient.invalidateQueries({ queryKey: ['pets'] });
-            
             const pet = pets.find(p => p.id === petId);
             if (pet && pet.userEmail !== currentUser.email) {
                  const ownerId = getUserIdByEmail(pet.userEmail);
@@ -694,7 +763,6 @@ const App: React.FC = () => {
                     });
                  }
             }
-
             if (parentId) {
                 const parentComment = pet?.comments?.find(c => c.id === parentId);
                 if (parentComment && parentComment.userEmail !== currentUser.email) {
@@ -712,7 +780,6 @@ const App: React.FC = () => {
                     }
                 }
             }
-
         } catch (err: any) {
             console.error("Error adding comment:", err);
             alert("Error al agregar comentario: " + err.message);
@@ -721,25 +788,72 @@ const App: React.FC = () => {
 
     const handleLikeComment = async (petId: string, commentId: string) => {
         if (!currentUser) return;
-
         const pet = pets.find(p => p.id === petId);
         const comment = pet?.comments?.find(c => c.id === commentId);
         if (!comment) return;
-
         const isLiked = comment.likes?.includes(currentUser.id || '');
-        
         try {
             if (isLiked) {
                 await supabase.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
-                
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
             } else {
                 await supabase.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
-                
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
             }
         } catch (err) {
             console.error("Error toggling like:", err);
+        }
+    };
+
+    // Centralized Notification Click Handler
+    const onNotificationClick = (notification: any) => {
+        const link = notification.link;
+        if (typeof link === 'object' && link.type === 'pet-renew') {
+            const pet = pets.find(p => p.id === link.id);
+            if (pet) {
+                setPetToRenew(pet);
+            } else {
+                // Fallback fetch if not in current list
+                supabase.from('pets').select('*').eq('id', link.id).single().then(({ data }) => {
+                    if (data) {
+                        const mappedPet: Pet = { 
+                            ...data, 
+                            imageUrls: data.image_urls || [], 
+                            animalType: data.animal_type,
+                            adoptionRequirements: data.adoption_requirements,
+                            shareContactInfo: data.share_contact_info,
+                            userEmail: '...', // Dummy for modal logic
+                            comments: []
+                        };
+                        setPetToRenew(mappedPet);
+                    }
+                });
+            }
+        } else if (typeof link === 'object' && link.type === 'pet-status-check') {
+            const pet = pets.find(p => p.id === link.id);
+            if (pet) {
+                setPetToStatusCheck(pet);
+            } else {
+                 supabase.from('pets').select('*').eq('id', link.id).single().then(({ data }) => {
+                    if (data) {
+                        const mappedPet: Pet = { 
+                            ...data, 
+                            imageUrls: data.image_urls || [], 
+                            animalType: data.animal_type,
+                            adoptionRequirements: data.adoption_requirements,
+                            shareContactInfo: data.share_contact_info,
+                            userEmail: '...', 
+                            comments: []
+                        };
+                        setPetToStatusCheck(mappedPet);
+                    }
+                });
+            }
+        } else if (link === 'support') navigate('/soporte');
+        else if (link === 'messages') navigate('/mensajes');
+        else if (typeof link === 'object') {
+            if (link.type === 'campaign') navigate(`/campanas/${link.id}`);
+            else if (link.type === 'pet') navigate(`/mascota/${link.id}`);
         }
     };
 
@@ -776,24 +890,21 @@ const App: React.FC = () => {
                             users={users}
                             onViewUser={handleViewUser}
                             filters={filters}
-                            onNavigate={(path) => navigate(path)} // Deprecated prop but keeping for compatibility if needed
+                            onNavigate={(path) => navigate(path)} 
                             onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))}
                             onReset={() => { resetFilters(); navigate('/'); }}
                             loadMore={loadMore}
                             hasMore={hasMore}
                             isLoading={petsLoading}
+                            isError={petsError}
+                            onRetry={() => refetchPets()}
                         />
                     } />
                     
+                    {/* Routes similar to previous App.tsx */}
                     <Route path="mascota/:id" element={
                         <PetDetailPage
-                            // We don't pass a specific pet here anymore, the component will find it from params
                             pet={undefined} 
-                            // Instead pass the full list so it can find it
-                            // Actually better: pass all props and let component handle lookup or passed prop override
-                            // BUT PetDetailPage expects 'pet'. We need to wrap it or update it.
-                            // Updating PetDetailPage to accept 'pets' array and use params is cleaner.
-                            // For now, let's assume we update PetDetailPage.
                             onClose={() => navigate('/')}
                             onStartChat={handleStartChat}
                             onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }}
@@ -819,11 +930,11 @@ const App: React.FC = () => {
                                 onBack={() => navigate('/')}
                                 onReportOwnedPetAsLost={(ownedPet) => {
                                     setReportStatus(PET_STATUS.PERDIDO);
-                                    // Note: Needs logic to convert OwnedPet to report form data
                                     setIsReportModalOpen(true);
                                 }}
                                 onNavigate={(path) => navigate(path)}
                                 onViewUser={handleViewUser}
+                                onRenewPet={(pet) => setPetToRenew(pet)}
                             />
                         </ProtectedRoute>
                     } />
@@ -858,7 +969,7 @@ const App: React.FC = () => {
                     <Route path="chat/:id" element={
                         <ProtectedRoute>
                             <ChatPage
-                                chat={undefined} // Component will find from params
+                                chat={undefined} 
                                 pet={undefined}
                                 users={users}
                                 currentUser={currentUser!}
@@ -912,7 +1023,7 @@ const App: React.FC = () => {
 
                     <Route path="campanas/:id" element={
                         <CampaignDetailPage
-                            campaign={undefined} // Component will lookup
+                            campaign={undefined}
                             onClose={() => navigate('/campanas')}
                         />
                     } />
@@ -929,7 +1040,7 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
-            {/* Global Modals that sit on top of routes */}
+            {/* Global Modals */}
             {isReportModalOpen && (
                 <ReportPetForm 
                     onClose={() => { setIsReportModalOpen(false); setSelectedPetForModal(null); }} 
@@ -1010,6 +1121,26 @@ const App: React.FC = () => {
                     }}
                     onGhostLogin={ghostLogin}
                     onViewUser={handleViewUser}
+                />
+            )}
+
+            {/* Expiration / Renewal Modal */}
+            {petToRenew && (
+                <RenewModal
+                    pet={petToRenew}
+                    onClose={() => setPetToRenew(null)}
+                    onRenew={handleRenewPet}
+                    onMarkAsFound={handleMarkAsFound}
+                />
+            )}
+
+            {/* 30-Day Status Check Modal */}
+            {petToStatusCheck && (
+                <StatusCheckModal
+                    pet={petToStatusCheck}
+                    onClose={() => setPetToStatusCheck(null)}
+                    onConfirmFound={handleMarkAsFound}
+                    onKeepLooking={handleKeepLooking}
                 />
             )}
         </>

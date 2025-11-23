@@ -23,7 +23,7 @@ interface PetDetailPageProps {
     onViewUser: (user: User) => void;
     onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string) => void;
     onRecordContactRequest: (petId: string) => void;
-    onAddComment: (petId: string, text: string, parentId?: string) => void;
+    onAddComment: (petId: string, text: string, parentId?: string) => Promise<void>;
     onLikeComment: (petId: string, commentId: string) => void;
 }
 
@@ -109,21 +109,30 @@ const CommentItem: React.FC<{
 const CommentListAndInput: React.FC<{ 
     petId: string, 
     comments?: Comment[], 
-    onAddComment: (text: string, parentId?: string) => void, 
+    onAddComment: (text: string, parentId?: string) => Promise<void>, 
     onLikeComment: (petId: string, commentId: string) => void,
     currentUser: User | null 
 }> = ({ petId, comments, onAddComment, onLikeComment, currentUser }) => {
     const navigate = useNavigate();
     const [newComment, setNewComment] = useState('');
     const [replyTo, setReplyTo] = useState<{ id: string, userName: string } | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newComment.trim()) {
-            onAddComment(newComment.trim(), replyTo?.id);
-            setNewComment('');
-            setReplyTo(null);
+        if (newComment.trim() && !isSubmitting) {
+            setIsSubmitting(true);
+            try {
+                await onAddComment(newComment.trim(), replyTo?.id);
+                setNewComment('');
+                setReplyTo(null);
+            } catch (error) {
+                console.error("Failed to post comment", error);
+                // Error is handled in parent, but we keep input state
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -182,17 +191,24 @@ const CommentListAndInput: React.FC<{
                                     onChange={(e) => setNewComment(e.target.value)}
                                     placeholder={replyTo ? "Escribe tu respuesta..." : "Escribe una pista o comentario..."}
                                     rows={1}
-                                    className="w-full p-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm resize-none bg-gray-50 text-gray-900 placeholder-gray-500 transition-all focus:bg-white"
+                                    disabled={isSubmitting}
+                                    className="w-full p-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-brand-primary focus:border-brand-primary text-sm resize-none bg-gray-50 text-gray-900 placeholder-gray-500 transition-all focus:bg-white disabled:opacity-60"
                                     style={{ minHeight: '46px' }}
                                 />
                             </div>
                             <button 
                                 type="submit" 
-                                disabled={!newComment.trim()}
-                                className="bg-brand-primary text-white px-4 py-2 rounded-xl hover:bg-brand-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold text-sm h-[46px] shadow-sm active:scale-95"
+                                disabled={!newComment.trim() || isSubmitting}
+                                className="bg-brand-primary text-white px-4 py-2 rounded-xl hover:bg-brand-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-semibold text-sm h-[46px] shadow-sm active:scale-95 min-w-[90px] justify-center"
                             >
-                                <span>Enviar</span>
-                                <SendIcon />
+                                {isSubmitting ? (
+                                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                ) : (
+                                    <>
+                                        <span>Enviar</span>
+                                        <SendIcon />
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>
@@ -228,14 +244,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
 
-    // Fetch pet directly if not in list (e.g., deep link)
+    // Sync local pet state with global pets list when it updates (e.g., new comment)
     useEffect(() => {
         const foundPet = pets.find(p => p.id === id);
         if (foundPet) {
             setPet(foundPet);
             setIsLoading(false);
         } else if (id && !propPet && !petsLoading) {
-            // Try fetching single pet
+            // Try fetching single pet if not in current list
             setIsLoading(true);
             supabase.from('pets').select('*').eq('id', id).single()
                 .then(({ data, error }) => {
@@ -244,7 +260,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                         const p = data;
                         const formatted: Pet = {
                             id: p.id,
-                            userEmail: 'loading...', // Will be enriched or ignored for simple view
+                            userEmail: 'loading...', 
                             status: p.status,
                             name: p.name,
                             animalType: p.animal_type,
@@ -274,21 +290,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     // Map Effect
     useEffect(() => {
-        // Race condition fix: ensure loading is done AND container exists
+        // Critical: Use primitives dependencies to avoid re-creating map when 'pet' object reference changes
+        // (which happens on every comment/update).
         if (isLoading || !pet || !pet.lat || !pet.lng || !miniMapRef.current) return;
 
         const L = (window as any).L;
         if (!L) return;
 
-        // Clean up existing instance to avoid duplicates/errors on re-render
-        if (miniMapInstance.current) {
-            miniMapInstance.current.remove();
-            miniMapInstance.current = null;
-        }
+        const lat = pet.lat;
+        const lng = pet.lng;
+        const status = pet.status;
+        const animalType = pet.animalType;
 
-        try {
+        // Initialize map only if instance doesn't exist
+        if (!miniMapInstance.current) {
             miniMapInstance.current = L.map(miniMapRef.current, {
-                center: [pet.lat, pet.lng],
+                center: [lat, lng],
                 zoom: 15,
                 zoomControl: true,
                 dragging: true,
@@ -298,37 +315,54 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap'
             }).addTo(miniMapInstance.current);
-
-            let statusClass = 'lost'; 
-            if (pet.status === PET_STATUS.ENCONTRADO) statusClass = 'found';
-            else if (pet.status === PET_STATUS.AVISTADO) statusClass = 'sighted';
-            else if (pet.status === PET_STATUS.EN_ADOPCION) statusClass = 'adoption';
-
-            const dogIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM8 14s1.5 2 4 2 4-2 4-2M9 10h6"/><path d="M12 14v6a2 2 0 002 2h2a2 2 0 00-2-2h-2M12 14v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2h2"/><path d="M5 8a3 3 0 016 0c0 1.5-3 4-3 4s-3-2.5-3-4zM19 8a3 3 0 00-6 0c0 1.5 3 4 3 4s3-2.5 3-4z"/></svg>`;
-            const catIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM9 12s1.5 2 3 2 3-2 3-2M9 9h6"/><path d="M20 12c0 4-4 8-8 8s-8-4-8-8 4-8 8-8 8 4 8 8zM5 8l-2 2M19 8l2 2"/></svg>`;
-            const otherIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-8 8c0 4.418 3.582 8 8 8s8-3.582 8-8-3.582-8-8-8-8 3.582-8 8zm0 0h16" /></svg>`;
-
-            const iconSVG = pet.animalType === ANIMAL_TYPES.PERRO ? dogIconSVG : (pet.animalType === ANIMAL_TYPES.GATO ? catIconSVG : otherIconSVG);
-
-            const icon = L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div class='marker-pin ${statusClass}'></div>${iconSVG}`,
-                iconSize: [30, 42],
-                iconAnchor: [15, 42]
-            });
-
-            L.marker([pet.lat, pet.lng], { icon }).addTo(miniMapInstance.current);
-
-            // Force resize to ensure tiles load if container size changed
-            setTimeout(() => {
-                miniMapInstance.current?.invalidateSize();
-            }, 200);
-
-        } catch (err) {
-            console.error("Error initializing map:", err);
+        } else {
+            // Just update view
+            miniMapInstance.current.setView([lat, lng]);
         }
 
-    }, [pet, isLoading]); // Dependency on isLoading is key
+        // Clear existing layers (markers)
+        miniMapInstance.current.eachLayer((layer: any) => {
+            if (layer instanceof L.Marker) {
+                miniMapInstance.current.removeLayer(layer);
+            }
+        });
+
+        let statusClass = 'lost'; 
+        if (status === PET_STATUS.ENCONTRADO) statusClass = 'found';
+        else if (status === PET_STATUS.AVISTADO) statusClass = 'sighted';
+        else if (status === PET_STATUS.EN_ADOPCION) statusClass = 'adoption';
+
+        const dogIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM8 14s1.5 2 4 2 4-2 4-2M9 10h6"/><path d="M12 14v6a2 2 0 002 2h2a2 2 0 00-2-2h-2M12 14v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-2a2 2 0 012-2h2"/><path d="M5 8a3 3 0 016 0c0 1.5-3 4-3 4s-3-2.5-3-4zM19 8a3 3 0 00-6 0c0 1.5 3 4 3 4s3-2.5 3-4z"/></svg>`;
+        const catIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM9 12s1.5 2 3 2 3-2 3-2M9 9h6"/><path d="M20 12c0 4-4 8-8 8s-8-4-8-8 4-8 8-8 8 4 8 8zM5 8l-2 2M19 8l2 2"/></svg>`;
+        const otherIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-8 8c0 4.418 3.582 8 8 8s8-3.582 8-8-3.582-8-8-8-8 3.582-8 8zm0 0h16" /></svg>`;
+
+        const iconSVG = animalType === ANIMAL_TYPES.PERRO ? dogIconSVG : (animalType === ANIMAL_TYPES.GATO ? catIconSVG : otherIconSVG);
+
+        const icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class='marker-pin ${statusClass}'></div>${iconSVG}`,
+            iconSize: [30, 42],
+            iconAnchor: [15, 42]
+        });
+
+        L.marker([lat, lng], { icon }).addTo(miniMapInstance.current);
+
+        // Force resize to ensure tiles load correctly
+        setTimeout(() => {
+            miniMapInstance.current?.invalidateSize();
+        }, 200);
+
+    }, [isLoading, pet?.lat, pet?.lng, pet?.status, pet?.animalType]); 
+
+    // Cleanup effect on unmount only
+    useEffect(() => {
+        return () => {
+            if (miniMapInstance.current) {
+                miniMapInstance.current.remove();
+                miniMapInstance.current = null;
+            }
+        };
+    }, []);
 
     if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div></div>;
     if (!pet) return <div className="text-center py-10">Mascota no encontrada</div>;
