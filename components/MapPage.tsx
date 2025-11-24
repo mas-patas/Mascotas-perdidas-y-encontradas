@@ -130,7 +130,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 // 1. Fetch Pets
                 let { data: petData, error: petError } = await supabase
                     .from('pets')
-                    .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at')
+                    .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at, reward, currency')
                     .not('lat', 'is', null)
                     .not('lng', 'is', null)
                     .gt('expires_at', nowIso);
@@ -147,7 +147,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                     console.warn("Map: Primary pet fetch failed, using fallback.", petError.message);
                     const { data: fallbackData, error: fallbackError } = await supabase
                         .from('pets')
-                        .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at')
+                        .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, reward, currency')
                         .not('lat', 'is', null)
                         .not('lng', 'is', null);
 
@@ -177,6 +177,8 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         imageUrls: p.image_urls || [],
                         lat: p.lat,
                         lng: p.lng,
+                        reward: p.reward,
+                        currency: p.currency,
                         createdAt: p.created_at,
                         expiresAt: p.expires_at
                     }));
@@ -324,12 +326,15 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         <div class="text-center min-w-[150px]">
                             <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
                             <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
-                            <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block
-                                ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : 
-                                  pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : 
-                                  pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">
-                                ${pet.status}
-                            </span>
+                            <div class="flex flex-wrap justify-center gap-1 mb-2">
+                                <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white inline-block
+                                    ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : 
+                                    pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : 
+                                    pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">
+                                    ${pet.status}
+                                </span>
+                                ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
+                            </div>
                             <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
                             <button onclick="window.location.hash = '#/mascota/${pet.id}'" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">
                                 Ver Detalles

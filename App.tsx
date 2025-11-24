@@ -105,20 +105,16 @@ const App: React.FC = () => {
     }, [location.pathname]);
 
     // Check for expired pets and 30-day status check
-    // FIXED: Using useRef to ensure this logic runs strictly ONCE per user session
     useEffect(() => {
         if (!currentUser) return;
         
-        // If we have already checked for this user, skip to prevent infinite loops
         if (hasCheckedStatusRef.current === currentUser.id) return;
 
         const checkStatuses = async () => {
-            // Mark as checked immediately to prevent re-entry during async op
             hasCheckedStatusRef.current = currentUser.id;
 
             const now = new Date();
             
-            // 1. Fetch user's pets
             const { data: userPets } = await supabase
                 .from('pets')
                 .select('id, name, expires_at, created_at, status')
@@ -126,7 +122,6 @@ const App: React.FC = () => {
 
             if (!userPets || userPets.length === 0) return;
 
-            // 2. Fetch existing notifications relevant to checks to avoid using stale 'notifications' prop
             const { data: existingNotifs } = await supabase
                 .from('notifications')
                 .select('link')
@@ -147,7 +142,6 @@ const App: React.FC = () => {
                 const isExpired = now > expirationDate;
                 const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
 
-                // 1. Expiration Check (60 Days)
                 if (isExpired) {
                     const alreadyNotified = existingNotifs?.some(n => 
                         (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id)
@@ -167,7 +161,6 @@ const App: React.FC = () => {
                     }
                 }
 
-                // 2. 30-Day Status Check (Only for Lost Pets)
                 if (pet.status === PET_STATUS.PERDIDO && daysSinceCreation >= 30 && daysSinceCreation < 60 && !isExpired) {
                      const alreadyChecked = existingNotifs?.some(n => 
                         (typeof n.link === 'object' && n.link?.type === 'pet-status-check' && n.link?.id === pet.id)
@@ -189,13 +182,12 @@ const App: React.FC = () => {
             }
 
             if (newNotificationAdded) {
-                // Force refresh notifications
                 queryClient.invalidateQueries({ queryKey: ['notifications'] });
             }
         };
 
         checkStatuses();
-    }, [currentUser?.id]); // Only run when user changes/logs in
+    }, [currentUser?.id]);
 
     const getUserIdByEmail = (email: string): string | undefined => {
         const user = users.find(u => u.email === email);
@@ -228,6 +220,8 @@ const App: React.FC = () => {
                     image_urls: petData.imageUrls,
                     adoption_requirements: petData.adoptionRequirements,
                     share_contact_info: petData.shareContactInfo,
+                    reward: petData.reward, // Integer
+                    currency: petData.currency, // 'S/' or '$'
                     lat: petData.lat,
                     lng: petData.lng
                 }).eq('id', idToUpdate);
@@ -235,7 +229,6 @@ const App: React.FC = () => {
                 if (error) throw error;
 
                 queryClient.invalidateQueries({ queryKey: ['pets'] });
-                // Also invalidate myPets to update profile list
                 if (currentUser) {
                     queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
                 }
@@ -269,7 +262,6 @@ const App: React.FC = () => {
         try {
             const newPetId = generateUUID();
             const now = new Date();
-            // Explicitly calculate expiration date for the DB column
             const expirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
 
             const { error } = await supabase.from('pets').insert({
@@ -288,11 +280,13 @@ const App: React.FC = () => {
                 image_urls: petData.imageUrls,
                 adoption_requirements: petData.adoptionRequirements,
                 share_contact_info: petData.shareContactInfo,
+                reward: petData.reward, // Integer
+                currency: petData.currency, // String
                 contact_requests: [],
                 lat: petData.lat,
                 lng: petData.lng,
                 created_at: now.toISOString(),
-                expires_at: expirationDate.toISOString() // REQUIRED: Set expiration
+                expires_at: expirationDate.toISOString()
             });
 
             if (error) throw error;
@@ -321,24 +315,24 @@ const App: React.FC = () => {
         }
     };
 
+    // ... rest of the file (handleRenewPet, handleMarkAsFound, etc. no changes needed)
     const handleRenewPet = async (pet: Pet) => {
         if (!currentUser) return;
         try {
             const now = new Date();
-            const newExpirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000)); // +60 days from now
+            const newExpirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
 
             const { error } = await supabase.from('pets').update({
                 expires_at: newExpirationDate.toISOString(),
-                created_at: now.toISOString() // Also update created_at to bump to top of lists
+                created_at: now.toISOString()
             }).eq('id', pet.id);
 
             if (error) throw error;
 
-            // IMPORTANT: Invalidate both general list AND profile specific list so UI updates instantly
             queryClient.invalidateQueries({ queryKey: ['pets'] });
             queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
             
-            setPetToRenew(null); // Close modal
+            setPetToRenew(null);
             alert(`La publicación de ${pet.name} ha sido renovada por 60 días más.`);
             
         } catch (err: any) {
@@ -351,7 +345,6 @@ const App: React.FC = () => {
         try {
             const { error } = await supabase.from('pets').update({ 
                 status: PET_STATUS.REUNIDO 
-                // We intentionally don't update expires_at here, or we could extend it slightly to show off the success
             }).eq('id', pet.id);
 
             if (error) throw error;
@@ -752,7 +745,6 @@ const App: React.FC = () => {
         if (!currentUser) return;
 
         try {
-            // 1. Get current state from DB to ensure we are atomic-ish and handle missing local state
             const { data: petData, error: fetchError } = await supabase
                 .from('pets')
                 .select('id, contact_requests, user_id, name')
@@ -766,12 +758,10 @@ const App: React.FC = () => {
 
             const currentRequests: string[] = petData.contact_requests || [];
             
-            // If already requested, do nothing
             if (currentRequests.includes(currentUser.email)) return;
 
             const updatedRequests = [...currentRequests, currentUser.email];
 
-            // 2. Update DB
             const { error: updateError } = await supabase
                 .from('pets')
                 .update({ contact_requests: updatedRequests })
@@ -779,13 +769,11 @@ const App: React.FC = () => {
 
             if (updateError) throw updateError;
 
-            // 3. Invalidate queries to refresh UI
             await queryClient.invalidateQueries({ queryKey: ['pets'] });
             await queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
 
-            // 4. Send Notification
             const ownerId = petData.user_id;
-            if (ownerId && ownerId !== currentUser.id) { // Don't notify self
+            if (ownerId && ownerId !== currentUser.id) {
                 const newNotifId = generateUUID();
                 await supabase.from('notifications').insert({
                     id: newNotifId,
@@ -798,7 +786,6 @@ const App: React.FC = () => {
             }
         } catch (err: any) {
             console.error("Error recording contact request:", err);
-            // alert("No se pudo registrar la solicitud de contacto."); // Optional
         }
     };
 
@@ -878,7 +865,6 @@ const App: React.FC = () => {
         }
     };
 
-    // Centralized Notification Click Handler
     const onNotificationClick = (notification: any) => {
         const link = notification.link;
         if (typeof link === 'object' && link.type === 'pet-renew') {
@@ -886,7 +872,6 @@ const App: React.FC = () => {
             if (pet) {
                 setPetToRenew(pet);
             } else {
-                // Fallback fetch if not in current list
                 supabase.from('pets').select('*').eq('id', link.id).single().then(({ data }) => {
                     if (data) {
                         const mappedPet: Pet = { 
@@ -895,7 +880,7 @@ const App: React.FC = () => {
                             animalType: data.animal_type,
                             adoptionRequirements: data.adoption_requirements,
                             shareContactInfo: data.share_contact_info,
-                            userEmail: '...', // Dummy for modal logic
+                            userEmail: '...',
                             comments: []
                         };
                         setPetToRenew(mappedPet);
@@ -957,6 +942,7 @@ const App: React.FC = () => {
                         onResetFilters={resetFilters}
                     />
                 }>
+                    {/* Routes ... */}
                     <Route index element={
                         <PetList
                             pets={pets}
@@ -974,7 +960,6 @@ const App: React.FC = () => {
                         />
                     } />
                     
-                    {/* Routes similar to previous App.tsx */}
                     <Route path="mascota/:id" element={
                         <PetDetailPage
                             pet={undefined} 
@@ -993,6 +978,7 @@ const App: React.FC = () => {
                         />
                     } />
 
+                    {/* Other routes ... */}
                     <Route path="perfil" element={
                         <ProtectedRoute>
                             <ProfilePage
@@ -1197,7 +1183,6 @@ const App: React.FC = () => {
                 />
             )}
 
-            {/* Expiration / Renewal Modal */}
             {petToRenew && (
                 <RenewModal
                     pet={petToRenew}
@@ -1207,7 +1192,6 @@ const App: React.FC = () => {
                 />
             )}
 
-            {/* 30-Day Status Check Modal */}
             {petToStatusCheck && (
                 <StatusCheckModal
                     pet={petToStatusCheck}

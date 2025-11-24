@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
-import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon } from './icons';
+import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon, WarningIcon } from './icons';
 import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
@@ -11,6 +11,7 @@ import { ReportModal } from './ReportModal';
 import { formatTime } from '../utils/formatters';
 import { usePets } from '../hooks/usePets';
 import { supabase } from '../services/supabaseClient';
+import UserPublicProfileModal from './UserPublicProfileModal';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -242,6 +243,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const [isLoading, setIsLoading] = useState(true);
     const [contactLoading, setContactLoading] = useState(false);
     const [isRevealingContact, setIsRevealingContact] = useState(false);
+    const [viewingPublisher, setViewingPublisher] = useState<User | null>(null);
     
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
@@ -277,6 +279,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                             adoptionRequirements: p.adoption_requirements,
                             shareContactInfo: p.share_contact_info,
                             contactRequests: p.contact_requests || [],
+                            reward: p.reward,
+                            currency: p.currency,
                             lat: p.lat,
                             lng: p.lng,
                             comments: []
@@ -292,8 +296,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     // Map Effect
     useEffect(() => {
-        // Critical: Use primitives dependencies to avoid re-creating map when 'pet' object reference changes
-        // (which happens on every comment/update).
         if (isLoading || !pet || !pet.lat || !pet.lng || !miniMapRef.current) return;
 
         const L = (window as any).L;
@@ -349,7 +351,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
         L.marker([lat, lng], { icon }).addTo(miniMapInstance.current);
 
-        // Force resize to ensure tiles load correctly
         setTimeout(() => {
             miniMapInstance.current?.invalidateSize();
         }, 200);
@@ -367,7 +368,21 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     }, []);
 
     if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div></div>;
-    if (!pet) return <div className="text-center py-10">Mascota no encontrada</div>;
+    
+    // Defensive check: if pet is missing (deleted or network error), show friendly message instead of crashing
+    if (!pet) return (
+        <div className="flex flex-col items-center justify-center h-96 text-center p-6 bg-white rounded-lg shadow-md">
+            <div className="text-brand-primary text-6xl mb-4 opacity-20"><TagIcon /></div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Publicación no encontrada</h2>
+            <p className="text-gray-600 mb-6">Es posible que la publicación haya sido eliminada o el enlace sea incorrecto.</p>
+            <button 
+                onClick={() => navigate('/')}
+                className="px-6 py-2 bg-brand-primary text-white rounded-full font-semibold hover:bg-brand-dark transition-colors shadow-md"
+            >
+                Volver al inicio
+            </button>
+        </div>
+    );
 
     // Helpers
     const petOwner = users.find(u => u.email === pet.userEmail);
@@ -380,12 +395,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     const nextImage = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % pet.imageUrls.length);
+        if (pet.imageUrls && pet.imageUrls.length > 0) {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % pet.imageUrls.length);
+        }
     };
 
     const prevImage = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + pet.imageUrls.length) % pet.imageUrls.length);
+        if (pet.imageUrls && pet.imageUrls.length > 0) {
+            setCurrentImageIndex((prevIndex) => (prevIndex - 1 + pet.imageUrls.length) % pet.imageUrls.length);
+        }
     };
     
     const handleOpenReportModal = (type: ReportType, id: string, identifier: string) => {
@@ -406,7 +425,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         setIsRevealingContact(true);
         try {
             await onRecordContactRequest(pet.id);
-            // Optimistic update for immediate feedback if network is slow or cache not yet invalid
             setPet(prev => prev ? ({
                 ...prev,
                 contactRequests: [...(prev.contactRequests || []), currentUser.email]
@@ -446,6 +464,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
     const generateStoryImage = async () => {
         return new Promise<string>((resolve, reject) => {
+            // ... (story generation logic) ...
             if (!pet.imageUrls || pet.imageUrls.length === 0) {
                 return reject('No hay imágenes disponibles');
             }
@@ -481,24 +500,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                 const imgX = (canvas.width - imgSize) / 2;
                 const imgY = cardY + 160;
                 
-                let sWidth = img.width;
-                let sHeight = img.height;
-                let sx = 0;
-                let sy = 0;
-                
-                if (sWidth > sHeight) {
-                    sWidth = sHeight;
-                    sx = (img.width - sHeight) / 2;
-                } else {
-                    sHeight = sWidth;
-                    sy = (img.height - sWidth) / 2;
-                }
-                
                 ctx.save();
                 ctx.beginPath();
                 ctx.roundRect(imgX, imgY, imgSize, imgSize, 20);
                 ctx.clip();
-                ctx.drawImage(img, sx, sy, sWidth, sHeight, imgX, imgY, imgSize, imgSize);
+                ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
                 ctx.restore();
 
                 ctx.fillStyle = '#1F2937';
@@ -517,10 +523,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                 ctx.font = 'bold 50px Arial';
                 ctx.fillText("¡AYÚDAME A VOLVER A CASA!", canvas.width / 2, canvas.height - margin * 3);
                 
-                ctx.fillStyle = '#6B7280';
-                ctx.font = '30px Arial';
-                ctx.fillText("Publicado en Pets App", canvas.width / 2, canvas.height - margin * 2);
-
                 resolve(canvas.toDataURL('image/png'));
             };
             img.onerror = () => reject('Error loading image');
@@ -641,13 +643,19 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                     <button onClick={onClose} className="bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 text-sm">
                         <ChevronLeftIcon /> Volver a la lista
                     </button>
-                     {canAdmin && petOwner?.username && (
+                     {petOwner?.username && (
                          <div className="hidden sm:flex items-center gap-2">
                             <span className="text-xs text-gray-500">Publicado por:</span>
-                            <div className="w-6 h-6 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold text-xs">
-                                {petOwner.username.charAt(0).toUpperCase()}
+                            <div className="w-6 h-6 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold text-xs overflow-hidden">
+                                {petOwner.avatarUrl ? (
+                                    <img src={petOwner.avatarUrl} alt="av" className="w-full h-full object-cover"/>
+                                ) : (
+                                    petOwner.username.charAt(0).toUpperCase()
+                                )}
                             </div>
-                            <button onClick={() => { if(petOwner) onViewUser(petOwner); }} className="font-bold text-gray-800 hover:underline text-sm">{petOwner.username}</button>
+                            <button onClick={() => setViewingPublisher(petOwner)} className="font-bold text-gray-800 hover:underline text-sm">
+                                {petOwner.username}
+                            </button>
                          </div>
                     )}
                 </div>
@@ -671,6 +679,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     )}
                                 </div>
                             </div>
+                            {pet.reward && pet.reward > 0 && (
+                                <div className="bg-green-100 border border-green-200 rounded-lg p-2 mb-3 inline-block">
+                                    <p className="text-green-800 font-bold text-sm flex items-center gap-1 uppercase tracking-wide">
+                                        <span>💰</span> Recompensa: {pet.currency || 'S/'} {pet.reward}
+                                    </p>
+                                </div>
+                            )}
                             <p className="text-gray-500 text-lg font-medium mb-4 lg:mb-6">{pet.breed} - {pet.color}</p>
                         </div>
 
@@ -769,8 +784,25 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     )}
                                 </div>
                             </div>
+                            {pet.reward && pet.reward > 0 && (
+                                <div className="bg-green-100 border border-green-200 rounded-lg p-3 mb-4 inline-block shadow-sm">
+                                    <p className="text-green-800 font-extrabold text-lg flex items-center gap-2 uppercase tracking-wide">
+                                        <span>💰</span> Recompensa: {pet.currency || 'S/'} {pet.reward}
+                                    </p>
+                                </div>
+                            )}
                             <p className="text-gray-500 text-lg font-medium mb-4 lg:mb-6">{pet.breed} - {pet.color}</p>
                         </div>
+
+                        {pet.reward && pet.reward > 0 && (
+                            <div className="mb-6 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 text-sm rounded-r-md flex gap-3 items-start">
+                                <WarningIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold">Advertencia de Seguridad</p>
+                                    <p>Nunca realices pagos ni transferencias por adelantado para "recuperar" a tu mascota. Si alguien afirma tenerla y exige dinero antes de verse, <strong>es una estafa</strong>. Entrega la recompensa solo en persona y en un lugar seguro.</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Stats Bar */}
                         <div className="space-y-4 text-gray-700 text-sm mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
@@ -830,7 +862,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     </button>
                                     <button 
                                         onClick={openInWaze}
-                                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg transition-colors font-medium text-xs border border-blue-200"
+                                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg transition-colors font-medium text-sm border border-blue-200"
                                     >
                                         <WazeIcon />
                                         Ver en Waze
@@ -959,6 +991,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                 </div>
             </div>
 
+            {/* Modals code ... (Share, Comment, Report, Delete modals remain same) */}
             {isShareModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-end sm:items-center p-0 sm:p-4" onClick={() => setIsShareModalOpen(false)}>
                     <div className="bg-white w-full sm:w-full max-w-sm rounded-t-xl sm:rounded-xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1051,6 +1084,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                     message="¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer."
                     confirmText="Sí, eliminar"
                     cancelText="Cancelar"
+                />
+            )}
+            
+            {viewingPublisher && (
+                <UserPublicProfileModal 
+                    isOpen={!!viewingPublisher}
+                    onClose={() => setViewingPublisher(null)}
+                    targetUser={viewingPublisher}
                 />
             )}
         </>

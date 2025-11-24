@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, PetStatus, PetSize, AnimalType, OwnedPet } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
 import { generatePetDescription } from '../services/geminiService';
-import { SparklesIcon, XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon } from './icons';
+import { SparklesIcon, XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon, WarningIcon } from './icons';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '../data/locations';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
 import { uploadImage } from '../utils/imageUtils';
@@ -34,12 +34,12 @@ interface FormDataState {
     lng?: number;
 }
 
-// Helper for normalizing strings for comparison (removes accents, lowercase, specific prefixes)
+// Helper for normalizing strings for comparison
 const normalizeLocationName = (name: string) => {
     if (!name) return '';
     return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
-        .replace(/(provincia|departamento|distrito|region|municipalidad) de /g, "") // Remove prefixes
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .replace(/(provincia|departamento|distrito|region|municipalidad) de /g, "") 
         .trim();
 };
 
@@ -48,9 +48,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
-    const isUpdatingFromMapRef = useRef(false); // Lock to prevent loop
-    
-    // Safety guard against unmounted state updates
+    const isUpdatingFromMapRef = useRef(false);
     const isMounted = useRef(true);
 
     useEffect(() => {
@@ -74,6 +72,10 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         date: new Date().toISOString().split('T')[0],
     });
     
+    // Separate state for reward UI
+    const [rewardAmount, setRewardAmount] = useState('');
+    const [currency, setCurrency] = useState('S/');
+
     const [color1, setColor1] = useState('');
     const [color2, setColor2] = useState('');
     const [color3, setColor3] = useState('');
@@ -92,7 +94,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const isEncontrado = formData.status === PET_STATUS.ENCONTRADO;
     const isPerdido = formData.status === PET_STATUS.PERDIDO;
 
-    // Initialize Proviences for default Department
     useEffect(() => {
         if (formData.department) {
             setProvinces(getProvinces(formData.department));
@@ -136,14 +137,12 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         const number = addr.house_number || '';
                         const newAddress = `${road} ${number}`.trim();
 
-                        // Logic to auto-detect Department, Province, District
                         let newDept = '';
                         let newProv = '';
                         let newDist = '';
                         let newProvincesList: string[] = [];
                         let newDistrictsList: string[] = [];
 
-                        // 1. Identify Department
                         const apiState = addr.state || addr.region;
                         if (apiState) {
                             const normalizedApiState = normalizeLocationName(apiState);
@@ -151,10 +150,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                       departments.find(d => normalizedApiState.includes(normalizeLocationName(d))) || '';
                         }
 
-                        // 2. Identify Province
                         if (newDept) {
                             newProvincesList = getProvinces(newDept);
-                            // OSM can map province to 'province', 'region', 'city', or 'county'
                             const apiProv = addr.province || addr.region || addr.city || addr.county;
                             
                             if (apiProv) {
@@ -163,17 +160,14 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                           newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
                             }
                             
-                             // Fallback: sometimes City name is the Province name (e.g. Lima)
                             if (!newProv && addr.city) {
                                 const normalizedCity = normalizeLocationName(addr.city);
                                 newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
                             }
                         }
 
-                        // 3. Identify District
                         if (newDept && newProv) {
                             newDistrictsList = getDistricts(newDept, newProv);
-                            // OSM can map district to 'district', 'town', 'city_district', 'suburb', 'village', 'neighbourhood'
                             const apiDist = addr.district || addr.town || addr.city_district || addr.suburb || addr.village || addr.neighbourhood;
                             if (apiDist) {
                                 const normalizedApiDist = normalizeLocationName(apiDist);
@@ -184,8 +178,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         
                         isUpdatingFromMapRef.current = true;
                         
-                        // Update lists if found - CRITICAL: These setters are async, so React might not update state immediately
-                        // but passing valid values to setFormData works because the select will pick it up if the list matches
                         if (newProvincesList.length > 0) setProvinces(newProvincesList);
                         if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
 
@@ -197,7 +189,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             district: newDist || (newProv ? '' : prev.district)
                         }));
 
-                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000); // Release lock
+                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                     }
                 } catch (err) {
                     console.error("Reverse geocoding error", err);
@@ -244,14 +236,13 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         };
     }, []); 
 
-    // Forward Geocoding (Address -> Coords)
+    // Forward Geocoding
     useEffect(() => {
         if (!formData.address || isUpdatingFromMapRef.current) return;
 
         const timeoutId = setTimeout(async () => {
             if (!isMounted.current) return;
             try {
-                // Construct cleaner query to avoid empty parts
                 const queryParts = [formData.address, formData.district, formData.province, formData.department, 'Peru'].filter(part => part && part.trim() !== '');
                 const query = queryParts.join(', ');
                 
@@ -268,7 +259,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
 
                     if (mapInstance.current) {
-                        mapInstance.current.invalidateSize(); // Force refresh size
+                        mapInstance.current.invalidateSize();
                         mapInstance.current.setView([newLat, newLng], 16);
                         if (markerInstance.current) {
                             markerInstance.current.setLatLng([newLat, newLng]);
@@ -281,7 +272,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                 iconAnchor: [15, 42]
                             });
                             markerInstance.current = L.marker([newLat, newLng], { icon, draggable: true }).addTo(mapInstance.current);
-                            
                             markerInstance.current.on('dragend', (event: any) => {
                                 const position = event.target.getLatLng();
                                 setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
@@ -292,16 +282,13 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             } catch (error) {
                 console.error("Geocoding error:", error);
             }
-        }, 1500); // Increased debounce to 1.5s to avoid excessive requests during typing
+        }, 1500);
 
         return () => clearTimeout(timeoutId);
     }, [formData.address, formData.district, formData.province, formData.department]);
 
-    // Center map when Department or Province changes
     useEffect(() => {
-        // If the update is coming from the map interaction (isUpdatingFromMapRef), do NOT re-center the map.
         if (!mapInstance.current || isUpdatingFromMapRef.current) return;
-        
         const coords = locationCoordinates[formData.province] || locationCoordinates[formData.department];
         if (coords) {
              mapInstance.current.invalidateSize();
@@ -330,8 +317,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
     useEffect(() => {
         if (isEditMode && petToEdit) {
-            // Attempt to parse location string: "Address, District, Province, Department"
-            const locationParts = petToEdit.location.split(', ').reverse(); // Dept, Prov, Dist, Addr
+            const locationParts = petToEdit.location.split(', ').reverse(); 
             
             let dept = 'Lima';
             let prov = 'Lima';
@@ -390,6 +376,11 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 lng: petToEdit.lng
             });
             
+            if (petToEdit.reward) {
+                setRewardAmount(petToEdit.reward.toString());
+                setCurrency(petToEdit.currency || 'S/');
+            }
+
             const colors = petToEdit.color.split(', ');
             setColor1(colors[0] || '');
             setColor2(colors[1] || '');
@@ -559,7 +550,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         if (newAddress) {
                              isUpdatingFromMapRef.current = true;
                              
-                             // Copied logic for consistency
                              let newDept = '';
                              let newProv = '';
                              let newDist = '';
@@ -581,7 +571,6 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                     newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || 
                                               newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
                                 }
-                                // Fallback for city
                                 if (!newProv && addr.city) {
                                     const normalizedCity = normalizeLocationName(addr.city);
                                     newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
@@ -668,11 +657,18 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
         let generatedName = formData.name;
         if (!isPerdido) {
-            // For Found/Sighted, generate descriptive name like "Perro Encontrado"
             generatedName = `${typeLabel} ${formData.status}`;
         } else if (!generatedName.trim()) {
-             // Fallback if name is missing for Lost pets
              generatedName = 'Desconocido';
+        }
+
+        // Validate reward is a number if present
+        let parsedReward: number | undefined = undefined;
+        if (rewardAmount && rewardAmount.trim() !== '') {
+            const num = parseInt(rewardAmount.replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(num)) {
+                parsedReward = num;
+            }
         }
 
         const petToSubmit: Omit<Pet, 'id' | 'userEmail'> = {
@@ -693,6 +689,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             description: finalDescription,
             imageUrls: imagePreviews,
             shareContactInfo: formData.status === PET_STATUS.AVISTADO ? false : shareContactInfo,
+            reward: parsedReward,
+            currency: currency,
             lat: formData.lat,
             lng: formData.lng
         };
@@ -714,6 +712,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* ... existing form fields ... */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-900">Estado</label>
@@ -885,6 +884,35 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             />
                         </div>
                         
+                        {isPerdido && (
+                            <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
+                                <label className="block text-sm font-medium text-gray-900 mb-1">Monto de Recompensa (Opcional)</label>
+                                <div className="flex gap-2">
+                                    <select
+                                        value={currency}
+                                        onChange={(e) => setCurrency(e.target.value)}
+                                        className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary bg-white text-gray-900 w-20"
+                                    >
+                                        <option value="S/">S/</option>
+                                        <option value="$">$</option>
+                                    </select>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        name="reward"
+                                        value={rewardAmount}
+                                        onChange={(e) => setRewardAmount(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="Ej: 500"
+                                    />
+                                </div>
+                                <div className="flex items-start gap-2 mt-2 text-xs text-yellow-800">
+                                    <WarningIcon className="h-4 w-4 flex-shrink-0" />
+                                    <p><strong>Consejo de seguridad:</strong> Nunca realices transferencias ni pagos por adelantado. Entrega la recompensa únicamente cuando tengas a tu mascota en brazos.</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-medium text-gray-900">
                                 Descripción

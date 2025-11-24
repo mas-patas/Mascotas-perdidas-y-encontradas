@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { User, Pet, OwnedPet } from '../types';
+import type { User, Pet, OwnedPet, UserRating } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
 import { EditIcon, PlusIcon, TrashIcon, SparklesIcon } from './icons';
@@ -10,6 +10,7 @@ import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
 import { uploadImage } from '../utils/imageUtils';
 import { supabase } from '../services/supabaseClient';
+import StarRating from './StarRating';
 
 
 interface ProfilePageProps {
@@ -42,7 +43,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const [loadingProfile, setLoadingProfile] = useState(false);
 
     // 1. Fetch 'My Pets' (Reported) - Includes Expired Pets
-    // This ensures the profile owner sees EVERYTHING they posted, even if it's hidden from the main feed.
     const { data: myReportedPets = [], isLoading: isLoadingMyPets } = useQuery({
         queryKey: ['myPets', user.id],
         enabled: !!user.id,
@@ -55,8 +55,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             
             if (error) throw error;
             
-            // Enrich/Format
-            return data.map((p: any) => ({
+            // Enrich/Format with safety check for data
+            return (data || []).map((p: any) => ({
                 id: p.id,
                 userEmail: user.email,
                 status: p.status,
@@ -73,6 +73,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 adoptionRequirements: p.adoption_requirements,
                 shareContactInfo: p.share_contact_info,
                 contactRequests: p.contact_requests || [],
+                reward: p.reward,
                 lat: p.lat,
                 lng: p.lng,
                 comments: [], // Comments not needed for list view
@@ -82,10 +83,45 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     });
 
+    // Fetch my ratings
+    const { data: myRatings = [], isLoading: isLoadingRatings } = useQuery({
+        queryKey: ['ratings', user.id],
+        enabled: !!user.id,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('user_ratings')
+                .select(`
+                    *,
+                    profiles:rater_id (username, avatar_url)
+                `)
+                .eq('rated_user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            return (data || []).map((r: any) => ({
+                id: r.id,
+                raterId: r.rater_id,
+                ratedUserId: r.rated_user_id,
+                rating: r.rating,
+                comment: r.comment,
+                createdAt: r.created_at,
+                raterName: r.profiles?.username || 'Usuario',
+                raterAvatar: r.profiles?.avatar_url
+            })) as UserRating[];
+        }
+    });
+
+    const averageRating = useMemo(() => {
+        if (myRatings.length === 0) return 0;
+        const sum = myRatings.reduce((acc, curr) => acc + curr.rating, 0);
+        return (sum / myRatings.length).toFixed(1);
+    }, [myRatings]);
+
     // Use the fetched data if available, otherwise fallback to props (though props filter out expired)
     const displayedReportedPets = myReportedPets.length > 0 || isLoadingMyPets ? myReportedPets : propReportedPets;
 
-    const savedPets = useMemo(() => allPets.filter(p => user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
+    const savedPets = useMemo(() => allPets.filter(p => p && user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
 
     // Helper to check if a reported pet is expired
     const isPetExpired = (pet: Pet) => {
@@ -263,6 +299,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
                             <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
                             {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                            
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-3xl font-bold text-gray-800">{averageRating}</span>
+                                    <div className="flex flex-col">
+                                        <StarRating rating={Number(averageRating)} size="sm" />
+                                        <span className="text-xs text-gray-500">{myRatings.length} calificaciones</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -341,7 +387,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                     <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                 ) : displayedReportedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {displayedReportedPets.map(pet => {
+                        {displayedReportedPets.filter(p => p).map(pet => {
                             const expired = isPetExpired(pet);
                             return (
                                 <div key={pet.id} className="relative">
@@ -371,7 +417,45 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 )}
             </div>
 
-             <div className="text-center pt-4">
+            {/* Ratings Section */}
+            <div className="space-y-4">
+                <h3 className="text-2xl font-semibold text-gray-700">Mis Calificaciones</h3>
+                {isLoadingRatings ? (
+                    <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
+                ) : myRatings.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {myRatings.map(rating => (
+                            <div key={rating.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+                                            {rating.raterAvatar ? (
+                                                <img src={rating.raterAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">
+                                                    {(rating.raterName || '?').charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="text-sm font-semibold">@{rating.raterName}</span>
+                                    </div>
+                                    <span className="text-xs text-gray-400">{new Date(rating.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="mb-2">
+                                    <StarRating rating={rating.rating} size="sm" />
+                                </div>
+                                <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{rating.comment}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
+                        <p className="text-lg text-gray-500">Aún no has recibido calificaciones de otros usuarios.</p>
+                    </div>
+                )}
+            </div>
+
+             <div className="text-center pt-8">
                  <button
                     onClick={onBack}
                     className="py-2 px-6 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"

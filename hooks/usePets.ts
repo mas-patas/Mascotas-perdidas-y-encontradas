@@ -21,11 +21,14 @@ interface UsePetsProps {
 
 // Helper to enrich pets with owner data and comments (Shared logic)
 const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
-    if (rawPets.length === 0) return [];
+    if (!rawPets || rawPets.length === 0) return [];
 
-    // Deduplicate IDs just in case, though logic shouldn't produce duplicates
-    const uniquePets = Array.from(new Map(rawPets.map(p => [p.id, p])).values());
+    // Deduplicate IDs and filter out invalid entries (nulls or missing IDs)
+    const validPets = rawPets.filter(p => p && p.id);
+    const uniquePets = Array.from(new Map(validPets.map(p => [p.id, p])).values());
     
+    if (uniquePets.length === 0) return [];
+
     const petIds = uniquePets.map(p => p.id);
     const userIds = [...new Set(uniquePets.map(p => p.user_id).filter(Boolean))];
 
@@ -87,6 +90,8 @@ const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
             adoptionRequirements: p.adoption_requirements,
             shareContactInfo: p.share_contact_info,
             contactRequests: p.contact_requests || [],
+            reward: p.reward,
+            currency: p.currency, // Map currency field
             lat: p.lat,
             lng: p.lng,
             comments: petComments,

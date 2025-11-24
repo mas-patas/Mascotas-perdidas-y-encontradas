@@ -76,6 +76,8 @@ export interface Pet {
     adoptionRequirements?: string;
     shareContactInfo?: boolean;
     contactRequests?: string[];
+    reward?: number; // Changed to number (integer in DB)
+    currency?: string; // New field for 'S/' or '$'
     lat?: number; // Coordenada Latitud
     lng?: number; // Coordenada Longitud
     comments?: Comment[];
@@ -122,6 +124,17 @@ export interface User {
     ownedPets?: OwnedPet[];
     savedPetIds?: string[];
     avatarUrl?: string;
+}
+
+export interface UserRating {
+    id: string;
+    raterId: string; // User who gave the rating
+    ratedUserId: string; // User who received the rating
+    rating: number; // 1-5
+    comment: string;
+    createdAt: string;
+    raterName?: string; // Enriched
+    raterAvatar?: string; // Enriched
 }
 
 export interface LocationDetails {

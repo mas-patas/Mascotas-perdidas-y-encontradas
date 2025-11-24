@@ -144,6 +144,15 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
                 <h3 className={`text-xl font-bold mb-1 truncate text-center transition-colors ${theme.textTitle}`} title={cardTitle}>
                     {cardTitle}
                 </h3>
+                
+                {pet.reward && pet.reward > 0 && (
+                    <div className="flex justify-center mb-2">
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold uppercase rounded-full border border-green-200 shadow-sm flex items-center gap-1">
+                            <span>💵</span> Recompensa
+                        </span>
+                    </div>
+                )}
+
                 <p className="text-gray-600 text-sm mb-3 text-center truncate font-medium">{pet.breed} • {pet.color}</p>
                 
                 <div className="space-y-2 text-gray-700 text-xs mb-3 flex-grow">

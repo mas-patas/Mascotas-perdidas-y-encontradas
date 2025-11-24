@@ -149,7 +149,7 @@ const PetSection: React.FC<{
                 onTouchEnd={onTouchEnd}
             >
                 <div className={`grid ${gridClass} gap-4 transition-all duration-300`}>
-                    {visiblePets.map(pet => {
+                    {visiblePets.filter(p => p).map(pet => {
                         const petOwner = users.find(u => u.email === pet.userEmail);
                         return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                     })}
@@ -266,7 +266,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                 ) : pets.length > 0 ? (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {pets.map(pet => {
+                            {pets.filter(p => p).map(pet => {
                                 const petOwner = users.find(u => u.email === pet.userEmail);
                                 return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                             })}
@@ -316,11 +316,11 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     }
 
     // View 2: Dashboard / Overview (Carousels per category)
-    const lostPets = pets.filter(p => p.status === PET_STATUS.PERDIDO);
-    const foundPets = pets.filter(p => p.status === PET_STATUS.ENCONTRADO);
-    const sightedPets = pets.filter(p => p.status === PET_STATUS.AVISTADO);
-    const adoptionPets = pets.filter(p => p.status === PET_STATUS.EN_ADOPCION);
-    const reunitedPets = pets.filter(p => p.status === PET_STATUS.REUNIDO);
+    const lostPets = pets.filter(p => p && p.status === PET_STATUS.PERDIDO);
+    const foundPets = pets.filter(p => p && p.status === PET_STATUS.ENCONTRADO);
+    const sightedPets = pets.filter(p => p && p.status === PET_STATUS.AVISTADO);
+    const adoptionPets = pets.filter(p => p && p.status === PET_STATUS.EN_ADOPCION);
+    const reunitedPets = pets.filter(p => p && p.status === PET_STATUS.REUNIDO);
 
     if (isLoading && pets.length === 0) {
         return (
