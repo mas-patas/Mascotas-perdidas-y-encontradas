@@ -3,9 +3,36 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
 import { USER_ROLES, USER_STATUS, SUPPORT_TICKET_STATUS } from '../constants';
-import type { User, Chat, Report, SupportTicket, Campaign, Notification } from '../types';
+import type { User, Chat, Report, SupportTicket, Campaign, Notification, BannedIP } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+
+// Helper to send System Notification
+const sendSystemNotification = (title: string, body: string, link?: string) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    // If service worker is ready, use it (better for PWA), else fallback to new Notification()
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+                body: body,
+                icon: 'https://placehold.co/192x192/1D4ED8/ffffff?text=Pets',
+                data: { link }
+            });
+        });
+    } else {
+        const n = new Notification(title, {
+            body: body,
+            icon: 'https://placehold.co/192x192/1D4ED8/ffffff?text=Pets'
+        });
+        if (link) {
+            n.onclick = () => {
+                window.focus();
+                window.location.href = link;
+            };
+        }
+    }
+};
 
 export const useAppData = () => {
     const { currentUser } = useAuth();
@@ -123,7 +150,7 @@ export const useAppData = () => {
         }
     });
 
-    // 5. ADMIN DATA (Reports & Tickets)
+    // 5. ADMIN DATA (Reports & Tickets & BannedIPs)
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
     const { data: reports = [] } = useQuery({
@@ -172,8 +199,23 @@ export const useAppData = () => {
                 response: t.response,
                 assignmentHistory: t.assignment_history || [],
                 timestamp: t.created_at,
-                relatedReportId: t.related_report_id // Ensure this is mapped
+                relatedReportId: t.related_report_id 
             }));
+        }
+    });
+
+    const { data: bannedIps = [], setBannedIps } = useQuery({
+        queryKey: ['bannedIps'],
+        // Always fetch banned IPs to check against current user, but write actions are protected by RLS
+        queryFn: async () => {
+            const { data } = await supabase.from('banned_ips').select('*').order('created_at', { ascending: false });
+            if (!data) return [];
+            return data.map((b: any) => ({
+                id: b.id,
+                ipAddress: b.ip_address,
+                reason: b.reason,
+                createdAt: b.created_at
+            })) as BannedIP[];
         }
     });
 
@@ -197,7 +239,6 @@ export const useAppData = () => {
                 { event: 'INSERT', schema: 'public', table: 'notifications' },
                 (payload) => {
                     if (payload.new.user_id === currentUser.id) {
-                        // Update cache immediately so red dot appears instantly
                         queryClient.setQueryData(['notifications', currentUser.id], (old: any) => {
                             const newNotif = {
                                 id: payload.new.id,
@@ -211,8 +252,19 @@ export const useAppData = () => {
                         });
                         
                         queryClient.invalidateQueries({ queryKey: ['notifications'] });
-                        // UX: Show Toast for new notification
                         showToast(payload.new.message, 'info');
+                        
+                        let link = '/';
+                        if (typeof payload.new.link === 'object') {
+                            if (payload.new.link.type === 'pet') link = `#/mascota/${payload.new.link.id}`;
+                            else if (payload.new.link.type === 'campaign') link = `#/campanas/${payload.new.link.id}`;
+                        } else if (payload.new.link === 'support') {
+                            link = '#/soporte';
+                        } else if (payload.new.link === 'messages') {
+                            link = '#/mensajes';
+                        }
+                        
+                        sendSystemNotification('Mascotas: Nueva Notificación', payload.new.message, link);
                     }
                 }
             )
@@ -220,18 +272,20 @@ export const useAppData = () => {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'support_tickets' },
                 (payload) => {
-                    // If I am the user who owns the ticket
                     if (payload.new.user_email === currentUser.email) {
                         queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
                         
-                        // UX: Specific toast for Resolution
+                        let msg = '';
                         if (payload.new.status === SUPPORT_TICKET_STATUS.RESOLVED && payload.old.status !== SUPPORT_TICKET_STATUS.RESOLVED) {
-                            showToast(`Tu ticket "${payload.new.subject}" ha sido resuelto.`, 'success');
+                            msg = `Tu ticket "${payload.new.subject}" ha sido resuelto.`;
+                            showToast(msg, 'success');
                         } else if (payload.new.status !== payload.old.status) {
-                            showToast(`El estado de tu ticket "${payload.new.subject}" ha cambiado a ${payload.new.status}.`, 'info');
+                            msg = `El estado de tu ticket "${payload.new.subject}" ha cambiado a ${payload.new.status}.`;
+                            showToast(msg, 'info');
                         }
+                        
+                        if (msg) sendSystemNotification('Actualización de Soporte', msg, '#/soporte');
                     }
-                    // If I am an admin (refresh list)
                     if (isAdmin) {
                         queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
                     }
@@ -241,6 +295,11 @@ export const useAppData = () => {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'reports' },
                 () => queryClient.invalidateQueries({ queryKey: ['reports'] })
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'banned_ips' },
+                () => queryClient.invalidateQueries({ queryKey: ['bannedIps'] })
             )
             .subscribe();
 
@@ -253,7 +312,7 @@ export const useAppData = () => {
 
     // Helper Setters
     const createSetter = (key: string) => (val: any) => {
-        const isGlobal = ['users', 'campaigns'].includes(key);
+        const isGlobal = ['users', 'campaigns', 'bannedIps'].includes(key);
         const queryKey = isGlobal ? [key] : [key, currentUser?.id];
 
         queryClient.setQueryData(queryKey, (old: any) => {
@@ -274,6 +333,7 @@ export const useAppData = () => {
         supportTickets, setSupportTickets: createSetter('supportTickets'),
         campaigns, setCampaigns: createSetter('campaigns'),
         notifications, setNotifications: createSetter('notifications'),
+        bannedIps, setBannedIps: createSetter('bannedIps'),
         loading
     };
 };

@@ -12,6 +12,9 @@ import { uploadImage } from '../utils/imageUtils';
 import { supabase } from '../services/supabaseClient';
 import StarRating from './StarRating';
 
+const countries = [
+    "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
+];
 
 interface ProfilePageProps {
     user: User;
@@ -37,6 +40,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         phone: user.phone || '',
+        country: user.country || 'Perú',
         avatarUrl: user.avatarUrl || '',
     });
     const [error, setError] = useState('');
@@ -129,7 +133,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         return new Date(pet.expiresAt) < new Date();
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setEditableUser(prev => ({ ...prev, [name]: value }));
     };
@@ -167,6 +171,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 firstName: editableUser.firstName,
                 lastName: editableUser.lastName,
                 phone: editableUser.phone,
+                country: editableUser.country,
                 avatarUrl: editableUser.avatarUrl,
             });
             setIsEditing(false);
@@ -264,15 +269,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                         <input type="text" name="lastName" id="lastName" value={editableUser.lastName} onChange={handleInputChange} className={inputClass} />
                                     </div>
                                 </div>
-                                <div>
-                                    <label htmlFor="phone" className="block text-sm font-medium text-gray-900">Teléfono</label>
-                                    <input 
-                                        type="tel" 
-                                        name="phone" 
-                                        id="phone" value={editableUser.phone} 
-                                        onChange={handleInputChange} className={inputClass} 
-                                        pattern="9[0-9]{8}"
-                                        title="El número de teléfono debe tener 9 dígitos y empezar con 9." />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="phone" className="block text-sm font-medium text-gray-900">Teléfono</label>
+                                        <input 
+                                            type="tel" 
+                                            name="phone" 
+                                            id="phone" value={editableUser.phone} 
+                                            onChange={handleInputChange} className={inputClass} 
+                                            pattern="9[0-9]{8}"
+                                            title="El número de teléfono debe tener 9 dígitos y empezar con 9." />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="country" className="block text-sm font-medium text-gray-900">País</label>
+                                        <select 
+                                            name="country" 
+                                            id="country" 
+                                            value={editableUser.country} 
+                                            onChange={handleInputChange} 
+                                            className={inputClass}
+                                        >
+                                            {countries.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -299,6 +320,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
                             <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
                             {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                            {user.country && <p><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
                             
                             <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
                                 <div className="flex items-center gap-2">

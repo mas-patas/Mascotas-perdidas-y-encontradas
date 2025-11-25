@@ -86,6 +86,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 bg-sidebar-dark text-white flex flex-col shadow-2xl 
                 transition-transform duration-300 ease-in-out
                 fixed inset-y-0 left-0 w-64 z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
+                pt-20 lg:pt-0
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
             `}>

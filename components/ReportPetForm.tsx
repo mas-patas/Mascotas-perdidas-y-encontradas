@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, PetStatus, PetSize, AnimalType, OwnedPet } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
-import { generatePetDescription } from '../services/geminiService';
+import { generatePetDescription, analyzePetImage } from '../services/geminiService';
 import { SparklesIcon, XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon, WarningIcon } from './icons';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '../data/locations';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
@@ -86,6 +86,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState('');
     const [customAnimalType, setCustomAnimalType] = useState('');
     const [customBreed, setCustomBreed] = useState('');
@@ -481,6 +482,51 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     
     const handleRemoveImage = (indexToRemove: number) => {
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleAnalyzeImage = async () => {
+        if (imagePreviews.length === 0) {
+            setError('Sube una imagen primero para analizarla.');
+            return;
+        }
+        
+        setIsAnalyzing(true);
+        setError('');
+        
+        try {
+            const result = await analyzePetImage(imagePreviews[0]);
+            
+            // Update Animal Type
+            setFormData(prev => ({ ...prev, animalType: result.animalType }));
+            
+            // Handle Breed
+            const targetBreeds = result.animalType === 'Perro' ? dogBreeds : (result.animalType === 'Gato' ? catBreeds : ['Otro']);
+            // We need to wait for the useEffect to update the breeds list in state, but we can check against static lists
+            
+            if (targetBreeds.includes(result.breed)) {
+                setFormData(prev => ({ ...prev, breed: result.breed }));
+                setCustomBreed('');
+            } else {
+                setFormData(prev => ({ ...prev, breed: 'Otro' }));
+                setCustomBreed(result.breed);
+            }
+            
+            // Handle Colors
+            if (result.colors.length > 0) setColor1(result.colors[0]);
+            if (result.colors.length > 1) setColor2(result.colors[1]);
+            if (result.colors.length > 2) setColor3(result.colors[2]);
+            
+            // Update Description if returned
+            if (result.description) {
+                setFormData(prev => ({ ...prev, description: result.description || '' }));
+            }
+
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || 'No se pudo analizar la imagen.');
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     const handleGenerateDescription = async () => {
@@ -940,6 +986,32 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             <label className="block text-sm font-medium text-gray-900">Fotos de la Mascota (hasta 3) <span className="text-red-500">*</span></label>
                             <input type="file" accept="image/jpeg, image/png, image/webp" multiple onChange={handleImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-light file:text-brand-primary hover:file:bg-blue-100" disabled={imagePreviews.length >= 3 || isUploading}/>
                             {isUploading && <p className="text-sm text-blue-600 mt-1">Subiendo imágenes...</p>}
+                            
+                            {/* AI Auto-Fill Button */}
+                            {imagePreviews.length > 0 && (
+                                <div className="mt-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleAnalyzeImage}
+                                        disabled={isAnalyzing}
+                                        className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                    >
+                                        {isAnalyzing ? (
+                                            <>
+                                                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                                <span>Analizando...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <SparklesIcon />
+                                                <span>Autocompletar datos con IA</span>
+                                            </>
+                                        )}
+                                    </button>
+                                    <p className="text-xs text-gray-500 mt-1 ml-1">Detecta automáticamente tipo, raza y colores.</p>
+                                </div>
+                            )}
+
                             {imagePreviews.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {imagePreviews.map((preview, index) => (
@@ -979,7 +1051,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         
                         <div className="pt-4 flex justify-end gap-3">
                             <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" disabled={isUploading} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button type="submit" disabled={isUploading || isAnalyzing} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
                                 {isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
                             </button>
                         </div>

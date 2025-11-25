@@ -12,7 +12,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     loginWithGoogle: () => Promise<void>;
     loginWithApple: () => Promise<void>;
-    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl'>>) => Promise<void>;
+    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl' | 'country'>>) => Promise<void>;
     addOwnedPet: (petData: Omit<OwnedPet, 'id'>) => Promise<void>;
     updateOwnedPet: (petData: OwnedPet) => Promise<void>;
     deleteOwnedPet: (petId: string) => Promise<void>;
@@ -70,7 +70,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         checkUser();
 
         // 1. Safety Timeout - Ensure app loads even if Supabase hangs (Cold Start).
-        // Increased to 20000ms (20s) to allow time for database wake-up on first load.
         const safetyTimeout = setTimeout(() => {
             if (mounted) {
                 setLoading(prevLoading => {
@@ -84,16 +83,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }, 20000);
 
         // 3. Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (mounted) {
                 if (session?.user) {
                     // Only fetch profile if we don't have it or it's a different user
                     if (!currentUser || currentUser.id !== session.user.id) {
                         await fetchProfile(session.user.email!, session.user.id);
                     }
-                } else {
+                } else if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
                     setLoading(false);
+                } else {
+                    // Handle initial load case where session might be null
+                    if (!currentUser) setLoading(false);
                 }
             }
         });
@@ -120,7 +122,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // Self-healing for orphaned users
+                    // Self-healing for orphaned users (common in OAuth first login)
+                    // OAuth providers might not trigger the trigger function immediately or at all if customized
                     const tempUsername = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                     const { error: insertError } = await supabase.from('profiles').insert({
                         id: uid,
@@ -128,6 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         username: tempUsername,
                         role: USER_ROLES.USER,
                         status: USER_STATUS.ACTIVE,
+                        country: 'Perú', // Default country for new OAuth users
                         updated_at: new Date().toISOString()
                     });
 
@@ -139,7 +143,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                             id: uid,
                             email,
                             role: USER_ROLES.USER,
-                            status: USER_STATUS.ACTIVE
+                            status: USER_STATUS.ACTIVE,
+                            country: 'Perú'
                          });
                     }
                 } else {
@@ -149,7 +154,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         id: uid,
                         email,
                         role: USER_ROLES.USER,
-                        status: USER_STATUS.ACTIVE
+                        status: USER_STATUS.ACTIVE,
+                        country: 'Perú'
                     });
                 }
             } else {
@@ -163,6 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     lastName: data.last_name,
                     phone: data.phone,
                     dni: data.dni,
+                    country: data.country || 'Perú', // Default if missing
                     avatarUrl: data.avatar_url,
                     // Parse JSONB columns
                     ownedPets: data.owned_pets || [], 
@@ -173,7 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (err) {
             console.error("Error fatal en fetchProfile:", err);
             // Final fallback
-            setCurrentUser({ id: uid, email, role: USER_ROLES.USER });
+            setCurrentUser({ id: uid, email, role: USER_ROLES.USER, country: 'Perú' });
         } finally {
             setLoading(false);
         }
@@ -190,12 +197,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const loginWithGoogle = async (): Promise<void> => {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+        const { error } = await supabase.auth.signInWithOAuth({ 
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin 
+            }
+        });
         if (error) throw new Error(error.message);
     };
 
     const loginWithApple = async (): Promise<void> => {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
+        const { error } = await supabase.auth.signInWithOAuth({ 
+            provider: 'apple',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
         if (error) throw new Error(error.message);
     };
 
@@ -217,7 +234,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl'>>): Promise<void> => {
+    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl' | 'country'>>): Promise<void> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('No auth session');
         
@@ -227,6 +244,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             last_name: profileData.lastName,
             phone: profileData.phone,
             dni: profileData.dni,
+            country: profileData.country,
             avatar_url: profileData.avatarUrl,
             updated_at: new Date().toISOString(),
         };

@@ -121,6 +121,7 @@ export interface User {
     lastName?: string;
     phone?: string;
     dni?: string;
+    country?: string; // Nuevo campo Pais
     provider?: 'email' | 'google' | 'apple';
     ownedPets?: OwnedPet[];
     savedPetIds?: string[];
@@ -162,4 +163,11 @@ export interface PotentialMatch {
     pet: Pet;
     score: number;
     explanation: string;
+}
+
+export interface BannedIP {
+    id: string;
+    ipAddress: string;
+    reason: string;
+    createdAt: string;
 }

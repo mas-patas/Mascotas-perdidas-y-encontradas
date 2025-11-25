@@ -5,6 +5,8 @@ import { Header } from './Header';
 import { FilterControls } from './FilterControls';
 import { useAuth } from '../contexts/AuthContext';
 import { Notification, PetStatus, AnimalType, PetSize } from '../types';
+import NotificationPermissionBanner from './NotificationPermissionBanner';
+import CompleteProfileModal from './CompleteProfileModal';
 
 interface LayoutProps {
     onReportPet: (status: PetStatus) => void;
@@ -46,6 +48,12 @@ export const Layout: React.FC<LayoutProps> = ({
                 </div>
             )}
             
+            {/* Push Notification Request Banner */}
+            <NotificationPermissionBanner />
+            
+            {/* Incomplete Profile Prompt */}
+            <CompleteProfileModal />
+            
             <Header 
                 onReportPet={onReportPet} 
                 onOpenAdoptionModal={onOpenAdoptionModal}
@@ -66,8 +74,24 @@ export const Layout: React.FC<LayoutProps> = ({
                     onClearFilters={onResetFilters}
                 />
 
-                <main className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
-                    <Outlet />
+                <main className="flex-1 overflow-y-auto flex flex-col scroll-smooth">
+                    <div className="p-4 lg:p-8 flex-grow">
+                        <Outlet />
+                    </div>
+                    {/* Global Footer with Slogan - Updated to Light Purple */}
+                    <footer className="bg-purple-50 text-purple-900 py-8 mt-auto border-t border-purple-100">
+                        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+                            <div className="max-w-lg">
+                                <p className="font-serif italic text-purple-800 text-xs md:text-sm leading-relaxed opacity-80">
+                                    "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERIAN IRSE"
+                                </p>
+                            </div>
+                            <div className="flex flex-col items-center md:items-end text-sm text-purple-700">
+                                <p>&copy; {new Date().getFullYear()} Pets. Todos los derechos reservados.</p>
+                                <p className="mt-1">Hecho con <span className="text-red-500">♥</span> en Perú</p>
+                            </div>
+                        </div>
+                    </footer>
                 </main>
             </div>
         </div>

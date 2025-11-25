@@ -7,6 +7,7 @@ import { XCircleIcon, TrashIcon, UserIcon, WarningIcon, AdminIcon } from './icon
 import StarRating from './StarRating';
 import { useAuth } from '../contexts/AuthContext';
 import { USER_ROLES } from '../constants';
+import { generateUUID } from '../utils/uuid';
 
 interface UserPublicProfileModalProps {
     isOpen: boolean;
@@ -76,13 +77,16 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
         setError('');
 
         try {
+            // We explicitly generate ID and Date to prevent DB constraints from failing silently
             const { error: submitError } = await supabase
                 .from('user_ratings')
                 .insert({
+                    id: generateUUID(),
                     rater_id: currentUser.id,
                     rated_user_id: targetUser.id,
                     rating: newRating,
-                    comment: newComment.trim()
+                    comment: newComment.trim(),
+                    created_at: new Date().toISOString()
                 });
 
             if (submitError) throw submitError;
@@ -92,7 +96,7 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
             setNewComment('');
         } catch (err: any) {
             console.error(err);
-            setError('Error al enviar la calificación. ' + err.message);
+            setError('Error al enviar la calificación: ' + (err.message || 'Intente nuevamente.'));
         } finally {
             setIsSubmitting(false);
         }
@@ -190,9 +194,14 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                                 <button 
                                     type="submit" 
                                     disabled={isSubmitting}
-                                    className="w-full mt-3 bg-brand-secondary text-brand-dark font-bold py-2 rounded-md hover:bg-amber-400 transition-colors text-sm disabled:opacity-50"
+                                    className="w-full mt-3 bg-brand-secondary text-brand-dark font-bold py-2 rounded-md hover:bg-amber-400 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {isSubmitting ? 'Enviando...' : 'Enviar Calificación'}
+                                    {isSubmitting ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-dark"></div>
+                                            <span>Enviando...</span>
+                                        </>
+                                    ) : 'Enviar Calificación'}
                                 </button>
                             </form>
                         </div>

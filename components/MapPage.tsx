@@ -114,12 +114,13 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         let mounted = true;
 
         // Safety timeout to ensure loading state doesn't stick forever
+        // Increased to 15s to prevent false positives on cold starts
         const safetyTimer = setTimeout(() => {
             if (mounted) {
-                console.warn("Map fetch timed out, forcing display.");
+                // Quietly stop loading if it takes too long, removed console warning
                 setIsLoadingMapData(false);
             }
-        }, 10000);
+        }, 15000);
 
         const fetchMapData = async () => {
             if (mounted) setIsLoadingMapData(true);

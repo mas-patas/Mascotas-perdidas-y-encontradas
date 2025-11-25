@@ -2,6 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
+const countries = [
+    "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
+];
+
 const ProfileSetupPage: React.FC = () => {
     const { currentUser, updateUserProfile } = useAuth();
     const [username, setUsername] = useState('');
@@ -9,6 +13,7 @@ const ProfileSetupPage: React.FC = () => {
     const [lastName, setLastName] = useState('');
     const [dni, setDni] = useState('');
     const [phone, setPhone] = useState('');
+    const [country, setCountry] = useState('Perú'); // Default to Peru
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -23,12 +28,13 @@ const ProfileSetupPage: React.FC = () => {
             if (currentUser.lastName) setLastName(currentUser.lastName);
             if (currentUser.dni) setDni(currentUser.dni);
             if (currentUser.phone) setPhone(currentUser.phone);
+            if (currentUser.country) setCountry(currentUser.country);
         }
     }, [currentUser]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const requiredFields = [username.trim(), firstName.trim(), lastName.trim(), dni.trim(), phone.trim()];
+        const requiredFields = [username.trim(), firstName.trim(), lastName.trim(), dni.trim(), phone.trim(), country];
         if (loading || requiredFields.some(field => !field)) {
              setError("Por favor, completa todos los campos obligatorios (*).");
              return;
@@ -54,6 +60,7 @@ const ProfileSetupPage: React.FC = () => {
                 lastName: lastName.trim(),
                 dni: dni.trim(),
                 phone: phone.trim(),
+                country: country,
             });
             // Context will update and AppRouter will redirect automatically
         } catch (err: any) {
@@ -76,7 +83,7 @@ const ProfileSetupPage: React.FC = () => {
                         Completa tu Perfil
                     </h1>
                     <p className="text-gray-500 mt-2">
-                        Necesitamos algunos datos más para crear tu cuenta.
+                        Necesitamos algunos datos más para finalizar tu registro y mejorar la seguridad de la comunidad.
                     </p>
                 </div>
 
@@ -124,20 +131,38 @@ const ProfileSetupPage: React.FC = () => {
                             />
                         </div>
                     </div>
-                     <div>
-                        <label htmlFor="dni" className="block text-sm font-medium text-gray-900">DNI <span className="text-red-500">*</span></label>
-                        <input
-                            id="dni"
-                            type="text"
-                            value={dni}
-                            onChange={(e) => setDni(e.target.value)}
-                            className={inputClass}
-                            placeholder="12345678"
-                            required
-                            pattern="\d{8}"
-                            title="El DNI debe contener 8 dígitos numéricos."
-                        />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="dni" className="block text-sm font-medium text-gray-900">DNI <span className="text-red-500">*</span></label>
+                            <input
+                                id="dni"
+                                type="text"
+                                value={dni}
+                                onChange={(e) => setDni(e.target.value)}
+                                className={inputClass}
+                                placeholder="12345678"
+                                required
+                                pattern="\d{8}"
+                                title="El DNI debe contener 8 dígitos numéricos."
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="country" className="block text-sm font-medium text-gray-900">País <span className="text-red-500">*</span></label>
+                            <select
+                                id="country"
+                                value={country}
+                                onChange={(e) => setCountry(e.target.value)}
+                                className={inputClass}
+                                required
+                            >
+                                {countries.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
+
                      <div>
                         <label htmlFor="phone" className="block text-sm font-medium text-gray-900">Teléfono de Contacto <span className="text-red-500">*</span></label>
                         <input
@@ -152,11 +177,12 @@ const ProfileSetupPage: React.FC = () => {
                             title="El número de teléfono debe tener 9 dígitos y empezar con 9."
                         />
                     </div>
-                    <div>
+                    
+                    <div className="pt-2">
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                         >
                             {loading ? 'Guardando...' : 'Guardar y Continuar'}
                         </button>

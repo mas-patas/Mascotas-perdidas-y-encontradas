@@ -12,6 +12,7 @@ import { formatTime } from '../utils/formatters';
 import { usePets } from '../hooks/usePets';
 import { supabase } from '../services/supabaseClient';
 import UserPublicProfileModal from './UserPublicProfileModal';
+import { sendEvent, trackContactOwner, trackShare } from '../services/analytics';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -313,6 +314,18 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         if (foundPet) {
             setPet(foundPet);
             setIsLoading(false);
+            // Analytics: Track Item View
+            sendEvent('view_item', {
+                currency: foundPet.currency,
+                value: foundPet.reward,
+                items: [{
+                    item_id: foundPet.id,
+                    item_name: foundPet.name,
+                    item_category: foundPet.status,
+                    item_brand: foundPet.breed,
+                    item_variant: foundPet.color
+                }]
+            });
         } else if (id && !propPet && !petsLoading) {
             // Try fetching single pet if not in current list
             setIsLoading(true);
@@ -345,11 +358,29 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                             comments: []
                         };
                         setPet(formatted);
+                        // Analytics
+                        sendEvent('view_item', {
+                            currency: p.currency,
+                            value: p.reward,
+                            items: [{
+                                item_id: p.id,
+                                item_name: p.name,
+                                item_category: p.status,
+                                item_brand: p.breed
+                            }]
+                        });
                     }
                     setIsLoading(false);
                 });
         } else if (propPet) {
             setIsLoading(false);
+            sendEvent('view_item', {
+                items: [{
+                    item_id: propPet.id,
+                    item_name: propPet.name,
+                    item_category: propPet.status
+                }]
+            });
         }
     }, [id, pets, petsLoading, propPet]);
 
@@ -504,6 +535,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                 ...prev,
                 contactRequests: [...(prev.contactRequests || []), currentUser.email]
             }) : prev);
+            // Analytics
+            trackContactOwner(pet.id, 'phone_reveal');
         } catch (error) {
             console.error(error);
         } finally {
@@ -538,6 +571,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         } else {
             shareText = `${pet.status}: ${pet.animalType} en ${pet.location}.`;
         }
+        
+        // Analytics
+        trackShare(platform, 'pet');
     
         if (platform === 'copy') {
              navigator.clipboard.writeText(`${shareText} ${pageUrl}`);
@@ -582,6 +618,18 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         setIsDeleteModalOpen(false);
     };
     
+    const handleStartChatWithAnalytics = (p: Pet) => {
+        onStartChat(p);
+        trackContactOwner(p.id, 'chat');
+    };
+    
+    const onGenerateFlyerWithAnalytics = (p: Pet) => {
+        onGenerateFlyer(p);
+        sendEvent('generate_flyer', {
+            pet_id: p.id
+        });
+    };
+
     const isUnknownAndFoundOrSighted = (pet.status === PET_STATUS.ENCONTRADO || pet.status === PET_STATUS.AVISTADO) && pet.name === 'Desconocido';
 
     let title = pet.name;
@@ -638,7 +686,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     <h2 className="text-2xl lg:text-4xl font-bold text-brand-dark">{title}</h2>
                                     {pet.status === PET_STATUS.PERDIDO && (isOwner || canAdmin) && (
                                         <button
-                                            onClick={() => onGenerateFlyer(pet)}
+                                            onClick={() => onGenerateFlyerWithAnalytics(pet)}
                                             className="flex items-center gap-2 bg-yellow-400 text-gray-900 font-bold py-1 px-3 rounded-lg hover:bg-yellow-500 transition-colors text-xs lg:text-sm shadow-sm whitespace-nowrap"
                                         >
                                             <PrinterIcon />
@@ -743,7 +791,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     <h2 className="text-2xl lg:text-4xl font-bold text-brand-dark">{title}</h2>
                                     {pet.status === PET_STATUS.PERDIDO && (isOwner || canAdmin) && (
                                         <button
-                                            onClick={() => onGenerateFlyer(pet)}
+                                            onClick={() => onGenerateFlyerWithAnalytics(pet)}
                                             className="flex items-center gap-2 bg-yellow-400 text-gray-900 font-bold py-1 px-3 rounded-lg hover:bg-yellow-500 transition-colors text-xs lg:text-sm shadow-sm whitespace-nowrap"
                                         >
                                             <PrinterIcon />
@@ -856,7 +904,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
 
                                 {(!isOwner) && (
                                     <button
-                                        onClick={() => currentUser ? onStartChat(pet) : navigate('/login')}
+                                        onClick={() => currentUser ? handleStartChatWithAnalytics(pet) : navigate('/login')}
                                         className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
                                             currentUser 
                                             ? 'bg-brand-primary text-white hover:bg-brand-dark' 
