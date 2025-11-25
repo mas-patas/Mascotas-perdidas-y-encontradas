@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
-import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon, WarningIcon } from './icons';
+import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon, WarningIcon, VerticalDotsIcon } from './icons';
 import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
@@ -35,9 +35,12 @@ const CommentItem: React.FC<{
     allComments: Comment[];
     onReply: (parentId: string, userName: string) => void;
     onLike: (commentId: string) => void;
+    onReportComment: (commentId: string) => void;
+    onDeleteComment?: (commentId: string) => void;
     currentUser: User | null;
     depth?: number;
-}> = ({ comment, allComments, onReply, onLike, currentUser, depth = 0 }) => {
+    postOwnerEmail?: string;
+}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail }) => {
     // Find replies for this comment
     const replies = allComments.filter(c => c.parentId === comment.id).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
@@ -48,6 +51,21 @@ const CommentItem: React.FC<{
     const dateStr = dateObj.toLocaleDateString();
     const timeStr = formatTime(comment.timestamp);
 
+    // Menu State
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Click outside to close menu
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const handleAction = (action: () => void) => {
         if (!currentUser) {
             alert("Debes iniciar sesión para realizar esta acción.");
@@ -56,21 +74,54 @@ const CommentItem: React.FC<{
         action();
     };
 
+    const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
+    const canDelete = isAdmin || (currentUser?.email === postOwnerEmail) || (currentUser?.email === comment.userEmail);
+
     return (
         <div className={`flex gap-3 items-start ${depth > 0 ? 'ml-8 mt-3 border-l-2 border-gray-100 pl-3' : 'mt-4'}`}>
             <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 flex-shrink-0">
                 {comment.userName.charAt(0).toUpperCase()}
             </div>
-            <div className="flex-1">
-                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+            <div className="flex-1 min-w-0 group relative">
+                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 pr-8 relative">
                     <div className="flex justify-between items-baseline mb-1">
                         <span className="font-semibold text-sm text-brand-dark">@{comment.userName}</span>
                         <span className="text-xs text-gray-500">{dateStr} {timeStr}</span>
                     </div>
-                    <p className="text-sm text-gray-900">{comment.text}</p>
+                    <p className="text-sm text-gray-900 break-words">{comment.text}</p>
+                    
+                    {/* Three Dots Menu */}
+                    {currentUser && (
+                        <div className="absolute top-2 right-2" ref={menuRef}>
+                            <button 
+                                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                            >
+                                <VerticalDotsIcon className="h-4 w-4" />
+                            </button>
+                            {isMenuOpen && (
+                                <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border border-gray-200 py-1 animate-fade-in">
+                                    <button 
+                                        onClick={() => { setIsMenuOpen(false); onReportComment(comment.id); }}
+                                        className="block w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-100"
+                                    >
+                                        Reportar
+                                    </button>
+                                    {canDelete && onDeleteComment && (
+                                        <button 
+                                            onClick={() => { setIsMenuOpen(false); onDeleteComment(comment.id); }}
+                                            className="block w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 font-medium"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 
-                {/* Action Buttons - Visible even if not logged in (will prompt) */}
+                {/* Action Buttons */}
                 <div className="flex items-center gap-4 mt-1 ml-1">
                     <button 
                         onClick={() => handleAction(() => onLike(comment.id))}
@@ -99,8 +150,11 @@ const CommentItem: React.FC<{
                         allComments={allComments} 
                         onReply={onReply} 
                         onLike={onLike}
+                        onReportComment={onReportComment}
+                        onDeleteComment={onDeleteComment}
                         currentUser={currentUser}
                         depth={depth + 1}
+                        postOwnerEmail={postOwnerEmail}
                     />
                 ))}
             </div>
@@ -110,11 +164,14 @@ const CommentItem: React.FC<{
 
 const CommentListAndInput: React.FC<{ 
     petId: string, 
+    postOwnerEmail?: string,
     comments?: Comment[], 
     onAddComment: (text: string, parentId?: string) => Promise<void>, 
     onLikeComment: (petId: string, commentId: string) => void,
+    onReportComment: (commentId: string) => void,
+    onDeleteComment?: (commentId: string) => void,
     currentUser: User | null 
-}> = ({ petId, comments, onAddComment, onLikeComment, currentUser }) => {
+}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser }) => {
     const navigate = useNavigate();
     const [newComment, setNewComment] = useState('');
     const [replyTo, setReplyTo] = useState<{ id: string, userName: string } | null>(null);
@@ -131,7 +188,6 @@ const CommentListAndInput: React.FC<{
                 setReplyTo(null);
             } catch (error) {
                 console.error("Failed to post comment", error);
-                // Error is handled in parent, but we keep input state
             } finally {
                 setIsSubmitting(false);
             }
@@ -164,7 +220,10 @@ const CommentListAndInput: React.FC<{
                             allComments={comments || []} 
                             onReply={handleReply} 
                             onLike={(cid) => onLikeComment(petId, cid)}
+                            onReportComment={onReportComment}
+                            onDeleteComment={onDeleteComment}
                             currentUser={currentUser}
+                            postOwnerEmail={postOwnerEmail}
                         />
                     ))
                 ) : (
@@ -412,6 +471,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         setIsReportModalOpen(true);
     };
 
+    // New handler for comment reports
+    const handleReportComment = (commentId: string) => {
+        handleOpenReportModal('comment', commentId, `Comentario ID: ${commentId.slice(0,6)}...`);
+    };
+
+    // New handler for deleting comments from UI
+    const handleDeleteCommentFromModal = async (commentId: string) => {
+        if (!window.confirm("¿Estás seguro de eliminar este comentario?")) return;
+        try {
+            const { error } = await supabase.from('comments').delete().eq('id', commentId);
+            if (error) throw error;
+        } catch (err: any) {
+            alert("Error al eliminar: " + err.message);
+        }
+    };
+
     const handleReportSubmit = (reason: ReportReason, details: string) => {
         if (reportTarget) {
             onReport(reportTarget.type, reportTarget.id, reason, details);
@@ -436,19 +511,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         }
     };
 
-    const handleContactClick = async () => {
-        if (!currentUser) {
-            navigate('/login');
-            return;
-        }
-        setContactLoading(true);
-        try {
-            await onStartChat(pet);
-        } finally {
-            setContactLoading(false);
-        }
-    };
-    
     const getStatusStyles = () => {
         switch (pet.status) {
             case PET_STATUS.PERDIDO: return 'bg-red-500 text-white';
@@ -461,73 +523,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     };
     
     const canManageStatus = (isOwner || canAdmin) && (pet.status === PET_STATUS.PERDIDO || pet.status === PET_STATUS.ENCONTRADO);
-
-    const generateStoryImage = async () => {
-        return new Promise<string>((resolve, reject) => {
-            // ... (story generation logic) ...
-            if (!pet.imageUrls || pet.imageUrls.length === 0) {
-                return reject('No hay imágenes disponibles');
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = 1080;
-            canvas.height = 1920;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject('No canvas context');
-
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = pet.imageUrls[0];
-
-            img.onload = () => {
-                ctx.fillStyle = pet.status === PET_STATUS.PERDIDO ? '#EF4444' : '#10B981';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                const margin = 80;
-                const cardWidth = canvas.width - (margin * 2);
-                const cardHeight = canvas.height - (margin * 4);
-                const cardY = margin * 2;
-                
-                ctx.fillStyle = '#FFFFFF';
-                ctx.roundRect(margin, cardY, cardWidth, cardHeight, 40);
-                ctx.fill();
-                
-                ctx.fillStyle = pet.status === PET_STATUS.PERDIDO ? '#DC2626' : '#059669';
-                ctx.font = 'bold 80px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(pet.status.toUpperCase(), canvas.width / 2, cardY + 120);
-
-                const imgSize = 800;
-                const imgX = (canvas.width - imgSize) / 2;
-                const imgY = cardY + 160;
-                
-                ctx.save();
-                ctx.beginPath();
-                ctx.roundRect(imgX, imgY, imgSize, imgSize, 20);
-                ctx.clip();
-                ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
-                ctx.restore();
-
-                ctx.fillStyle = '#1F2937';
-                ctx.font = 'bold 90px Arial';
-                ctx.fillText(pet.name, canvas.width / 2, imgY + imgSize + 100);
-
-                ctx.fillStyle = '#4B5563';
-                ctx.font = '50px Arial';
-                ctx.fillText(`${pet.breed} - ${pet.color}`, canvas.width / 2, imgY + imgSize + 180);
-
-                ctx.fillStyle = '#374151';
-                ctx.font = 'bold 40px Arial';
-                ctx.fillText("📍 " + pet.location.substring(0, 30) + (pet.location.length > 30 ? '...' : ''), canvas.width / 2, imgY + imgSize + 280);
-
-                ctx.fillStyle = '#000000';
-                ctx.font = 'bold 50px Arial';
-                ctx.fillText("¡AYÚDAME A VOLVER A CASA!", canvas.width / 2, canvas.height - margin * 3);
-                
-                resolve(canvas.toDataURL('image/png'));
-            };
-            img.onerror = () => reject('Error loading image');
-        });
-    };
 
     const handleShare = async (platform: 'facebook' | 'whatsapp' | 'copy' | 'native_story') => {
         let pageUrl = window.location.href;
@@ -544,33 +539,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
             shareText = `${pet.status}: ${pet.animalType} en ${pet.location}.`;
         }
     
-        if (platform === 'native_story') {
-            try {
-                const dataUrl = await generateStoryImage();
-                const blob = await (await fetch(dataUrl)).blob();
-                const file = new File([blob], "mascota_story.png", { type: "image/png" });
-
-                if (navigator.share && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Historia para Instagram/Facebook',
-                        text: shareText
-                    });
-                } else {
-                    const link = document.createElement('a');
-                    link.href = dataUrl;
-                    link.download = `historia_${pet.name}.png`;
-                    link.click();
-                    alert('La imagen se ha descargado. Puedes subirla manualmente a tus historias.');
-                }
-            } catch (err) {
-                console.error('Error generating story:', err);
-                alert('No se pudo generar la imagen para historias.');
-            }
-            setIsShareModalOpen(false);
-            return;
-        }
-
         if (platform === 'copy') {
              navigator.clipboard.writeText(`${shareText} ${pageUrl}`);
              alert('Enlace copiado al portapapeles');
@@ -653,7 +621,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     petOwner.username.charAt(0).toUpperCase()
                                 )}
                             </div>
-                            <button onClick={() => setViewingPublisher(petOwner)} className="font-bold text-gray-800 hover:underline text-sm">
+                            <button onClick={() => setViewingPublisher(petOwner)} className="font-bold text-gray-800 hover:underline text-sm bg-transparent border-none cursor-pointer">
                                 {petOwner.username}
                             </button>
                          </div>
@@ -991,7 +959,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                 </div>
             </div>
 
-            {/* Modals code ... (Share, Comment, Report, Delete modals remain same) */}
+            {/* Modals code */}
             {isShareModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-end sm:items-center p-0 sm:p-4" onClick={() => setIsShareModalOpen(false)}>
                     <div className="bg-white w-full sm:w-full max-w-sm rounded-t-xl sm:rounded-xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1001,15 +969,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                         </div>
                         
                         <div className="grid grid-cols-4 gap-4 mb-6">
-                             <button onClick={() => handleShare('native_story')} className="flex flex-col items-center gap-2 group">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 p-[2px] group-hover:scale-105 transition-transform">
-                                     <div className="w-full h-full bg-white rounded-full flex items-center justify-center">
-                                        <SparklesIcon />
-                                     </div>
-                                </div>
-                                <span className="text-xs text-center text-gray-600">Instagram Stories</span>
-                            </button>
-                            
+                            {/* Share buttons */}
                             <button onClick={() => handleShare('whatsapp')} className="flex flex-col items-center gap-2 group">
                                 <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
                                     <WhatsAppIcon />
@@ -1027,7 +987,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                             <button onClick={() => handleShare('copy')} className="flex flex-col items-center gap-2 group">
                                 <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 shadow-sm group-hover:bg-gray-300 transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 01-2-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
                                 </div>
                                 <span className="text-xs text-center text-gray-600">Copiar Enlace</span>
@@ -1056,9 +1016,12 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                         <div className="flex-grow overflow-y-auto">
                              <CommentListAndInput 
                                 petId={pet.id}
+                                postOwnerEmail={pet.userEmail}
                                 comments={pet.comments} 
                                 onAddComment={(text, parentId) => onAddComment(pet.id, text, parentId)} 
                                 onLikeComment={onLikeComment}
+                                onReportComment={handleReportComment}
+                                onDeleteComment={handleDeleteCommentFromModal}
                                 currentUser={currentUser}
                             />
                         </div>
@@ -1092,6 +1055,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                     isOpen={!!viewingPublisher}
                     onClose={() => setViewingPublisher(null)}
                     targetUser={viewingPublisher}
+                    onViewAdminProfile={onViewUser}
                 />
             )}
         </>

@@ -8,7 +8,7 @@ export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 export type UserStatus = typeof USER_STATUS[keyof typeof USER_STATUS];
 export type ReportReason = typeof REPORT_REASONS[keyof typeof REPORT_REASONS];
 export type ReportStatus = typeof REPORT_STATUS[keyof typeof REPORT_STATUS];
-export type ReportType = 'post' | 'user';
+export type ReportType = 'post' | 'user' | 'comment';
 export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUS[keyof typeof SUPPORT_TICKET_STATUS];
 export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeof SUPPORT_TICKET_CATEGORIES];
 export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
@@ -47,6 +47,7 @@ export interface SupportTicket {
     assignedTo?: string; // Admin email
     assignmentHistory?: { adminEmail: string; timestamp: string }[];
     response?: string;
+    relatedReportId?: string; // Link to a specific report
 }
 
 export interface Comment {
@@ -85,7 +86,7 @@ export interface Pet {
     createdAt?: string; // ISO String creation date
 }
 
-export type ReportPostSnapshot = Pet;
+export type ReportPostSnapshot = Pet | { text: string }; // Can be a Pet or a Comment text object
 
 export interface Report {
     id: string;

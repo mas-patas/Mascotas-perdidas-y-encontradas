@@ -60,6 +60,7 @@ export const SUPPORT_TICKET_CATEGORIES = {
     ACCOUNT_HELP: 'Ayuda con la Cuenta',
     GENERAL_INQUIRY: 'Consulta General',
     FEEDBACK: 'Sugerencia o Feedback',
+    REPORT_FOLLOWUP: 'Seguimiento de Reporte',
 } as const;
 
 export const CAMPAIGN_TYPES = {

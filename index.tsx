@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -18,8 +19,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
-      retry: 1, // Reduced from 3 to fail faster
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 3000), // Max 3s delay
+      retry: 2, // Increased from 1 to 2 to handle cold starts better
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Increase max delay to 10s
     },
   },
 });
@@ -30,9 +31,11 @@ root.render(
     <HelmetProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <ToastProvider>
               <HashRouter>
                   <App />
               </HashRouter>
+            </ToastProvider>
           </AuthProvider>
         </QueryClientProvider>
     </HelmetProvider>

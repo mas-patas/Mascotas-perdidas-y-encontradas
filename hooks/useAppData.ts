@@ -2,12 +2,14 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
-import { USER_ROLES, USER_STATUS } from '../constants';
+import { USER_ROLES, USER_STATUS, SUPPORT_TICKET_STATUS } from '../constants';
 import type { User, Chat, Report, SupportTicket, Campaign, Notification } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 export const useAppData = () => {
     const { currentUser } = useAuth();
+    const { showToast } = useToast();
     const queryClient = useQueryClient();
 
     // 1. USERS QUERY
@@ -169,7 +171,8 @@ export const useAppData = () => {
                 assignedTo: t.assigned_to,
                 response: t.response,
                 assignmentHistory: t.assignment_history || [],
-                timestamp: t.created_at
+                timestamp: t.created_at,
+                relatedReportId: t.related_report_id // Ensure this is mapped
             }));
         }
     });
@@ -194,7 +197,43 @@ export const useAppData = () => {
                 { event: 'INSERT', schema: 'public', table: 'notifications' },
                 (payload) => {
                     if (payload.new.user_id === currentUser.id) {
+                        // Update cache immediately so red dot appears instantly
+                        queryClient.setQueryData(['notifications', currentUser.id], (old: any) => {
+                            const newNotif = {
+                                id: payload.new.id,
+                                userId: payload.new.user_id,
+                                message: payload.new.message,
+                                link: payload.new.link,
+                                isRead: payload.new.is_read,
+                                timestamp: payload.new.created_at
+                            };
+                            return [newNotif, ...(old || [])];
+                        });
+                        
                         queryClient.invalidateQueries({ queryKey: ['notifications'] });
+                        // UX: Show Toast for new notification
+                        showToast(payload.new.message, 'info');
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'support_tickets' },
+                (payload) => {
+                    // If I am the user who owns the ticket
+                    if (payload.new.user_email === currentUser.email) {
+                        queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
+                        
+                        // UX: Specific toast for Resolution
+                        if (payload.new.status === SUPPORT_TICKET_STATUS.RESOLVED && payload.old.status !== SUPPORT_TICKET_STATUS.RESOLVED) {
+                            showToast(`Tu ticket "${payload.new.subject}" ha sido resuelto.`, 'success');
+                        } else if (payload.new.status !== payload.old.status) {
+                            showToast(`El estado de tu ticket "${payload.new.subject}" ha cambiado a ${payload.new.status}.`, 'info');
+                        }
+                    }
+                    // If I am an admin (refresh list)
+                    if (isAdmin) {
+                        queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
                     }
                 }
             )
@@ -208,19 +247,16 @@ export const useAppData = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [currentUser, queryClient]);
+    }, [currentUser, queryClient, showToast, isAdmin]);
 
     const loading = usersLoading || campaignsLoading || (!!currentUser && (chatsLoading || notificationsLoading));
 
     // Helper Setters
-    // This setter manually updates the cache to allow for immediate UI updates (optimistic),
-    // solving race conditions where navigation happens before refetch completes.
     const createSetter = (key: string) => (val: any) => {
         const isGlobal = ['users', 'campaigns'].includes(key);
         const queryKey = isGlobal ? [key] : [key, currentUser?.id];
 
         queryClient.setQueryData(queryKey, (old: any) => {
-            // Safety check for old data being undefined/null
             const current = old || [];
             if (typeof val === 'function') {
                 return val(current);
@@ -228,7 +264,6 @@ export const useAppData = () => {
             return val;
         });
         
-        // Invalidate to ensure consistency with server in background
         queryClient.invalidateQueries({ queryKey: [key] });
     };
 

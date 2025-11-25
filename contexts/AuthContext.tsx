@@ -70,18 +70,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         checkUser();
 
         // 1. Safety Timeout - Ensure app loads even if Supabase hangs (Cold Start).
-        // Increased to 8000ms to allow time for the database to wake up on first load.
+        // Increased to 20000ms (20s) to allow time for database wake-up on first load.
         const safetyTimeout = setTimeout(() => {
             if (mounted) {
                 setLoading(prevLoading => {
                     if (prevLoading) {
-                        console.warn("Supabase auth check timed out. Forcing app load in public mode.");
+                        console.warn("Supabase auth check timed out (Cold Start potential). Forcing app load in public mode.");
                         return false;
                     }
                     return prevLoading;
                 });
             }
-        }, 8000);
+        }, 20000);
 
         // 3. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {

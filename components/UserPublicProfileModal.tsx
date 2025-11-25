@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
 import type { User, UserRating } from '../types';
-import { XCircleIcon, TrashIcon, UserIcon, WarningIcon } from './icons';
+import { XCircleIcon, TrashIcon, UserIcon, WarningIcon, AdminIcon } from './icons';
 import StarRating from './StarRating';
 import { useAuth } from '../contexts/AuthContext';
 import { USER_ROLES } from '../constants';
@@ -12,9 +12,10 @@ interface UserPublicProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     targetUser: User;
+    onViewAdminProfile?: (user: User) => void;
 }
 
-const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen, onClose, targetUser }) => {
+const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen, onClose, targetUser, onViewAdminProfile }) => {
     const { currentUser } = useAuth();
     const queryClient = useQueryClient();
     const [newRating, setNewRating] = useState(0);
@@ -84,19 +85,14 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                     comment: newComment.trim()
                 });
 
-            if (submitError) {
-                if (submitError.code === '42501' || submitError.message.includes('row-level security')) {
-                    throw new Error('No tienes permisos para calificar. Si estás en modo fantasma, asegúrate de que los admins tengan permiso en la BD.');
-                }
-                throw submitError;
-            }
+            if (submitError) throw submitError;
 
             await queryClient.invalidateQueries({ queryKey: ['ratings', targetUser.id] });
             setNewRating(0);
             setNewComment('');
         } catch (err: any) {
             console.error(err);
-            setError('Error: ' + err.message);
+            setError('Error al enviar la calificación. ' + err.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -132,6 +128,18 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                     <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl">
                         <XCircleIcon />
                     </button>
+                    
+                    {isAdmin && onViewAdminProfile && (
+                        <button 
+                            onClick={() => { onClose(); onViewAdminProfile(targetUser); }}
+                            className="absolute top-4 left-4 text-white/80 hover:text-white flex items-center gap-1 text-xs bg-white/20 px-2 py-1 rounded-full"
+                            title="Ver perfil de administración"
+                        >
+                            <AdminIcon />
+                            <span className="hidden sm:inline">Admin</span>
+                        </button>
+                    )}
+
                     <div className="w-24 h-24 mx-auto bg-white rounded-full p-1 mb-3 shadow-lg overflow-hidden">
                         {targetUser.avatarUrl ? (
                             <img src={targetUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" />

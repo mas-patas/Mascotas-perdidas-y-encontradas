@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Campaign } from '../types';
 import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from '../constants';
-import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon } from './icons';
+import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon, EyeIcon } from './icons';
 import ReportDetailModal from './ReportDetailModal';
 import SupportTicketModal from './SupportTicketModal';
 import CampaignFormModal from './CampaignFormModal';
@@ -25,6 +25,7 @@ interface AdminDashboardProps {
     onSaveCampaign: (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => void;
     onDeleteCampaign: (campaignId: string) => void;
     onNavigate: (path: string) => void;
+    onDeleteComment: (commentId: string) => Promise<void>;
 }
 
 const formatDateSafe = (dateString: string) => {
@@ -132,7 +133,7 @@ const SimpleBarChart: React.FC<{ data: { label: string, value: number }[], title
 };
 
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUser, pets, chats, reports, supportTickets, onUpdateReportStatus, onDeletePet, onUpdateSupportTicket, isAiSearchEnabled, onToggleAiSearch, campaigns, onSaveCampaign, onDeleteCampaign, onNavigate }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUser, pets, chats, reports, supportTickets, onUpdateReportStatus, onDeletePet, onUpdateSupportTicket, isAiSearchEnabled, onToggleAiSearch, campaigns, onSaveCampaign, onDeleteCampaign, onNavigate, onDeleteComment }) => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings'>('dashboard');
     const [statusFilter, setStatusFilter] = useState<PetStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<AnimalType | 'all'>('all');
@@ -261,6 +262,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
         };
     }, [pets, users, chats, reports, supportTickets, campaigns, statusFilter, typeFilter, dateRangeFilter]);
 
+    // ... (Filtered Users logic remains same) ...
     const filteredUsers = useMemo(() => {
         if (!searchQuery) {
             return users;
@@ -360,6 +362,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
     }
 
     const renderDashboard = () => (
+         // ... (Dashboard rendering logic remains same) ...
          <div className="space-y-6">
             <div className="bg-white p-4 rounded-lg shadow-md">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
@@ -601,11 +604,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                             <tr>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Fecha</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Reportado por</th>
-                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Objetivo</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Publicación</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Tipo</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Razón</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Autor</th>
                                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Acción Tomada</th>
+                                <th className="py-3 px-4 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Ver detalles</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 text-gray-900">
@@ -614,10 +618,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                 const reportedUser = users.find(u => u.email === report.reportedEmail);
                                 
                                 const reportedPet = report.type === 'post' ? pets.find(p => p.id === report.targetId) : null;
-                                const petData = reportedPet || report.postSnapshot;
+                                const petData = reportedPet || (report.type === 'post' ? report.postSnapshot as Pet : undefined);
                                 const isDeleted = report.type === 'post' && !reportedPet;
-                                const author = petData ? users.find(u => u.email === petData.userEmail) : null;
+                                const author = reportedUser || (petData && 'userEmail' in petData ? users.find(u => u.email === petData.userEmail) : null);
 
+                                // For comments, find the parent pet to link to
+                                let parentPetForComment: Pet | undefined;
+                                if (report.type === 'comment') {
+                                    parentPetForComment = pets.find(p => p.comments?.some(c => c.id === report.targetId));
+                                }
+
+                                let targetContent: React.ReactNode = `ID: ${report.targetId.slice(0, 6)}...`;
+                                
+                                if (report.type === 'post') {
+                                    if (petData && 'id' in petData) {
+                                        targetContent = (
+                                            <button 
+                                                onClick={() => onNavigate(`/mascota/${petData.id}`)}
+                                                className="text-brand-primary hover:underline text-left"
+                                            >
+                                                {'name' in petData ? petData.name : 'Publicación'}
+                                                {isDeleted && <span className="ml-2 text-xs text-red-600">(Eliminado)</span>}
+                                            </button>
+                                        );
+                                    } else {
+                                        targetContent = <span>Publicación eliminada</span>;
+                                    }
+                                } else if (report.type === 'user' && reportedUser) {
+                                    targetContent = (
+                                        <button onClick={() => onViewUser(reportedUser)} className="text-brand-primary hover:underline">
+                                            {reportedUser.username || reportedUser.email}
+                                        </button>
+                                    );
+                                } else if (report.type === 'comment') {
+                                    // If comment, check if snapshot exists with text
+                                    let text = "Comentario";
+                                    if (report.postSnapshot && 'text' in report.postSnapshot) {
+                                        text = `"${(report.postSnapshot as any).text.substring(0, 20)}..."`;
+                                    }
+                                    
+                                    if (parentPetForComment) {
+                                        targetContent = (
+                                            <button 
+                                                onClick={() => onNavigate(`/mascota/${parentPetForComment!.id}`)}
+                                                className="text-brand-primary hover:underline text-left italic"
+                                                title="Ver en publicación"
+                                            >
+                                                {text} en {parentPetForComment.name}
+                                            </button>
+                                        );
+                                    } else {
+                                        targetContent = <span className="text-gray-600 italic">{text}</span>;
+                                    }
+                                }
+
+                                // Correct context for the modal: if comment, pass the snapshot correctly
+                                const modalPetData = report.type === 'comment' ? report.postSnapshot : petData;
 
                                 return (
                                     <tr key={report.id} className="hover:bg-gray-50">
@@ -626,20 +682,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                             <button onClick={() => reporter && onViewUser(reporter)} className="text-brand-primary hover:underline">{reporter?.username || report.reporterEmail}</button>
                                         </td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">
-                                            {report.type === 'user' && (
-                                                <button onClick={() => reportedUser && onViewUser(reportedUser)} className="text-brand-primary hover:underline">
-                                                    {reportedUser?.username || report.targetId}
-                                                </button>
-                                            )}
-                                            {report.type === 'post' && petData && (
-                                                <button onClick={() => setViewingReportDetail({ report, pet: petData, isDeleted })} className="text-brand-primary hover:underline">
-                                                    {petData.name || `ID: ${report.targetId.slice(0, 6)}...`}
-                                                    {isDeleted && <span className="ml-2 text-xs text-red-600">(Eliminado)</span>}
-                                                </button>
-                                            )}
-                                            {report.type === 'post' && !petData && `ID: ${report.targetId.slice(0, 6)}...`}
+                                            {targetContent}
                                         </td>
-                                        <td className="py-4 px-4 whitespace-nowrap text-sm capitalize">{report.type === 'post' ? 'Publicación' : 'Usuario'}</td>
+                                        <td className="py-4 px-4 whitespace-nowrap text-sm capitalize">
+                                            {report.type === 'post' ? 'Publicación' : report.type === 'user' ? 'Usuario' : 'Comentario'}
+                                        </td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">{report.reason}</td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">
                                             {author ? (
@@ -649,13 +696,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                                             )}
                                         </td>
                                         <td className="py-4 px-4 whitespace-nowrap text-sm">
-                                            <select
-                                                value={report.status}
-                                                onChange={(e) => onUpdateReportStatus(report.id, e.target.value as ReportStatusType)}
-                                                className={`p-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-primary text-xs font-medium ${getReportStatusClass(report.status)}`}
+                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getReportStatusClass(report.status)}`}>
+                                                {report.status}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4 whitespace-nowrap text-sm font-medium">
+                                            <button 
+                                                onClick={() => setViewingReportDetail({ report, pet: modalPetData as Pet, isDeleted })} 
+                                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition-colors"
                                             >
-                                                {Object.values(REPORT_STATUS).map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
+                                                <EyeIcon className="h-4 w-4" /> Ver detalles
+                                            </button>
                                         </td>
                                     </tr>
                                 );
@@ -746,6 +797,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
     };
 
     const renderCampaignsManagement = () => {
+        // ... (Campaign rendering logic remains same) ...
         const handleOpenCreateModal = () => {
             setCampaignToEdit(null);
             setIsCampaignModalOpen(true);
@@ -1029,9 +1081,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, users, onViewUs
                     isOpen={!!viewingReportDetail}
                     onClose={() => setViewingReportDetail(null)}
                     report={viewingReportDetail.report}
-                    pet={viewingReportDetail.pet}
+                    pet={viewingReportDetail.pet as Pet}
                     isDeleted={viewingReportDetail.isDeleted}
                     onDeletePet={onDeletePet}
+                    onUpdateReportStatus={onUpdateReportStatus}
+                    allUsers={users}
+                    onViewUser={onViewUser}
+                    onDeleteComment={onDeleteComment}
                 />
             )}
             {viewingTicket && (

@@ -45,8 +45,7 @@ const StarRating: React.FC<StarRatingProps> = ({
         <div className="flex items-center gap-1" onMouseLeave={handleMouseLeave}>
             {Array.from({ length: maxRating }, (_, i) => i + 1).map((starIndex) => {
                 const isFilled = starIndex <= displayRating;
-                const isHalf = starIndex - 0.5 === displayRating; // Simple half star logic if needed later
-
+                
                 return (
                     <button
                         key={starIndex}

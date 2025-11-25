@@ -16,7 +16,6 @@ interface PetCardProps {
 export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
     const { currentUser, savePet, unsavePet } = useAuth();
     const [imageLoaded, setImageLoaded] = useState(false);
-    const isAdminView = currentUser && ([USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] as UserRole[]).includes(currentUser.role);
     const isSaved = !!currentUser?.savedPetIds?.includes(pet.id);
     
     // Theme logic: Returns subtle background and border colors based on status
@@ -166,7 +165,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
                     </div>
                 </div>
                 
-                {isAdminView && owner?.username && (
+                {currentUser && owner?.username && (
                     <div className="mt-auto pt-2 border-t border-gray-200/50">
                         <p className="text-[10px] text-gray-500">
                             Publicado por: 

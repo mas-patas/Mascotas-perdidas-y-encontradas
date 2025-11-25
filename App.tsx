@@ -7,7 +7,7 @@ import { PetList } from './components/PetList';
 import { ReportPetForm } from './components/ReportPetForm';
 import { PetDetailPage } from './components/PetDetailPage';
 import type { Pet, PetStatus, Chat, User, UserRole, PotentialMatch, UserStatus, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicket, SupportTicketCategory, Campaign, Comment } from './types';
-import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS } from './constants';
+import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
@@ -26,6 +26,7 @@ import CampaignDetailPage from './components/CampaignDetailPage';
 import MapPage from './components/MapPage';
 import { RenewModal } from './components/RenewModal';
 import { StatusCheckModal } from './components/StatusCheckModal';
+import UserPublicProfileModal from './components/UserPublicProfileModal';
 import { supabase } from './services/supabaseClient';
 import { generateUUID } from './utils/uuid';
 
@@ -88,6 +89,10 @@ const App: React.FC = () => {
     const [selectedPetForModal, setSelectedPetForModal] = useState<Pet | null>(null);
     const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
     const [petToStatusCheck, setPetToStatusCheck] = useState<Pet | null>(null);
+    
+    // Public Profile Modal State
+    const [isPublicProfileModalOpen, setIsPublicProfileModalOpen] = useState(false);
+    const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
@@ -315,7 +320,6 @@ const App: React.FC = () => {
         }
     };
 
-    // ... rest of the file (handleRenewPet, handleMarkAsFound, etc. no changes needed)
     const handleRenewPet = async (pet: Pet) => {
         if (!currentUser) return;
         try {
@@ -496,15 +500,36 @@ const App: React.FC = () => {
         if (!currentUser) return;
         try {
             let reportedEmail = '';
+            let postSnapshot: any = undefined;
+
             if (type === 'user') {
                 reportedEmail = targetId;
-            } else {
+            } else if (type === 'post') {
                 const pet = pets.find(p => p.id === targetId);
                 reportedEmail = pet?.userEmail || '';
+                postSnapshot = pet;
+            } else if (type === 'comment') {
+                for (const p of pets) {
+                    const comment = p.comments?.find(c => c.id === targetId);
+                    if (comment) {
+                        reportedEmail = comment.userEmail;
+                        postSnapshot = { text: comment.text };
+                        break;
+                    }
+                }
+                if (!reportedEmail) {
+                    const { data: comment } = await supabase.from('comments').select('user_email, text').eq('id', targetId).single();
+                    if (comment) {
+                        reportedEmail = comment.user_email;
+                        postSnapshot = { text: comment.text };
+                    }
+                }
             }
-            const postSnapshot = type === 'post' ? pets.find(p => p.id === targetId) : undefined;
+
             const newReportId = generateUUID();
             const now = new Date().toISOString();
+            
+            // 1. Create the Report
             const { error } = await supabase.from('reports').insert({
                 id: newReportId,
                 reporter_email: currentUser.email,
@@ -517,7 +542,10 @@ const App: React.FC = () => {
                 post_snapshot: postSnapshot,
                 created_at: now
             });
+            
             if (error) throw error;
+
+            // Update local state for Report immediately
             const newReport: Report = {
                 id: newReportId,
                 reporterEmail: currentUser.email,
@@ -531,16 +559,49 @@ const App: React.FC = () => {
                 postSnapshot
             };
             setReports(prev => [newReport, ...prev]);
+
+            // 2. AUTOMATED: Create a Support Ticket for this report (ALL types)
+            const newTicketId = generateUUID();
+            const targetTypeLabel = type === 'post' ? 'una publicación' : type === 'comment' ? 'un comentario' : 'un usuario';
+            const ticketDescription = `Has enviado un reporte sobre ${targetTypeLabel}. \nDetalles: ${details}`;
+            
+            const { error: ticketError } = await supabase.from('support_tickets').insert({
+                id: newTicketId,
+                user_email: currentUser.email,
+                category: SUPPORT_TICKET_CATEGORIES.REPORT_FOLLOWUP,
+                subject: `Reporte enviado: ${type} - ${reason}`,
+                description: ticketDescription,
+                status: SUPPORT_TICKET_STATUS.PENDING,
+                related_report_id: newReportId, // Link to report
+                created_at: now
+            });
+
+            if (ticketError) {
+                console.error("Error generating support ticket for report:", ticketError);
+            } else {
+                const newTicket: SupportTicket = {
+                    id: newTicketId,
+                    userEmail: currentUser.email,
+                    category: SUPPORT_TICKET_CATEGORIES.REPORT_FOLLOWUP,
+                    subject: `Reporte enviado: ${type} - ${reason}`,
+                    description: ticketDescription,
+                    status: SUPPORT_TICKET_STATUS.PENDING,
+                    timestamp: now,
+                    relatedReportId: newReportId
+                };
+                setSupportTickets(prev => [newTicket, ...prev]);
+            }
+
             const newNotifId = generateUUID();
             await supabase.from('notifications').insert({
                 id: newNotifId,
                 user_id: currentUser.id,
-                message: `Hemos recibido tu reporte. Gracias por ayudar a la comunidad.`,
-                link: 'support',
+                message: `Hemos recibido tu reporte. Puedes ver el seguimiento en Soporte.`,
+                link: 'support', 
                 is_read: false,
                 created_at: now
             });
-            alert('Reporte enviado exitosamente.');
+            alert('Reporte enviado exitosamente. Se ha creado un ticket de soporte para el seguimiento.');
         } catch (err: any) {
             console.error("Error sending report:", err);
             alert("Error al enviar reporte: " + err.message);
@@ -549,18 +610,55 @@ const App: React.FC = () => {
 
     const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => {
         try {
+            // 1. Update the Report Status
             const { error } = await supabase.from('reports').update({ status }).eq('id', reportId);
             if (error) throw error;
             setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
-            const report = reports.find(r => r.id === reportId);
-            if (report) {
-                const reporterId = getUserIdByEmail(report.reporterEmail);
+            
+            // Fetch fresh report to know the type accurately for the link logic
+            const { data: freshReport } = await supabase
+                .from('reports')
+                .select('type, reporter_email')
+                .eq('id', reportId)
+                .single();
+            
+            // 2. AUTOMATED: Update the linked Support Ticket if it exists
+            let automatedResponse = '';
+            
+            if (status === REPORT_STATUS.INVALID) {
+                automatedResponse = "Gracias por tu reporte. Tras revisarlo detenidamente, hemos determinado que el contenido no infringe las normas y políticas actuales. Por lo tanto, no se tomarán acciones adicionales en este momento. Agradecemos tu colaboración para mantener la comunidad segura.";
+            } else if (status === REPORT_STATUS.ELIMINATED) {
+                automatedResponse = "Gracias por tu reporte. Hemos revisado el contenido reportado y confirmado que incumple nuestras normas comunitarias. Se ha procedido a su eliminación inmediata. Gracias por ayudarnos a mantener un ambiente seguro.";
+            }
+
+            // If there is an automated response needed, update the linked ticket
+            if (automatedResponse) {
+                const { error: ticketUpdateError } = await supabase
+                    .from('support_tickets')
+                    .update({ 
+                        status: SUPPORT_TICKET_STATUS.RESOLVED,
+                        response: automatedResponse,
+                    })
+                    .eq('related_report_id', reportId);
+                
+                if (ticketUpdateError) console.error("Failed to auto-update ticket:", ticketUpdateError);
+                
+                // Optimistic update for tickets list
+                setSupportTickets(prev => prev.map(t => 
+                    t.relatedReportId === reportId 
+                        ? { ...t, status: SUPPORT_TICKET_STATUS.RESOLVED, response: automatedResponse } 
+                        : t
+                ));
+            }
+
+            if (freshReport) {
+                const reporterId = getUserIdByEmail(freshReport.reporter_email);
                 if (reporterId) {
                     const newNotifId = generateUUID();
                     await supabase.from('notifications').insert({
                         id: newNotifId,
                         user_id: reporterId,
-                        message: `El estado de tu reporte ha cambiado a: ${status}`,
+                        message: `El estado de tu reporte ha cambiado a: ${status}. Revisa tus tickets de soporte.`,
                         link: 'support',
                         is_read: false,
                         created_at: new Date().toISOString()
@@ -717,9 +815,14 @@ const App: React.FC = () => {
         }
     };
 
-    const handleViewUser = (user: User) => {
+    const handleViewAdminUser = (user: User) => {
         setSelectedUserProfile(user);
         setIsUserDetailModalOpen(true);
+    };
+
+    const handleViewPublicProfile = (user: User) => {
+        setPublicProfileUser(user);
+        setIsPublicProfileModalOpen(true);
     };
 
     const handleMarkNotificationAsRead = async (id: string) => {
@@ -865,6 +968,21 @@ const App: React.FC = () => {
         }
     };
 
+    const handleDeleteComment = async (commentId: string) => {
+        try {
+            const { error } = await supabase.from('comments').delete().eq('id', commentId);
+            if (error) throw error;
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            // Also invalidate user profiles in case they have myPets cached with comments
+            if (currentUser) {
+                queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+            }
+        } catch (err: any) {
+            console.error("Error deleting comment:", err);
+            alert("Error al eliminar comentario: " + err.message);
+        }
+    };
+
     const onNotificationClick = (notification: any) => {
         const link = notification.link;
         if (typeof link === 'object' && link.type === 'pet-renew') {
@@ -947,7 +1065,7 @@ const App: React.FC = () => {
                         <PetList
                             pets={pets}
                             users={users}
-                            onViewUser={handleViewUser}
+                            onViewUser={handleViewPublicProfile}
                             filters={filters}
                             onNavigate={(path) => navigate(path)} 
                             onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))}
@@ -970,7 +1088,7 @@ const App: React.FC = () => {
                             onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }}
                             onUpdateStatus={handleUpdatePetStatus}
                             users={users}
-                            onViewUser={handleViewUser}
+                            onViewUser={handleViewPublicProfile}
                             onReport={handleReport}
                             onRecordContactRequest={handleRecordContactRequest}
                             onAddComment={handleAddComment}
@@ -992,7 +1110,7 @@ const App: React.FC = () => {
                                     setIsReportModalOpen(true);
                                 }}
                                 onNavigate={(path) => navigate(path)}
-                                onViewUser={handleViewUser}
+                                onViewUser={handleViewPublicProfile}
                                 onRenewPet={(pet) => setPetToRenew(pet)}
                             />
                         </ProtectedRoute>
@@ -1044,7 +1162,7 @@ const App: React.FC = () => {
                             <AdminDashboard
                                 onBack={() => navigate('/')}
                                 users={users}
-                                onViewUser={handleViewUser}
+                                onViewUser={handleViewAdminUser}
                                 pets={pets}
                                 chats={chats}
                                 reports={reports}
@@ -1058,6 +1176,7 @@ const App: React.FC = () => {
                                 onSaveCampaign={handleSaveCampaign}
                                 onDeleteCampaign={handleDeleteCampaign}
                                 onNavigate={(path) => navigate(path)}
+                                onDeleteComment={handleDeleteComment}
                             />
                         </ProtectedRoute>
                     } />
@@ -1067,6 +1186,7 @@ const App: React.FC = () => {
                             <SupportPage
                                 currentUser={currentUser!}
                                 userTickets={supportTickets.filter(t => t.userEmail === currentUser?.email)}
+                                userReports={reports.filter(r => r.reporterEmail === currentUser?.email)}
                                 onAddTicket={handleAddSupportTicket}
                                 onBack={() => navigate('/')}
                             />
@@ -1179,7 +1299,7 @@ const App: React.FC = () => {
                          }
                     }}
                     onGhostLogin={ghostLogin}
-                    onViewUser={handleViewUser}
+                    onViewUser={handleViewAdminUser}
                 />
             )}
 
@@ -1198,6 +1318,15 @@ const App: React.FC = () => {
                     onClose={() => setPetToStatusCheck(null)}
                     onConfirmFound={handleMarkAsFound}
                     onKeepLooking={handleKeepLooking}
+                />
+            )}
+
+            {isPublicProfileModalOpen && publicProfileUser && (
+                <UserPublicProfileModal
+                    isOpen={isPublicProfileModalOpen}
+                    onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }}
+                    targetUser={publicProfileUser}
+                    onViewAdminProfile={handleViewAdminUser}
                 />
             )}
         </>

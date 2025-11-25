@@ -139,9 +139,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
             });
 
             try {
-                // Add timeout to prevent infinite hanging on cold starts
+                // Add timeout to prevent infinite hanging on cold starts (Increased to 90s)
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Dashboard request timed out')), 12000)
+                    setTimeout(() => reject(new Error('Dashboard request timed out')), 90000)
                 );
 
                 const resultsPromise = Promise.all(promises);
@@ -166,9 +166,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
 
                 return { data: enriched, nextCursor: undefined }; // No next cursor for mixed dashboard
             } catch (error) {
-                console.warn("Warning: Dashboard fetch issue (non-critical):", error);
-                // Return empty data instead of crashing the app so the user can still navigate
-                return { data: [], nextCursor: undefined };
+                console.error("Dashboard fetch failed:", error);
+                // Throw error to let React Query handle retry and show Error UI
+                throw error;
             }
 
         } else {
@@ -193,9 +193,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
             query = query.order('created_at', { ascending: false }).range(from, to);
 
             try {
-                // Explicit timeout race
+                // Explicit timeout race (Increased to 90s)
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('List request timed out')), 12000)
+                    setTimeout(() => reject(new Error('List request timed out')), 90000)
                 );
 
                 const queryPromise = query.then(({ data, count, error }) => {
@@ -208,8 +208,9 @@ export const usePets = ({ filters }: UsePetsProps) => {
                 const enriched = await enrichPets(data || []);
                 return { data: enriched, nextCursor: (from + (data?.length || 0) < (count || 0)) ? pageParam + 1 : undefined };
             } catch (error) {
-                console.warn("Warning: List fetch issue:", error);
-                return { data: [], nextCursor: undefined };
+                console.error("List fetch failed:", error);
+                // Throw error to let React Query handle retry
+                throw error;
             }
         }
     };
