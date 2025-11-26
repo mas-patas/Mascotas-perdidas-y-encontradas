@@ -4,13 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet, UserRating } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon } from './icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
 import { uploadImage } from '../utils/imageUtils';
 import { supabase } from '../services/supabaseClient';
 import StarRating from './StarRating';
+import GamificationBadge from './GamificationBadge';
+import GamificationDashboard from './GamificationDashboard';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -32,6 +34,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet, currentUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
+    const [isDashboardOpen, setIsDashboardOpen] = useState(false);
     const [editingOwnedPet, setEditingOwnedPet] = useState<OwnedPet | null>(null);
     const [viewingOwnedPet, setViewingOwnedPet] = useState<OwnedPet | null>(null);
     const [petToDelete, setPetToDelete] = useState<OwnedPet | null>(null);
@@ -121,6 +124,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         const sum = myRatings.reduce((acc, curr) => acc + curr.rating, 0);
         return (sum / myRatings.length).toFixed(1);
     }, [myRatings]);
+
+    // --- GAMIFICATION SCORE CALCULATION ---
+    const gamificationPoints = useMemo(() => {
+        // 15 pts per report
+        const reportPoints = myReportedPets.length * 15;
+        // 10 pts per rating received
+        const ratingCountPoints = myRatings.length * 10;
+        // 20 pts per star average (max 100)
+        const qualityPoints = Number(averageRating) * 20;
+        
+        return Math.round(reportPoints + ratingCountPoints + qualityPoints);
+    }, [myReportedPets.length, myRatings.length, averageRating]);
 
     // Use the fetched data if available, otherwise fallback to props (though props filter out expired)
     const displayedReportedPets = myReportedPets.length > 0 || isLoadingMyPets ? myReportedPets : propReportedPets;
@@ -305,32 +320,49 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center md:flex-row md:items-start gap-6">
-                        <div className="relative">
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover shadow-md" />
-                            ) : (
-                                <div className="w-32 h-32 rounded-full bg-brand-primary text-white flex items-center justify-center text-5xl font-bold shadow-md">
-                                    {(user.firstName || '?').charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                        </div>
-                        <div className="text-center md:text-left space-y-2 text-gray-600">
-                            <p><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
-                            <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
-                            <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
-                            {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
-                            {user.country && <p><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
-                            
-                            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-3xl font-bold text-gray-800">{averageRating}</span>
-                                    <div className="flex flex-col">
-                                        <StarRating rating={Number(averageRating)} size="sm" />
-                                        <span className="text-xs text-gray-500">{myRatings.length} calificaciones</span>
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* User Info Side */}
+                        <div className="flex-1 flex flex-col md:flex-row md:items-start gap-6">
+                            <div className="relative">
+                                {user.avatarUrl ? (
+                                    <img src={user.avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover shadow-md" />
+                                ) : (
+                                    <div className="w-32 h-32 rounded-full bg-brand-primary text-white flex items-center justify-center text-5xl font-bold shadow-md">
+                                        {(user.firstName || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-center md:text-left space-y-2 text-gray-600">
+                                <p><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
+                                <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
+                                <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
+                                {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                                {user.country && <p><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
+                                
+                                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-3xl font-bold text-gray-800">{averageRating}</span>
+                                        <div className="flex flex-col">
+                                            <StarRating rating={Number(averageRating)} size="sm" />
+                                            <span className="text-xs text-gray-500">{myRatings.length} calificaciones</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Gamification Side */}
+                        <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center min-w-[220px] shadow-sm">
+                            <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">Insignia de Comunidad</h4>
+                            <GamificationBadge points={gamificationPoints} size="lg" showProgress={true} />
+                            
+                            <button 
+                                onClick={() => setIsDashboardOpen(true)}
+                                className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs uppercase tracking-wide py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            >
+                                <TrophyIcon className="h-4 w-4" />
+                                Ver Doggy Dashboard
+                            </button>
                         </div>
                     </div>
                 )}
@@ -508,6 +540,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         setViewingOwnedPet(null);
                         onReportOwnedPetAsLost(pet);
                     }}
+                />
+            )}
+
+            {isDashboardOpen && (
+                <GamificationDashboard
+                    user={user}
+                    currentPoints={gamificationPoints}
+                    userReportedPets={displayedReportedPets}
+                    onClose={() => setIsDashboardOpen(false)}
                 />
             )}
 

@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useRef } from 'react';
 import type { User, OwnedPet, UserRole, UserStatus } from '../types';
 import { USER_ROLES, USER_STATUS } from '../constants';
 import { supabase } from '../services/supabaseClient';
@@ -41,16 +41,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [isGhosting, setIsGhosting] = useState<User | null>(null);
+    
+    // Ref to track if component is mounted
+    const mountedRef = useRef(true);
+
+    // --- KEEP-ALIVE MECHANISM ---
+    useEffect(() => {
+        mountedRef.current = true;
+        const pingSupabase = async () => {
+            await supabase.auth.getSession();
+        };
+        const intervalId = setInterval(pingSupabase, 240000);
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                pingSupabase();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            mountedRef.current = false;
+            clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     useEffect(() => {
-        let mounted = true;
-
-        const checkUser = async () => {
+        const initAuth = async () => {
             try {
-                // Attempt to get session
-                const { data: { session } } = await supabase.auth.getSession();
+                // Race condition: 
+                // If Supabase is cold, getSession might take long. 
+                // We race it against a timeout to ensure the app loads for guests.
+                const sessionPromise = supabase.auth.getSession();
+                const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) => 
+                    setTimeout(() => reject(new Error('Auth timeout')), 8000)
+                );
+
+                const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
                 
-                if (mounted) {
+                if (mountedRef.current) {
                     if (session?.user) {
                         await fetchProfile(session.user.email!, session.user.id);
                     } else {
@@ -59,57 +87,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
                 }
             } catch (error) {
-                console.error("Error checking session:", error);
-                if (mounted) {
+                // Silent recovery: treat as guest if timeout or error
+                console.log("Auth init info: Defaulting to guest mode due to timeout or network.");
+                if (mountedRef.current) {
                     setCurrentUser(null);
                     setLoading(false);
                 }
             }
         };
 
-        checkUser();
+        initAuth();
 
-        // 1. Safety Timeout - Ensure app loads even if Supabase hangs (Cold Start).
-        const safetyTimeout = setTimeout(() => {
-            if (mounted) {
-                setLoading(prevLoading => {
-                    if (prevLoading) {
-                        console.warn("Supabase auth check timed out (Cold Start potential). Forcing app load in public mode.");
-                        return false;
-                    }
-                    return prevLoading;
-                });
-            }
-        }, 20000);
-
-        // 3. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (mounted) {
+            if (mountedRef.current) {
                 if (session?.user) {
-                    // Only fetch profile if we don't have it or it's a different user
                     if (!currentUser || currentUser.id !== session.user.id) {
-                        await fetchProfile(session.user.email!, session.user.id);
+                        // We don't await here to avoid blocking UI on auth state change
+                        fetchProfile(session.user.email!, session.user.id);
                     }
                 } else if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
                     setLoading(false);
                 } else {
-                    // Handle initial load case where session might be null
+                    // Fallback
                     if (!currentUser) setLoading(false);
                 }
             }
         });
 
         return () => {
-            mounted = false;
-            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
         };
     }, []);
 
     const fetchProfile = async (email: string, uid: string, retryCount = 0) => {
+        // Stop retrying after 3 attempts
         if (retryCount > 2) {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
             return;
         }
 
@@ -122,8 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // Self-healing for orphaned users (common in OAuth first login)
-                    // OAuth providers might not trigger the trigger function immediately or at all if customized
+                    // Profile missing (Self-healing for new OAuth users)
                     const tempUsername = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                     const { error: insertError } = await supabase.from('profiles').insert({
                         id: uid,
@@ -131,25 +144,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         username: tempUsername,
                         role: USER_ROLES.USER,
                         status: USER_STATUS.ACTIVE,
-                        country: 'Perú', // Default country for new OAuth users
+                        country: 'Perú',
                         updated_at: new Date().toISOString()
                     });
 
                     if (!insertError) {
+                        // Retry fetch after creating profile
                         return fetchProfile(email, uid, retryCount + 1);
-                    } else {
-                         // Even if self-healing fails, provide basic object so app works
-                         setCurrentUser({
-                            id: uid,
-                            email,
-                            role: USER_ROLES.USER,
-                            status: USER_STATUS.ACTIVE,
-                            country: 'Perú'
-                         });
                     }
-                } else {
-                    // Error accessing profile (e.g. network), fall back to session data
-                    console.error("Profile fetch error:", error);
+                }
+                
+                // If we can't get the profile, we create a minimal user object from auth data
+                // This ensures the user is still logged in even if profile fetch fails
+                console.warn("Using fallback profile data due to error:", error.message);
+                if (mountedRef.current) {
                     setCurrentUser({
                         id: uid,
                         email,
@@ -169,20 +177,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     lastName: data.last_name,
                     phone: data.phone,
                     dni: data.dni,
-                    country: data.country || 'Perú', // Default if missing
+                    country: data.country || 'Perú',
                     avatarUrl: data.avatar_url,
-                    // Parse JSONB columns
                     ownedPets: data.owned_pets || [], 
                     savedPetIds: data.saved_pet_ids || []
                 };
-                setCurrentUser(user);
+                if (mountedRef.current) setCurrentUser(user);
             }
         } catch (err) {
-            console.error("Error fatal en fetchProfile:", err);
-            // Final fallback
-            setCurrentUser({ id: uid, email, role: USER_ROLES.USER, country: 'Perú' });
+            console.error("Fetch profile exception:", err);
+            if (mountedRef.current) {
+                setCurrentUser({ id: uid, email, role: USER_ROLES.USER, country: 'Perú' });
+            }
         } finally {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
     };
 
@@ -217,12 +225,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = async () => {
-        // Optimistic logout: Clear state immediately
         setCurrentUser(null);
         setIsGhosting(null);
         localStorage.removeItem('ghostingAdmin');
         
-        // Force redirect immediately
         if (window.location.hash !== '#/' && window.location.hash !== '') {
             window.location.hash = '/';
         }
@@ -266,7 +272,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setCurrentUser(prev => prev ? { ...prev, ...profileData } : null);
     };
 
-    // Owned Pets: Stored as JSONB in 'owned_pets' column in 'profiles'
     const addOwnedPet = async (petData: Omit<OwnedPet, 'id'>) => {
         if (!currentUser) return;
         
@@ -310,7 +315,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setCurrentUser(prev => prev ? { ...prev, ownedPets: updatedOwnedPets } : null);
     };
 
-    // Saved Pets: Stored as TEXT[] array in 'saved_pet_ids' column in 'profiles'
     const savePet = async (petId: string) => {
         if (!currentUser) return;
         
@@ -388,3 +392,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         </AuthContext.Provider>
     );
 };
+    

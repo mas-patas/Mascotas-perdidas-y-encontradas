@@ -36,6 +36,7 @@ import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
 import { usePets } from './hooks/usePets';
 import { sendPageView, trackPetReunited, trackReportPet } from './services/analytics';
+import { logActivity, POINTS_CONFIG } from './services/gamificationService';
 
 // Stable empty array to prevent hook dependency loops
 const EMPTY_PETS_ARRAY: Pet[] = [];
@@ -235,10 +236,13 @@ const App: React.FC = () => {
             });
             if (error) throw error;
             
-            // Analytics
+            // Analytics & Gamification
             const locationParts = petData.location.split(',').map((s: string) => s.trim());
             const dept = locationParts[locationParts.length - 1] || 'Unknown';
             trackReportPet(petData.status, petData.animalType, dept);
+            
+            // Log Activity for Points
+            await logActivity(currentUser.id, 'report_pet', POINTS_CONFIG.REPORT_PET, { petId: newPetId, status: petData.status });
 
             queryClient.invalidateQueries({ queryKey: ['pets'] });
             queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
@@ -270,8 +274,11 @@ const App: React.FC = () => {
     const handleMarkAsFound = async (pet: Pet) => {
         try { 
             await supabase.from('pets').update({ status: PET_STATUS.REUNIDO }).eq('id', pet.id);
-            // Analytics
+            // Analytics & Gamification
             trackPetReunited(pet.id);
+            if (currentUser) {
+                await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: pet.id });
+            }
             
             queryClient.invalidateQueries({ queryKey: ['pets'] }); 
             if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
@@ -281,7 +288,18 @@ const App: React.FC = () => {
     };
     const handleKeepLooking = () => { setPetToStatusCheck(null); };
     const handleDeletePet = async (petId: string) => { try { await supabase.from('pets').delete().eq('id', petId); queryClient.invalidateQueries({ queryKey: ['pets'] }); if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); navigate('/'); } catch(e:any){ alert(e.message); } };
-    const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { try { await supabase.from('pets').update({ status }).eq('id', petId); queryClient.invalidateQueries({ queryKey: ['pets'] }); if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); } catch(e:any){ alert(e.message); } };
+    const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { 
+        try { 
+            await supabase.from('pets').update({ status }).eq('id', petId); 
+            
+            if (status === PET_STATUS.REUNIDO && currentUser) {
+                 await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: petId });
+            }
+
+            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
+            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
+        } catch(e:any){ alert(e.message); } 
+    };
     
     // ... (Admin Handlers) ...
     const handleUpdateUserStatus = async (email: string, status: UserStatus) => { try { await supabase.from('profiles').update({ status }).eq('email', email); setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u)); } catch(e:any){ alert(e.message); } };
@@ -351,6 +369,12 @@ const App: React.FC = () => {
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if(!currentUser) return;
         await supabase.from('comments').insert({ id: generateUUID(), pet_id: petId, user_email: currentUser.email, user_name: currentUser.username||'User', text, parent_id: parentId });
+        
+        // Force invalidate to speed up UI sync if realtime is slow
+        queryClient.invalidateQueries({ queryKey: ['pets'] });
+
+        // Log Activity
+        await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
     };
     const handleLikeComment = async (petId: string, commentId: string) => {
         if(!currentUser) return;

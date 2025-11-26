@@ -149,6 +149,7 @@ export interface Message {
     senderEmail: string;
     text: string;
     timestamp: string;
+    isUnread?: boolean; // Helper for UI
 }
 
 export interface Chat {
@@ -170,4 +171,39 @@ export interface BannedIP {
     ipAddress: string;
     reason: string;
     createdAt: string;
+}
+
+export interface Mission {
+    id: string;
+    title: string;
+    description: string;
+    points: number;
+    isCompleted: boolean;
+    icon: 'login' | 'share' | 'comment' | 'report';
+}
+
+export interface ActivityLog {
+    id: string;
+    userId: string;
+    actionType: 'report_pet' | 'comment_added' | 'pet_reunited' | 'daily_login' | 'share_post';
+    points: number;
+    createdAt: string;
+    details?: any;
+}
+
+export interface Reward {
+    id: string;
+    title: string;
+    description: string;
+    cost: number;
+    icon: string;
+    actionType: 'boost_post' | 'urgent_badge' | 'frame';
+}
+
+export interface LeaderboardEntry {
+    user_id: string;
+    username: string;
+    avatar_url: string;
+    total_points: number;
+    rank: number;
 }

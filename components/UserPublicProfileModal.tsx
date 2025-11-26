@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
 import type { User, UserRating } from '../types';
@@ -8,6 +8,7 @@ import StarRating from './StarRating';
 import { useAuth } from '../contexts/AuthContext';
 import { USER_ROLES } from '../constants';
 import { generateUUID } from '../utils/uuid';
+import GamificationBadge, { getLevelFromPoints } from './GamificationBadge';
 
 interface UserPublicProfileModalProps {
     isOpen: boolean;
@@ -55,11 +56,36 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
         }
     });
 
+    // Fetch User's Reported Pets (for points calculation)
+    const { data: userReportsCount = 0 } = useQuery({
+        queryKey: ['publicUserReportsCount', targetUser.id],
+        enabled: !!targetUser.id && isOpen,
+        queryFn: async () => {
+            const { count, error } = await supabase
+                .from('pets')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', targetUser.id);
+            if (error) return 0;
+            return count || 0;
+        }
+    });
+
     const averageRating = useMemo(() => {
         if (ratings.length === 0) return 0;
         const sum = ratings.reduce((acc, curr) => acc + curr.rating, 0);
         return (sum / ratings.length).toFixed(1);
     }, [ratings]);
+
+    // --- GAMIFICATION SCORE CALCULATION ---
+    const gamificationPoints = useMemo(() => {
+        const reportPoints = userReportsCount * 15;
+        const ratingCountPoints = ratings.length * 10;
+        const qualityPoints = Number(averageRating) * 20;
+        return Math.round(reportPoints + ratingCountPoints + qualityPoints);
+    }, [userReportsCount, ratings.length, averageRating]);
+
+    // Get Dynamic Level Info for Gradient
+    const currentLevel = useMemo(() => getLevelFromPoints(gamificationPoints), [gamificationPoints]);
 
     const handleSubmitRating = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -77,7 +103,6 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
         setError('');
 
         try {
-            // We explicitly generate ID and Date to prevent DB constraints from failing silently
             const { error: submitError } = await supabase
                 .from('user_ratings')
                 .insert({
@@ -127,16 +152,16 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 
-                {/* Header Profile Info */}
-                <div className="p-6 bg-brand-primary text-white rounded-t-xl relative text-center">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl">
+                {/* Header Profile Info - Light Purple Background */}
+                <div className="p-6 bg-purple-100 rounded-t-xl relative pb-8 text-center">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-purple-400 hover:text-purple-700 text-2xl">
                         <XCircleIcon />
                     </button>
                     
                     {isAdmin && onViewAdminProfile && (
                         <button 
                             onClick={() => { onClose(); onViewAdminProfile(targetUser); }}
-                            className="absolute top-4 left-4 text-white/80 hover:text-white flex items-center gap-1 text-xs bg-white/20 px-2 py-1 rounded-full"
+                            className="absolute top-4 left-4 text-purple-600 hover:text-purple-900 flex items-center gap-1 text-xs bg-white px-2 py-1 rounded-full shadow-sm"
                             title="Ver perfil de administración"
                         >
                             <AdminIcon />
@@ -144,35 +169,50 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                         </button>
                     )}
 
-                    <div className="w-24 h-24 mx-auto bg-white rounded-full p-1 mb-3 shadow-lg overflow-hidden">
-                        {targetUser.avatarUrl ? (
-                            <img src={targetUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" />
-                        ) : (
-                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-3xl rounded-full">
-                                {(targetUser.firstName || '?').charAt(0).toUpperCase()}
+                    <div className="flex flex-col items-center space-y-3">
+                        {/* Avatar */}
+                        <div className="w-24 h-24 bg-white rounded-full p-1 shadow-md overflow-hidden">
+                            {targetUser.avatarUrl ? (
+                                <img src={targetUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                                <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-3xl rounded-full">
+                                    {(targetUser.firstName || '?').charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* User Info - Dark Text for Contrast */}
+                        <div>
+                            <h2 className="text-2xl font-black text-purple-900">@{targetUser.username || 'Usuario'}</h2>
+                            <p className="text-purple-700 text-sm font-medium">{targetUser.firstName} {targetUser.lastName}</p>
+                        </div>
+
+                        {/* Badge Section - In between Name and Score */}
+                        <div className="py-2 transform scale-110">
+                            <GamificationBadge points={gamificationPoints} size="md" showProgress={false} />
+                        </div>
+
+                        {/* Score Card - Dynamic Gradient based on Level */}
+                        <div className={`flex flex-col items-center gap-1 bg-gradient-to-r ${currentLevel.gradient} text-white px-8 py-3 rounded-xl shadow-lg w-full max-w-[200px] transform hover:scale-105 transition-transform`}>
+                            <div className="flex items-center gap-2">
+                                <span className="text-4xl font-black drop-shadow-md">{averageRating}</span>
+                                <div className="flex flex-col items-start">
+                                    <StarRating rating={1} size="md" maxRating={1} />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Promedio</span>
+                                </div>
                             </div>
-                        )}
-                    </div>
-                    <h2 className="text-2xl font-bold">@{targetUser.username || 'Usuario'}</h2>
-                    <p className="text-white/80 text-sm">{targetUser.firstName} {targetUser.lastName}</p>
-                    
-                    <div className="mt-4 flex flex-col items-center justify-center">
-                        <div className="flex items-center gap-2 bg-white/10 px-4 py-1 rounded-full backdrop-blur-sm">
-                            <span className="text-3xl font-bold">{averageRating}</span>
-                            <div className="flex flex-col items-start">
-                                <StarRating rating={Number(averageRating)} size="sm" />
-                                <span className="text-xs opacity-80">{ratings.length} opiniones</span>
-                            </div>
+                            <div className="w-full h-[1px] bg-white/30 my-1"></div>
+                            <span className="text-xs font-medium opacity-90">{ratings.length} opiniones</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+                <div className="flex-1 overflow-y-auto bg-white p-4 pt-6">
                     
                     {/* Rating Form */}
                     {!isOwnProfile && !hasRated && currentUser && (
-                        <div className="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200">
+                        <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-6 border border-gray-200">
                             <h3 className="font-bold text-gray-800 mb-2 text-sm">Calificar a este usuario</h3>
                             {error && (
                                 <div className="bg-red-50 border-l-4 border-red-500 p-2 mb-3 flex items-start gap-2">
@@ -208,16 +248,18 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                     )}
 
                     {/* Feedback List */}
-                    <h3 className="font-bold text-gray-700 mb-3 pl-1">Opiniones Recientes</h3>
+                    <h3 className="font-bold text-gray-700 mb-3 pl-1 border-b pb-2">Opiniones Recientes</h3>
                     
                     {isLoading ? (
                         <div className="text-center py-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary mx-auto"></div></div>
                     ) : ratings.length === 0 ? (
-                        <p className="text-center text-gray-500 text-sm py-4 italic">Este usuario aún no tiene calificaciones.</p>
+                        <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed">
+                            <p className="text-gray-500 text-sm italic">Este usuario aún no tiene calificaciones.</p>
+                        </div>
                     ) : (
                         <div className="space-y-3">
                             {ratings.map(rating => (
-                                <div key={rating.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 relative group">
+                                <div key={rating.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 relative group hover:bg-gray-50 transition-colors">
                                     {isAdmin && (
                                         <button 
                                             onClick={() => handleDeleteRating(rating.id)}
@@ -229,21 +271,23 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                                     )}
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
                                                 {rating.raterAvatar ? (
                                                     <img src={rating.raterAvatar} alt="avatar" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <UserIcon className="w-full h-full p-1 text-gray-500" />
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                                        <UserIcon className="h-4 w-4" />
+                                                    </div>
                                                 )}
                                             </div>
-                                            <span className="font-semibold text-sm text-gray-800">@{rating.raterName}</span>
+                                            <div>
+                                                <span className="font-semibold text-sm text-gray-800 block leading-none">@{rating.raterName}</span>
+                                                <span className="text-[10px] text-gray-400">{new Date(rating.createdAt).toLocaleDateString()}</span>
+                                            </div>
                                         </div>
-                                        <span className="text-xs text-gray-400">{new Date(rating.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                    <div className="mb-1">
                                         <StarRating rating={rating.rating} size="sm" />
                                     </div>
-                                    <p className="text-sm text-gray-600 leading-snug">{rating.comment}</p>
+                                    <p className="text-sm text-gray-600 leading-snug mt-2 pl-10">{rating.comment}</p>
                                 </div>
                             ))}
                         </div>

@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
-import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, FacebookIcon, TwitterIcon, WhatsAppIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, SparklesIcon, XCircleIcon, ThumbUpIcon, HeartIcon, WarningIcon, VerticalDotsIcon } from './icons';
+import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, CheckCircleIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, WarningIcon, VerticalDotsIcon } from './icons';
 import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
@@ -13,6 +14,7 @@ import { usePets } from '../hooks/usePets';
 import { supabase } from '../services/supabaseClient';
 import UserPublicProfileModal from './UserPublicProfileModal';
 import { sendEvent, trackContactOwner, trackShare } from '../services/analytics';
+import ShareModal from './ShareModal';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -289,6 +291,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    const queryClient = useQueryClient();
     const { pets, loading: petsLoading } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
     
     // Find pet from props or list
@@ -301,19 +304,103 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [contactLoading, setContactLoading] = useState(false);
     const [isRevealingContact, setIsRevealingContact] = useState(false);
     const [viewingPublisher, setViewingPublisher] = useState<User | null>(null);
     
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
 
+    // REALTIME COMMENTS SUBSCRIPTION
+    useEffect(() => {
+        if (!pet?.id) return;
+
+        const channel = supabase.channel(`comments-${pet.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'comments',
+                    filter: `pet_id=eq.${pet.id}`
+                },
+                (payload) => {
+                    const newCommentRaw = payload.new;
+                    
+                    // Convert to App Type (Comment)
+                    const newComment: Comment = {
+                        id: newCommentRaw.id,
+                        userEmail: newCommentRaw.user_email,
+                        userName: newCommentRaw.user_name,
+                        text: newCommentRaw.text,
+                        timestamp: newCommentRaw.created_at,
+                        parentId: newCommentRaw.parent_id,
+                        likes: []
+                    };
+
+                    setPet(prev => {
+                        if (!prev) return prev;
+                        
+                        // Check if we already have this comment (by ID)
+                        const exists = prev.comments?.some(c => c.id === newComment.id);
+                        if (exists) return prev;
+
+                        // Handle Optimistic Update Deduplication
+                        // If the comment belongs to the current user, try to find a temp comment to replace
+                        if (currentUser && newComment.userEmail === currentUser.email) {
+                            const hasOptimistic = prev.comments?.some(c => c.id.startsWith('temp-') && c.text === newComment.text);
+                            if (hasOptimistic) {
+                                // Replace the temp comment with the real one
+                                const updatedComments = prev.comments?.map(c => 
+                                    (c.id.startsWith('temp-') && c.text === newComment.text) ? newComment : c
+                                );
+                                return { ...prev, comments: updatedComments };
+                            }
+                        }
+
+                        // Otherwise, append new comment
+                        return {
+                            ...prev,
+                            comments: [...(prev.comments || []), newComment]
+                        };
+                    });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [pet?.id, currentUser]);
+
     // Sync local pet state with global pets list when it updates (e.g., new comment)
     useEffect(() => {
         const foundPet = pets.find(p => p.id === id);
+        
         if (foundPet) {
-            setPet(foundPet);
+            setPet(prev => {
+                // If no previous state, accept global
+                if (!prev) return foundPet;
+
+                // CRITICAL FIX: PRESERVE OPTIMISTIC COMMENTS
+                // When global state updates (e.g. refetch), it might wipe out local optimistic comments (temp-*)
+                // We must merge them back in until the real comment arrives via realtime/refetch.
+                const optimisticComments = prev.comments?.filter(c => c.id.toString().startsWith('temp-')) || [];
+                
+                // Check if any optimistic comments are now redundant (because foundPet has the real one)
+                // We match by text and user email as a heuristic
+                const realComments = foundPet.comments || [];
+                const uniqueOptimistic = optimisticComments.filter(opt => 
+                    !realComments.some(real => real.text === opt.text && real.userEmail === opt.userEmail)
+                );
+
+                return {
+                    ...foundPet,
+                    comments: [...realComments, ...uniqueOptimistic]
+                };
+            });
+
             setIsLoading(false);
+            
             // Analytics: Track Item View
             sendEvent('view_item', {
                 currency: foundPet.currency,
@@ -358,29 +445,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                             comments: []
                         };
                         setPet(formatted);
-                        // Analytics
-                        sendEvent('view_item', {
-                            currency: p.currency,
-                            value: p.reward,
-                            items: [{
-                                item_id: p.id,
-                                item_name: p.name,
-                                item_category: p.status,
-                                item_brand: p.breed
-                            }]
-                        });
                     }
                     setIsLoading(false);
                 });
         } else if (propPet) {
             setIsLoading(false);
-            sendEvent('view_item', {
-                items: [{
-                    item_id: propPet.id,
-                    item_name: propPet.name,
-                    item_category: propPet.status
-                }]
-            });
         }
     }, [id, pets, petsLoading, propPet]);
 
@@ -557,50 +626,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     
     const canManageStatus = (isOwner || canAdmin) && (pet.status === PET_STATUS.PERDIDO || pet.status === PET_STATUS.ENCONTRADO);
 
-    const handleShare = async (platform: 'facebook' | 'whatsapp' | 'copy' | 'native_story') => {
-        let pageUrl = window.location.href;
-        try {
-             pageUrl = new URL(window.location.href).href;
-        } catch (e) {
-             pageUrl = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
-        }
-
-        let shareText = '';
-        if (pet.status === PET_STATUS.PERDIDO) {
-            shareText = `¡Ayuda a encontrar a ${pet.name}! ${pet.breed} en ${pet.location}.`;
-        } else {
-            shareText = `${pet.status}: ${pet.animalType} en ${pet.location}.`;
-        }
-        
-        // Analytics
-        trackShare(platform, 'pet');
-    
-        if (platform === 'copy') {
-             navigator.clipboard.writeText(`${shareText} ${pageUrl}`);
-             alert('Enlace copiado al portapapeles');
-             setIsShareModalOpen(false);
-             return;
-        }
-
-        const encodedText = encodeURIComponent(shareText);
-        const encodedUrl = encodeURIComponent(pageUrl);
-        let shareUrl = '';
-    
-        switch (platform) {
-            case 'facebook':
-                shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`;
-                break;
-            case 'whatsapp':
-                shareUrl = `https://api.whatsapp.com/send?text=${encodedText}%20${encodedUrl}`;
-                break;
-        }
-        
-        if (shareUrl) {
-            window.open(shareUrl, '_blank', 'noopener,noreferrer');
-        }
-        setIsShareModalOpen(false);
-    };
-
     const openInGoogleMaps = () => {
         if (pet.lat && pet.lng) {
             window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank');
@@ -628,6 +653,50 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         sendEvent('generate_flyer', {
             pet_id: p.id
         });
+    };
+
+    // --- OPTIMISTIC COMMENT UI UPDATE ---
+    const handleOptimisticAddComment = async (text: string, parentId?: string) => {
+        if (!currentUser || !pet) return;
+
+        // 1. Create temp comment
+        const tempId = `temp-${Date.now()}`;
+        const optimisticComment: Comment = {
+            id: tempId,
+            userEmail: currentUser.email,
+            userName: currentUser.username || 'Yo',
+            text: text,
+            timestamp: new Date().toISOString(),
+            parentId: parentId || null,
+            likes: []
+        };
+
+        // 2. Update local state immediately
+        setPet(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                comments: [...(prev.comments || []), optimisticComment]
+            };
+        });
+
+        // 3. Perform actual server request
+        try {
+            await onAddComment(pet.id, text, parentId);
+            // 4. Force refresh to ensure consistency if realtime is slow
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+        } catch (error) {
+            console.error("Error posting comment:", error);
+            // Rollback on error
+            setPet(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    comments: prev.comments?.filter(c => c.id !== tempId)
+                };
+            });
+            alert("No se pudo enviar el comentario.");
+        }
     };
 
     const isUnknownAndFoundOrSighted = (pet.status === PET_STATUS.ENCONTRADO || pet.status === PET_STATUS.AVISTADO) && pet.name === 'Desconocido';
@@ -1008,41 +1077,12 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
             </div>
 
             {/* Modals code */}
-            {isShareModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 z-[2000] flex justify-center items-end sm:items-center p-0 sm:p-4" onClick={() => setIsShareModalOpen(false)}>
-                    <div className="bg-white w-full sm:w-full max-w-sm rounded-t-xl sm:rounded-xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">Compartir</h3>
-                            <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600"><XCircleIcon /></button>
-                        </div>
-                        
-                        <div className="grid grid-cols-4 gap-4 mb-6">
-                            {/* Share buttons */}
-                            <button onClick={() => handleShare('whatsapp')} className="flex flex-col items-center gap-2 group">
-                                <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                                    <WhatsAppIcon />
-                                </div>
-                                <span className="text-xs text-center text-gray-600">WhatsApp</span>
-                            </button>
-                            
-                            <button onClick={() => handleShare('facebook')} className="flex flex-col items-center gap-2 group">
-                                <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                                    <FacebookIcon />
-                                </div>
-                                <span className="text-xs text-center text-gray-600">Facebook</span>
-                            </button>
-
-                            <button onClick={() => handleShare('copy')} className="flex flex-col items-center gap-2 group">
-                                <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 shadow-sm group-hover:bg-gray-300 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 01-2-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <span className="text-xs text-center text-gray-600">Copiar Enlace</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {isShareModalOpen && pet && (
+                <ShareModal
+                    pet={pet}
+                    isOpen={isShareModalOpen}
+                    onClose={() => setIsShareModalOpen(false)}
+                />
             )}
 
             {isCommentModalOpen && (
@@ -1066,7 +1106,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                 petId={pet.id}
                                 postOwnerEmail={pet.userEmail}
                                 comments={pet.comments} 
-                                onAddComment={(text, parentId) => onAddComment(pet.id, text, parentId)} 
+                                onAddComment={handleOptimisticAddComment} 
                                 onLikeComment={onLikeComment}
                                 onReportComment={handleReportComment}
                                 onDeleteComment={handleDeleteCommentFromModal}
