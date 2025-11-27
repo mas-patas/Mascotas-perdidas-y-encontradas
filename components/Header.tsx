@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     // Updated Styling: Light gray background, dark gray text, Purple hover
     const navButtonClass = "flex items-center gap-2 px-2 sm:px-3 py-2 text-gray-600 hover:text-sidebar-dark hover:bg-purple-100 rounded-lg transition-all duration-200 relative font-medium";
-    const isMainView = ['/', '/campanas', '/mapa'].includes(location.pathname);
+    const isMainView = ['/', '/campanas', '/mapa', '/servicios'].includes(location.pathname);
 
     return (
         <header className="bg-gray-100 text-gray-800 shadow-md px-3 py-2 sm:px-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-50 flex-shrink-0">
@@ -176,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
 
                     {/* Nosotros Link - Always visible on mobile (Icon) */}
-                    <button onClick={() => navigate('/nosotros')} className={navButtonClass} aria-label="Quiénes Somos">
+                    <button onClick={() => navigate('/nosotros')} className={`${navButtonClass} hidden md:flex`} aria-label="Quiénes Somos">
                         <HeartIcon className="h-5 w-5" />
                         <span className="hidden lg:inline">Nosotros</span>
                     </button>

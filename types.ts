@@ -1,5 +1,6 @@
 
-import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from './constants';
+
+import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES, BUSINESS_TYPES } from './constants';
 
 export type PetStatus = typeof PET_STATUS[keyof typeof PET_STATUS];
 export type AnimalType = typeof ANIMAL_TYPES[keyof typeof ANIMAL_TYPES];
@@ -12,6 +13,40 @@ export type ReportType = 'post' | 'user' | 'comment';
 export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUS[keyof typeof SUPPORT_TICKET_STATUS];
 export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeof SUPPORT_TICKET_CATEGORIES];
 export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
+export type BusinessType = typeof BUSINESS_TYPES[keyof typeof BUSINESS_TYPES];
+
+export interface BusinessProduct {
+    id: string;
+    businessId: string;
+    name: string;
+    description?: string;
+    price: number;
+    imageUrl?: string; // Deprecated, kept for compatibility
+    imageUrls?: string[]; // New array
+}
+
+export interface Business {
+    id: string;
+    ownerId: string; // Links to a User.id
+    name: string;
+    type: BusinessType;
+    description: string;
+    address: string;
+    phone: string;
+    whatsapp?: string;
+    website?: string;
+    facebook?: string;
+    instagram?: string;
+    logoUrl?: string;
+    coverUrl?: string; // Hero image
+    bannerUrl?: string; // Secondary promotional banner
+    services: string[]; // Array of strings e.g., ["Rayos X", "Baños", "Urgencias"]
+    products?: BusinessProduct[];
+    lat?: number;
+    lng?: number;
+    isVerified?: boolean;
+    createdAt?: string;
+}
 
 export interface Campaign {
     id: string;
@@ -31,7 +66,7 @@ export interface Notification {
     id: string;
     userId: string;
     message: string;
-    link: 'support' | 'messages' | { type: 'campaign'; id: string } | { type: 'pet'; id: string };
+    link: 'support' | 'messages' | { type: 'campaign'; id: string } | { type: 'pet'; id: string } | { type: 'pet-renew'; id: string };
     timestamp: string;
     isRead: boolean;
 }
@@ -84,6 +119,7 @@ export interface Pet {
     comments?: Comment[];
     expiresAt?: string; // ISO String for 60-day expiration
     createdAt?: string; // ISO String creation date
+    embedding?: number[]; // Vector embedding for AI search
 }
 
 export type ReportPostSnapshot = Pet | { text: string }; // Can be a Pet or a Comment text object
@@ -126,6 +162,7 @@ export interface User {
     ownedPets?: OwnedPet[];
     savedPetIds?: string[];
     avatarUrl?: string;
+    businessId?: string; // ID of the business if they own one
 }
 
 export interface UserRating {

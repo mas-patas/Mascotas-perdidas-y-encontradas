@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -8,6 +9,7 @@ const countries = [
 
 const ProfileSetupPage: React.FC = () => {
     const { currentUser, updateUserProfile } = useAuth();
+    const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -62,13 +64,16 @@ const ProfileSetupPage: React.FC = () => {
                 phone: phone.trim(),
                 country: country,
             });
-            // Context will update and AppRouter will redirect automatically
+            
+            // Force explicit navigation to home, replacing the current history entry
+            // This prevents the user from clicking "Back" to return to the setup page
+            navigate('/', { replace: true });
+            
         } catch (err: any) {
             console.error("Profile update error:", err);
             // Extract meaningful message from object or string
             const message = err.message || (typeof err === 'object' ? JSON.stringify(err) : 'Ocurrió un error al guardar el perfil.');
             setError(message);
-        } finally {
             setLoading(false);
         }
     };

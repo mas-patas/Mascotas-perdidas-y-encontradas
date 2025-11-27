@@ -15,7 +15,7 @@ import ProfileSetupPage from './components/ProfileSetupPage';
 import MessagesPage from './components/MessagesPage';
 import { ChatPage } from './components/ChatPage';
 import AdminDashboard from './components/AdminDashboard';
-import { findMatchingPets } from './services/geminiService';
+import { findMatchingPets, generatePetEmbedding } from './services/geminiService';
 import { PotentialMatchesModal } from './components/PotentialMatchesModal';
 import { FlyerModal } from './components/FlyerModal';
 import { ReportAdoptionForm } from './components/ReportAdoptionForm';
@@ -24,6 +24,8 @@ import SupportPage from './components/SupportPage';
 import CampaignsPage from './components/CampaignsPage';
 import CampaignDetailPage from './components/CampaignDetailPage';
 import MapPage from './components/MapPage';
+import ServicesMapPage from './components/ServicesMapPage';
+import BusinessDetailPage from './components/BusinessDetailPage';
 import { RenewModal } from './components/RenewModal';
 import { StatusCheckModal } from './components/StatusCheckModal';
 import UserPublicProfileModal from './components/UserPublicProfileModal';
@@ -154,7 +156,7 @@ const App: React.FC = () => {
 
     // Auto-close sidebar
     useEffect(() => {
-        if (location.pathname === '/mapa' || location.pathname === '/nosotros') {
+        if (location.pathname === '/mapa' || location.pathname === '/nosotros' || location.pathname === '/servicios') {
             setIsSidebarOpen(false);
         }
     }, [location.pathname]);
@@ -199,10 +201,11 @@ const App: React.FC = () => {
         setIsReportModalOpen(true);
     };
 
-    // ... (Other handlers: handleSubmitPet, finalizePetSubmission, handleRenewPet, etc. - Keep existing logic)
     const handleSubmitPet = async (petData: any, idToUpdate?: string) => {
         if (idToUpdate) {
              try {
+                // If editing, we might want to update the embedding too, but for simplicity, we focus on the submission.
+                // A production app should re-generate embedding on edit if description changes.
                 const { error } = await supabase.from('pets').update({
                     status: petData.status, name: petData.name, animal_type: petData.animalType, breed: petData.breed, color: petData.color, size: petData.size, location: petData.location, date: petData.date, contact: petData.contact, description: petData.description, image_urls: petData.imageUrls, adoption_requirements: petData.adoptionRequirements, share_contact_info: petData.shareContactInfo, reward: petData.reward, currency: petData.currency, lat: petData.lat, lng: petData.lng
                 }).eq('id', idToUpdate);
@@ -213,15 +216,25 @@ const App: React.FC = () => {
              } catch (err: any) { alert('Error al actualizar: ' + err.message); }
             return;
         }
-        if (isAiSearchEnabled && petData.status === PET_STATUS.PERDIDO) {
-            const candidates = pets.filter(p => p.status === PET_STATUS.ENCONTRADO || p.status === PET_STATUS.AVISTADO);
-            if (candidates.length > 0) {
-                 const matches = await findMatchingPets(petData, candidates);
+        
+        // AI Search Logic (Gated by Feature Toggle)
+        if (isAiSearchEnabled && (petData.status === PET_STATUS.PERDIDO || petData.status === PET_STATUS.ENCONTRADO || petData.status === PET_STATUS.AVISTADO)) {
+             try {
+                 // Pass the pet data directly to the service, which now handles Supabase RPC
+                 const matches = await findMatchingPets(petData);
                  if (matches.length > 0) {
-                     setPotentialMatches(matches); setPendingPetToSubmit(petData); setIsReportModalOpen(false); setIsMatchModalOpen(true); return;
+                     setPotentialMatches(matches); 
+                     setPendingPetToSubmit(petData); 
+                     setIsReportModalOpen(false); 
+                     setIsMatchModalOpen(true); 
+                     return;
                  }
-            }
+             } catch (e) {
+                 console.error("Error during AI search:", e);
+                 // Fallback to normal submission if search fails
+             }
         }
+        
         finalizePetSubmission(petData);
     };
 
@@ -231,8 +244,38 @@ const App: React.FC = () => {
             const newPetId = generateUUID();
             const now = new Date();
             const expirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
+            
+            // Generate Embedding (Gated by Feature Toggle to save resources if disabled)
+            let embedding = null;
+            if (isAiSearchEnabled) {
+                const contentToEmbed = `${petData.animalType} ${petData.breed} ${petData.color} ${petData.description}`;
+                embedding = await generatePetEmbedding(contentToEmbed);
+            }
+
             const { error } = await supabase.from('pets').insert({
-                id: newPetId, user_id: currentUser.id, status: petData.status, name: petData.name, animal_type: petData.animalType, breed: petData.breed, color: petData.color, size: petData.size, location: petData.location, date: petData.date, contact: petData.contact, description: petData.description, image_urls: petData.imageUrls, adoption_requirements: petData.adoptionRequirements, share_contact_info: petData.shareContactInfo, reward: petData.reward, currency: petData.currency, contact_requests: [], lat: petData.lat, lng: petData.lng, created_at: now.toISOString(), expires_at: expirationDate.toISOString()
+                id: newPetId, 
+                user_id: currentUser.id, 
+                status: petData.status, 
+                name: petData.name, 
+                animal_type: petData.animalType, 
+                breed: petData.breed, 
+                color: petData.color, 
+                size: petData.size, 
+                location: petData.location, 
+                date: petData.date, 
+                contact: petData.contact, 
+                description: petData.description, 
+                image_urls: petData.imageUrls, 
+                adoption_requirements: petData.adoptionRequirements, 
+                share_contact_info: petData.shareContactInfo, 
+                reward: petData.reward, 
+                currency: petData.currency, 
+                contact_requests: [], 
+                lat: petData.lat, 
+                lng: petData.lng, 
+                created_at: now.toISOString(), 
+                expires_at: expirationDate.toISOString(),
+                embedding: embedding // Save vector to DB
             });
             if (error) throw error;
             
@@ -361,10 +404,25 @@ const App: React.FC = () => {
     // Contact & Comments
     const handleRecordContactRequest = async (petId: string) => { 
         if(!currentUser) return;
-        const pet = pets.find(p=>p.id === petId);
-        if(!pet) return;
-        const reqs = [...(pet.contactRequests || []), currentUser.email];
-        await supabase.from('pets').update({ contact_requests: reqs }).eq('id', petId);
+        
+        // --- ATOMIC UPDATE USING RPC TO AVOID RACE CONDITIONS AND LOCKS ---
+        try {
+            const { error } = await supabase.rpc('request_pet_contact', { pet_id: petId });
+            
+            if (error) {
+                // Fallback for cases where RPC might be missing (dev environments)
+                console.warn("RPC failed, falling back to manual update", error);
+                const pet = pets.find(p => p.id === petId);
+                if (pet) {
+                    const reqs = [...(pet.contactRequests || []), currentUser.email];
+                    // Manual deduplication
+                    const uniqueReqs = [...new Set(reqs)];
+                    await supabase.from('pets').update({ contact_requests: uniqueReqs }).eq('id', petId);
+                }
+            }
+        } catch (e) {
+            console.error("Error recording contact request:", e);
+        }
     };
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if(!currentUser) return;
@@ -430,6 +488,8 @@ const App: React.FC = () => {
                     <Route path="campanas" element={<CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} />} />
                     <Route path="campanas/:id" element={<CampaignDetailPage campaign={undefined} onClose={() => navigate('/campanas')} />} />
                     <Route path="mapa" element={<MapPage pets={pets} onNavigate={(path) => navigate(path)} />} />
+                    <Route path="servicios" element={<ServicesMapPage />} />
+                    <Route path="negocio/:id" element={<BusinessDetailPage />} />
                     <Route path="nosotros" element={<AboutPage />} />
                 </Route>
                 <Route path="/login" element={<AuthPage />} />

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { Pet, User, UserRole } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
@@ -16,6 +16,7 @@ interface PetCardProps {
 export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
     const { currentUser, savePet, unsavePet } = useAuth();
     const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const isSaved = !!currentUser?.savedPetIds?.includes(pet.id);
     
     // Theme logic: Returns subtle background and border colors based on status
@@ -81,10 +82,9 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
         }
     }
     
-    // Safe image access with fallback
-    const image = (pet.imageUrls && pet.imageUrls.length > 0)
-        ? pet.imageUrls[0]
-        : 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen';
+    // Safe image access with fallback logic
+    const primaryImage = (pet.imageUrls && pet.imageUrls.length > 0) ? pet.imageUrls[0] : null;
+    const fallbackImage = 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen';
 
     return (
         <Link 
@@ -97,20 +97,26 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
                 </div>
             )}
             <div className="relative h-48 w-full bg-gray-200 overflow-hidden">
-                {/* Skeleton Loader - Visible while image is loading */}
-                {!imageLoaded && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse z-0">
+                {/* Fallback / Loading State */}
+                {(!imageLoaded || imageError || !primaryImage) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 z-0">
                         <PetIcon className="h-12 w-12 text-gray-300" />
                     </div>
                 )}
 
-                <img 
-                    className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`} 
-                    src={image} 
-                    alt={`${pet.breed} ${pet.name}`} 
-                    loading="lazy"
-                    onLoad={() => setImageLoaded(true)}
-                />
+                {primaryImage && !imageError && (
+                    <img 
+                        className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`} 
+                        src={primaryImage} 
+                        alt={`${pet.breed} ${pet.name}`} 
+                        loading="lazy"
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => {
+                            setImageError(true);
+                            setImageLoaded(true); // Stop loading spinner
+                        }}
+                    />
+                )}
 
                 <div className={`absolute top-2 left-2 px-3 py-1 text-xs font-bold rounded-full shadow-sm z-10 ${theme.badge}`}>
                     {pet.status}

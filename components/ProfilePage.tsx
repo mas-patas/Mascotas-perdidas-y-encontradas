@@ -1,10 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { User, Pet, OwnedPet, UserRating } from '../types';
+import type { User, Pet, OwnedPet, UserRating, Business } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon } from './icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -13,6 +13,8 @@ import { supabase } from '../services/supabaseClient';
 import StarRating from './StarRating';
 import GamificationBadge from './GamificationBadge';
 import GamificationDashboard from './GamificationDashboard';
+import BusinessManagementModal from './BusinessManagementModal';
+import { businessService } from '../services/businessService';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -20,7 +22,7 @@ const countries = [
 
 interface ProfilePageProps {
     user: User;
-    reportedPets: Pet[]; // Keeping for fallback, but will load own data
+    reportedPets: Pet[];
     allPets: Pet[];
     users: User[];
     onBack: () => void;
@@ -35,6 +37,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
     const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+    const [isBusinessModalOpen, setIsBusinessModalOpen] = useState(false);
     const [editingOwnedPet, setEditingOwnedPet] = useState<OwnedPet | null>(null);
     const [viewingOwnedPet, setViewingOwnedPet] = useState<OwnedPet | null>(null);
     const [petToDelete, setPetToDelete] = useState<OwnedPet | null>(null);
@@ -48,8 +51,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     });
     const [error, setError] = useState('');
     const [loadingProfile, setLoadingProfile] = useState(false);
+    const [myBusiness, setMyBusiness] = useState<Business | null>(null);
 
-    // 1. Fetch 'My Pets' (Reported) - Includes Expired Pets
+    useEffect(() => {
+        const checkBusiness = async () => {
+            if (!user.id) return;
+            const business = await businessService.getBusinessByOwnerId(user.id);
+            setMyBusiness(business);
+        };
+        checkBusiness();
+    }, [user.id]);
+
     const { data: myReportedPets = [], isLoading: isLoadingMyPets } = useQuery({
         queryKey: ['myPets', user.id],
         enabled: !!user.id,
@@ -62,7 +74,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             
             if (error) throw error;
             
-            // Enrich/Format with safety check for data
             return (data || []).map((p: any) => ({
                 id: p.id,
                 userEmail: user.email,
@@ -83,14 +94,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 reward: p.reward,
                 lat: p.lat,
                 lng: p.lng,
-                comments: [], // Comments not needed for list view
+                comments: [], 
                 expiresAt: p.expires_at,
                 createdAt: p.created_at
             })) as Pet[];
         }
     });
 
-    // Fetch my ratings
     const { data: myRatings = [], isLoading: isLoadingRatings } = useQuery({
         queryKey: ['ratings', user.id],
         enabled: !!user.id,
@@ -125,24 +135,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         return (sum / myRatings.length).toFixed(1);
     }, [myRatings]);
 
-    // --- GAMIFICATION SCORE CALCULATION ---
     const gamificationPoints = useMemo(() => {
-        // 15 pts per report
         const reportPoints = myReportedPets.length * 15;
-        // 10 pts per rating received
         const ratingCountPoints = myRatings.length * 10;
-        // 20 pts per star average (max 100)
         const qualityPoints = Number(averageRating) * 20;
-        
         return Math.round(reportPoints + ratingCountPoints + qualityPoints);
     }, [myReportedPets.length, myRatings.length, averageRating]);
 
-    // Use the fetched data if available, otherwise fallback to props (though props filter out expired)
     const displayedReportedPets = myReportedPets.length > 0 || isLoadingMyPets ? myReportedPets : propReportedPets;
-
     const savedPets = useMemo(() => allPets.filter(p => p && user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
 
-    // Helper to check if a reported pet is expired
     const isPetExpired = (pet: Pet) => {
         if (!pet.expiresAt) return false; 
         return new Date(pet.expiresAt) < new Date();
@@ -157,7 +159,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         const file = e.target.files?.[0];
         if (file) {
              try {
-                // Upload to Supabase Storage and get URL
                 setLoadingProfile(true);
                 const publicUrl = await uploadImage(file);
                 setEditableUser(prev => ({ ...prev, avatarUrl: publicUrl }));
@@ -212,7 +213,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             await updateOwnedPet(pet);
             setIsAddPetModalOpen(false);
             setEditingOwnedPet(null);
-            // If the pet being edited is also the one being viewed, refresh the view
             if (viewingOwnedPet?.id === pet.id) {
                 setViewingOwnedPet(pet);
             }
@@ -226,11 +226,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         if (petToDelete) {
             try {
                 await deleteOwnedPet(petToDelete.id);
-                setPetToDelete(null); // Close modal on success
+                setPetToDelete(null);
             } catch (err: any) {
                 console.error(err);
                 alert(err.message || 'Error al eliminar la mascota.');
-                setPetToDelete(null); // Also close modal on error
+                setPetToDelete(null);
             }
         }
     };
@@ -242,12 +242,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-start mb-4">
                     <h2 className="text-3xl font-bold text-brand-dark">Mi Perfil</h2>
-                    {!isEditing && (
-                        <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 text-sm py-2 px-3 bg-blue-100 text-brand-primary rounded-lg hover:bg-blue-200 transition-colors">
-                            <EditIcon />
-                            Editar Perfil
-                        </button>
-                    )}
+                    <div className="flex gap-2">
+                        {myBusiness && (
+                            <button 
+                                onClick={() => setIsBusinessModalOpen(true)}
+                                className="flex items-center gap-2 text-sm py-2 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-bold"
+                            >
+                                <StoreIcon />
+                                Gestionar mi Negocio
+                            </button>
+                        )}
+                        {!isEditing && (
+                            <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 text-sm py-2 px-3 bg-blue-100 text-brand-primary rounded-lg hover:bg-blue-200 transition-colors">
+                                <EditIcon />
+                                Editar Perfil
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">{error}</div>}
                 
@@ -321,7 +332,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                     </div>
                 ) : (
                     <div className="flex flex-col lg:flex-row gap-8">
-                        {/* User Info Side */}
                         <div className="flex-1 flex flex-col md:flex-row md:items-start gap-6">
                             <div className="relative">
                                 {user.avatarUrl ? (
@@ -338,6 +348,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                 <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
                                 {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
                                 {user.country && <p><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
+                                {myBusiness && (
+                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                        <p className="text-sm font-bold text-green-800 flex items-center gap-2">
+                                            <StoreIcon /> Dueño de: {myBusiness.name}
+                                        </p>
+                                    </div>
+                                )}
                                 
                                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
                                     <div className="flex items-center gap-2">
@@ -351,7 +368,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             </div>
                         </div>
 
-                        {/* Gamification Side */}
                         <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center min-w-[220px] shadow-sm">
                             <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">Insignia de Comunidad</h4>
                             <GamificationBadge points={gamificationPoints} size="lg" showProgress={true} />
@@ -477,50 +493,40 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 {isLoadingRatings ? (
                     <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                 ) : myRatings.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-4">
                         {myRatings.map(rating => (
-                            <div key={rating.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                <div className="flex items-center justify-between mb-2">
+                            <div key={rating.id} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                                <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                                            {rating.raterAvatar ? (
-                                                <img src={rating.raterAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">
-                                                    {(rating.raterName || '?').charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                        {rating.raterAvatar ? (
+                                            <img src={rating.raterAvatar} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-xs">
+                                                {rating.raterName.charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-800">@{rating.raterName}</p>
+                                            <p className="text-xs text-gray-500">{new Date(rating.createdAt).toLocaleDateString()}</p>
                                         </div>
-                                        <span className="text-sm font-semibold">@{rating.raterName}</span>
                                     </div>
-                                    <span className="text-xs text-gray-400">{new Date(rating.createdAt).toLocaleDateString()}</span>
-                                </div>
-                                <div className="mb-2">
                                     <StarRating rating={rating.rating} size="sm" />
                                 </div>
-                                <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{rating.comment}</p>
+                                <p className="text-sm text-gray-600">{rating.comment}</p>
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
-                        <p className="text-lg text-gray-500">Aún no has recibido calificaciones de otros usuarios.</p>
+                        <p className="text-lg text-gray-500">Aún no tienes calificaciones.</p>
                     </div>
                 )}
             </div>
 
-             <div className="text-center pt-8">
-                 <button
-                    onClick={onBack}
-                    className="py-2 px-6 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                    &larr; Volver a la lista principal
-                </button>
-            </div>
-            
-            {(isAddPetModalOpen || editingOwnedPet) && (
-                <AddPetModal 
-                    onClose={() => { setIsAddPetModalOpen(false); setEditingOwnedPet(null); }}
+            {/* Modals */}
+            {isAddPetModalOpen && (
+                <AddPetModal
+                    onClose={() => setIsAddPetModalOpen(false)}
                     onSubmit={handleAddPet}
                     onUpdate={handleUpdatePet}
                     petToEdit={editingOwnedPet}
@@ -531,24 +537,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 <OwnedPetDetailModal
                     pet={viewingOwnedPet}
                     onClose={() => setViewingOwnedPet(null)}
-                    onEdit={(pet) => {
-                        setViewingOwnedPet(null);
-                        setEditingOwnedPet(pet);
-                        setIsAddPetModalOpen(true);
-                    }}
-                    onReportLost={(pet) => {
-                        setViewingOwnedPet(null);
-                        onReportOwnedPetAsLost(pet);
-                    }}
-                />
-            )}
-
-            {isDashboardOpen && (
-                <GamificationDashboard
-                    user={user}
-                    currentPoints={gamificationPoints}
-                    userReportedPets={displayedReportedPets}
-                    onClose={() => setIsDashboardOpen(false)}
+                    onEdit={(pet) => { setViewingOwnedPet(null); setEditingOwnedPet(pet); setIsAddPetModalOpen(true); }}
+                    onReportLost={(pet) => { setViewingOwnedPet(null); onReportOwnedPetAsLost(pet); }}
                 />
             )}
 
@@ -558,9 +548,26 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                     onClose={() => setPetToDelete(null)}
                     onConfirm={handleConfirmDelete}
                     title="Eliminar Mascota"
-                    message={`¿Estás seguro de que quieres eliminar a "${petToDelete.name}" de tu perfil? Esta acción no se puede deshacer.`}
-                    confirmText="Sí, eliminar"
+                    message={`¿Estás seguro de que quieres eliminar a ${petToDelete.name}? Esta acción no se puede deshacer.`}
+                    confirmText="Eliminar"
                     cancelText="Cancelar"
+                />
+            )}
+
+            {isDashboardOpen && (
+                <GamificationDashboard
+                    user={user}
+                    currentPoints={gamificationPoints}
+                    userReportedPets={myReportedPets}
+                    onClose={() => setIsDashboardOpen(false)}
+                />
+            )}
+
+            {isBusinessModalOpen && myBusiness && (
+                <BusinessManagementModal
+                    isOpen={isBusinessModalOpen}
+                    onClose={() => setIsBusinessModalOpen(false)}
+                    businessId={myBusiness.id}
                 />
             )}
         </div>

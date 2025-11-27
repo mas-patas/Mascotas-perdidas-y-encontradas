@@ -304,8 +304,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [isRevealingContact, setIsRevealingContact] = useState(false);
+    // Removed isRevealingContact loader state to prevent UI flicker/delay
     const [viewingPublisher, setViewingPublisher] = useState<User | null>(null);
+    
+    // NEW: Local state to force show contact immediately upon click (Optimistic UI)
+    const [hasLocalAccess, setHasLocalAccess] = useState(false);
     
     const miniMapRef = useRef<HTMLDivElement>(null);
     const miniMapInstance = useRef<any>(null);
@@ -550,7 +553,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
     const canAdmin = currentUser && ([USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] as UserRole[]).includes(currentUser.role);
     
     const hasRevealedContact = currentUser && pet.contactRequests?.includes(currentUser.email);
-    const canSeeContact = isOwner || canAdmin || hasRevealedContact;
+    // Updated visibility logic to include hasLocalAccess for instant UI feedback
+    const canSeeContact = isOwner || canAdmin || hasRevealedContact || hasLocalAccess;
 
     const nextImage = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -595,22 +599,27 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
         setReportTarget(null);
     };
     
-    const handleRevealContact = async () => {
+    // --- OPTIMISTIC CONTACT REVEAL ---
+    const handleRevealContact = () => {
         if (!currentUser) return;
-        setIsRevealingContact(true);
-        try {
-            await onRecordContactRequest(pet.id);
-            setPet(prev => prev ? ({
-                ...prev,
-                contactRequests: [...(prev.contactRequests || []), currentUser.email]
-            }) : prev);
-            // Analytics
-            trackContactOwner(pet.id, 'phone_reveal');
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setIsRevealingContact(false);
-        }
+        
+        // 1. Force local visibility immediately (Robust UI)
+        setHasLocalAccess(true);
+        
+        // 2. Optimistic Update (Immediate Feedback on Object)
+        setPet(prev => prev ? ({
+            ...prev,
+            contactRequests: [...(prev.contactRequests || []), currentUser.email]
+        }) : prev);
+        
+        // 3. Fire and Forget (Server Sync in background)
+        onRecordContactRequest(pet.id).catch(err => {
+            console.error("Error recording contact request in background", err);
+            // We do NOT revert UI here to prevent jitter
+        });
+        
+        // 4. Analytics
+        trackContactOwner(pet.id, 'phone_reveal');
     };
 
     const getStatusStyles = () => {
@@ -989,7 +998,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                     pet.shareContactInfo !== false ? (
                                         <div>
                                             {canSeeContact ? (
-                                                <div className="flex items-center gap-3 p-4 bg-white border-2 border-green-700 rounded-lg shadow-sm mt-2">
+                                                <div className="flex items-center gap-3 p-4 bg-white border-2 border-green-700 rounded-lg shadow-sm mt-2 animate-fade-in">
                                                     <div className="p-2 bg-green-100 text-green-800 rounded-full">
                                                         <PhoneIcon className="h-6 w-6" />
                                                     </div>
@@ -1002,24 +1011,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({ pet: propPet, onCl
                                                 (!isOwner) && (
                                                     <button
                                                         onClick={() => currentUser ? handleRevealContact() : navigate('/login')}
-                                                        disabled={isRevealingContact}
                                                         className={`w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg transition-colors shadow-md ${
                                                             currentUser 
-                                                            ? 'bg-green-700 text-white hover:bg-green-800 disabled:bg-green-400'
+                                                            ? 'bg-green-700 text-white hover:bg-green-800'
                                                             : 'bg-green-500 text-white hover:bg-green-600'
                                                         }`}
                                                     >
-                                                        {isRevealingContact ? (
-                                                            <>
-                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                                <span>Procesando...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <PhoneIcon />
-                                                                <span>{currentUser ? 'Mostrar Información de Contacto' : 'Inicia sesión para ver contacto'}</span>
-                                                            </>
-                                                        )}
+                                                        <PhoneIcon />
+                                                        <span>{currentUser ? 'Mostrar Información de Contacto' : 'Inicia sesión para ver contacto'}</span>
                                                     </button>
                                                 )
                                             )}

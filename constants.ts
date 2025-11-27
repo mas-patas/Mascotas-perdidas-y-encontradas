@@ -67,3 +67,10 @@ export const CAMPAIGN_TYPES = {
     ESTERILIZACION: 'Esterilización',
     ADOPCION: 'Adopción',
 } as const;
+
+export const BUSINESS_TYPES = {
+    VETERINARIA: 'Veterinaria',
+    PET_SHOP: 'Pet Shop',
+    ESTETICA: 'Estética/Grooming',
+    HOTEL: 'Hospedaje',
+} as const;

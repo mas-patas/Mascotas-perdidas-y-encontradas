@@ -2,6 +2,8 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import type { AnimalType, Pet, PotentialMatch } from "../types";
 import { petColors, dogBreeds, catBreeds } from "../data/breeds";
+import { supabase } from "./supabaseClient";
+import { PET_STATUS } from "../constants";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -78,12 +80,96 @@ export async function analyzePetImage(imageUrl: string): Promise<{
     }
 }
 
-// Devuelve un array vacío para que el flujo de la app continúe directamente a publicar.
+export async function generatePetEmbedding(text: string): Promise<number[]> {
+    try {
+        const result = await ai.models.embedContent({
+            model: 'text-embedding-004',
+            content: { parts: [{ text }] }
+        });
+        
+        if (!result.embedding || !result.embedding.values) {
+            throw new Error("Failed to generate embedding");
+        }
+        
+        return result.embedding.values;
+    } catch (error) {
+        console.error("Error generating embedding:", error);
+        return [];
+    }
+}
+
+// Performs Vector Search using Supabase RPC
 export async function findMatchingPets(
-    targetPet: Omit<Pet, 'id' | 'userEmail'>,
-    candidatePets: Pet[]
+    targetPet: Omit<Pet, 'id' | 'userEmail'>
 ): Promise<PotentialMatch[]> {
-    return [];
+    
+    // 1. Construct a rich description for the embedding
+    const contentToEmbed = `${targetPet.animalType} ${targetPet.breed} ${targetPet.color} ${targetPet.description}`;
+    
+    // 2. Generate Vector
+    const embedding = await generatePetEmbedding(contentToEmbed);
+    
+    if (embedding.length === 0) return [];
+
+    // 3. Determine target status to match against
+    // If I lost a pet, I look for 'Found' or 'Sighted' pets.
+    // If I found a pet, I look for 'Lost' pets.
+    let targetStatus: string[] = [];
+    if (targetPet.status === PET_STATUS.PERDIDO) {
+        targetStatus = [PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO];
+    } else if (targetPet.status === PET_STATUS.ENCONTRADO || targetPet.status === PET_STATUS.AVISTADO) {
+        targetStatus = [PET_STATUS.PERDIDO];
+    } else {
+        return []; // No matching logic for Adoptions/Reunited here
+    }
+
+    const matches: PotentialMatch[] = [];
+
+    // 4. Call Supabase RPC for each status target
+    for (const status of targetStatus) {
+        const { data: rpcData, error } = await supabase.rpc('match_pets', {
+            query_embedding: embedding,
+            match_threshold: 0.70, // Similarity threshold (0-1)
+            match_count: 5,
+            filter_status: status,
+            filter_type: targetPet.animalType
+        });
+
+        if (error) {
+            console.error("Vector search RPC error:", error);
+            continue;
+        }
+
+        if (rpcData) {
+            rpcData.forEach((p: any) => {
+                // Convert RPC result to basic Pet structure for the modal
+                const matchedPet: Pet = {
+                    id: p.id,
+                    userEmail: 'hidden', // We don't need this for the preview
+                    status: p.status as any,
+                    name: p.name,
+                    animalType: targetPet.animalType,
+                    breed: 'Ver detalles', // Simplified for preview list
+                    color: '',
+                    location: '',
+                    date: new Date().toISOString(),
+                    contact: '',
+                    description: p.description,
+                    imageUrls: p.image_urls || [],
+                    comments: []
+                };
+
+                matches.push({
+                    pet: matchedPet,
+                    score: Math.round(p.similarity * 100),
+                    explanation: `Esta mascota tiene un ${Math.round(p.similarity * 100)}% de similitud visual y descriptiva.`
+                });
+            });
+        }
+    }
+
+    // Sort by highest score
+    return matches.sort((a, b) => b.score - a.score);
 }
 
 export async function generatePetDescription(

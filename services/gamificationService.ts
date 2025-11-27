@@ -28,9 +28,12 @@ export const logActivity = async (
         });
 
         if (error) {
-            console.warn('Error logging activity, likely table missing or RLS:', error.message);
-            // Fail silently to not disrupt main user flow, 
-            // simply means gamification history won't update in this instance.
+            // Check specifically for RLS errors to guide the developer/user
+            if (error.code === '42501' || error.message.includes('row-level security')) {
+                console.error("⛔ RLS ERROR: No tienes permisos para escribir en 'user_activity_logs'. Ejecuta el script 'SUPABASE_SETUP.sql' en tu panel de Supabase para corregir esto.");
+            } else {
+                console.warn('Error logging activity:', error.message);
+            }
         }
     } catch (e) {
         console.error('Exception logging activity:', e);
@@ -46,7 +49,11 @@ export const getUserHistory = async (userId: string): Promise<ActivityLog[]> => 
         .limit(50);
 
     if (error) {
-        console.error('Error fetching history:', error);
+        if (error.code === '42501' || error.message.includes('row-level security')) {
+             console.error("⛔ RLS ERROR (Read): No se puede leer el historial. Ejecuta el script 'SUPABASE_SETUP.sql'.");
+        } else {
+             console.error('Error fetching history:', error.message);
+        }
         return [];
     }
 
@@ -61,10 +68,11 @@ export const getUserHistory = async (userId: string): Promise<ActivityLog[]> => 
 };
 
 export const getWeeklyLeaderboard = async (): Promise<LeaderboardEntry[]> => {
+    // Note: This RPC function also needs to be created in Supabase if it doesn't exist
     const { data, error } = await supabase.rpc('get_weekly_leaderboard');
     
     if (error) {
-        console.error('Error fetching leaderboard:', error);
+        console.warn('Error fetching leaderboard (RPC might be missing):', error.message);
         return [];
     }
     

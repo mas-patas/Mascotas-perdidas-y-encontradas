@@ -1,14 +1,17 @@
 
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Campaign, BannedIP } from '../types';
 import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from '../constants';
-import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon, EyeIcon, BellIcon, LocationMarkerIcon, XCircleIcon, PlusIcon } from './icons';
+import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon, EyeIcon, BellIcon, LocationMarkerIcon, XCircleIcon, PlusIcon, StoreIcon } from './icons';
 import ReportDetailModal from './ReportDetailModal';
 import SupportTicketModal from './SupportTicketModal';
 import CampaignFormModal from './CampaignFormModal';
 import ConfirmationModal from './ConfirmationModal';
 import { supabase } from '../services/supabaseClient';
 import { useAppData } from '../hooks/useAppData';
+import AdminBusinessPanel from './AdminBusinessPanel';
 
 interface AdminDashboardProps {
     onBack: () => void;
@@ -168,7 +171,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     campaigns, onSaveCampaign, onDeleteCampaign, onNavigate, onDeleteComment 
 }) => {
     const { bannedIps } = useAppData();
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings' | 'security'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings' | 'security' | 'businesses'>('dashboard');
     const [statusFilter, setStatusFilter] = useState<PetStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<AnimalType | 'all'>('all');
     const [dateRangeFilter, setDateRangeFilter] = useState<'7d' | '30d' | '1y' | 'all'>('all');
@@ -783,6 +786,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button onClick={() => setActiveTab('reports')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'reports' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Reportes <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${reports.filter(r => r.status === 'Pendiente').length > 0 ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'}`}>{reports.filter(r => r.status === 'Pendiente').length}</span></button>
                         <button onClick={() => setActiveTab('support')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'support' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Soporte <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${supportTickets.filter(t => t.status === 'Pendiente').length > 0 ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'}`}>{supportTickets.filter(t => t.status === 'Pendiente').length}</span></button>
                         <button onClick={() => setActiveTab('campaigns')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'campaigns' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Campañas</button>
+                        <button onClick={() => setActiveTab('businesses')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'businesses' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Negocios</button>
                         <button onClick={() => setActiveTab('security')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'security' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Seguridad</button>
                         <button onClick={() => setActiveTab('settings')} className={`flex-grow sm:flex-1 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Configuración</button>
                     </nav>
@@ -796,6 +800,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 : activeTab === 'support' ? renderSupportManagement()
                 : activeTab === 'campaigns' ? renderCampaignsManagement()
                 : activeTab === 'security' ? renderSecuritySettings()
+                : activeTab === 'businesses' ? <AdminBusinessPanel allUsers={users} />
                 : renderSettingsManagement()}
             </div>
             
