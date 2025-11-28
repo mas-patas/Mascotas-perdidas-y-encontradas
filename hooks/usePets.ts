@@ -1,4 +1,5 @@
 
+
 import { useEffect } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabaseClient';
@@ -64,6 +65,7 @@ const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
                 const commentLikes = likes?.filter(l => l.comment_id === c.id).map(l => l.user_id) || [];
                 return {
                     id: c.id,
+                    userId: c.user_id, // Map database user_id to type
                     userEmail: c.user_email,
                     userName: c.user_name,
                     text: c.text,

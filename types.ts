@@ -87,6 +87,7 @@ export interface SupportTicket {
 
 export interface Comment {
     id: string;
+    userId?: string; // Added optional userId for DB linking
     userEmail: string;
     userName: string;
     text: string;
@@ -120,6 +121,8 @@ export interface Pet {
     expiresAt?: string; // ISO String for 60-day expiration
     createdAt?: string; // ISO String creation date
     embedding?: number[]; // Vector embedding for AI search
+    reunionStory?: string; // Historia del reencuentro
+    reunionDate?: string; // Fecha del reencuentro
 }
 
 export type ReportPostSnapshot = Pet | { text: string }; // Can be a Pet or a Comment text object

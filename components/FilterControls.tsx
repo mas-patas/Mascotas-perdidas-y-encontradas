@@ -5,7 +5,7 @@ import type { PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
 import { departments } from '../data/locations';
-import { HomeIcon, MegaphoneIcon, MapIcon, TrashIcon, StoreIcon } from './icons';
+import { HomeIcon, MegaphoneIcon, MapIcon, TrashIcon, StoreIcon, HeartIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
 
@@ -45,7 +45,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     const miniMapRef = useRef<HTMLDivElement>(null);
     
     // Show sidebar on main lists, campaigns, map, AND services
-    const showDesktopSidebar = ['/', '/campanas', '/mapa', '/servicios'].includes(location.pathname);
+    const showDesktopSidebar = ['/', '/campanas', '/mapa', '/servicios', '/reunidos'].includes(location.pathname);
     
     // Context Flags
     const isHome = location.pathname === '/';
@@ -141,6 +141,10 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     <button onClick={() => navigate('/servicios')} className={navLinkClass(isServices)}>
                         <StoreIcon />
                         <span>Servicios</span>
+                    </button>
+                    <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')}>
+                        <HeartIcon />
+                        <span>Mascotas Reunidas</span>
                     </button>
                 </nav>
 

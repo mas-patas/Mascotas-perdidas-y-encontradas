@@ -30,6 +30,7 @@ import { RenewModal } from './components/RenewModal';
 import { StatusCheckModal } from './components/StatusCheckModal';
 import UserPublicProfileModal from './components/UserPublicProfileModal';
 import AboutPage from './components/AboutPage';
+import ReunitedPetsPage from './components/ReunitedPetsPage';
 import { supabase } from './services/supabaseClient';
 import { generateUUID } from './utils/uuid';
 import { WarningIcon } from './components/icons';
@@ -156,7 +157,7 @@ const App: React.FC = () => {
 
     // Auto-close sidebar
     useEffect(() => {
-        if (location.pathname === '/mapa' || location.pathname === '/nosotros' || location.pathname === '/servicios') {
+        if (location.pathname === '/mapa' || location.pathname === '/nosotros' || location.pathname === '/servicios' || location.pathname === '/reunidos') {
             setIsSidebarOpen(false);
         }
     }, [location.pathname]);
@@ -426,13 +427,29 @@ const App: React.FC = () => {
     };
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if(!currentUser) return;
-        await supabase.from('comments').insert({ id: generateUUID(), pet_id: petId, user_email: currentUser.email, user_name: currentUser.username||'User', text, parent_id: parentId });
         
-        // Force invalidate to speed up UI sync if realtime is slow
-        queryClient.invalidateQueries({ queryKey: ['pets'] });
+        try {
+            const { error } = await supabase.from('comments').insert({ 
+                id: generateUUID(), 
+                pet_id: petId, 
+                user_id: currentUser.id, 
+                user_email: currentUser.email, 
+                user_name: currentUser.username || 'User', 
+                text, 
+                parent_id: parentId || null 
+            });
 
-        // Log Activity
-        await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
+            if (error) throw error;
+
+            // Force invalidate to speed up UI sync if realtime is slow
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+
+            // Log Activity
+            await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
+        } catch (error: any) {
+            console.error("Error adding comment:", error);
+            alert("Error al enviar el comentario: " + (error.message || "Error desconocido"));
+        }
     };
     const handleLikeComment = async (petId: string, commentId: string) => {
         if(!currentUser) return;
@@ -491,6 +508,7 @@ const App: React.FC = () => {
                     <Route path="servicios" element={<ServicesMapPage />} />
                     <Route path="negocio/:id" element={<BusinessDetailPage />} />
                     <Route path="nosotros" element={<AboutPage />} />
+                    <Route path="reunidos" element={<ReunitedPetsPage />} />
                 </Route>
                 <Route path="/login" element={<AuthPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
