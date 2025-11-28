@@ -82,7 +82,7 @@ const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClo
                         <textarea 
                             value={story}
                             onChange={(e) => setStory(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm bg-purple-50 placeholder-purple-300"
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm bg-purple-50 placeholder-purple-300 text-gray-900"
                             rows={4}
                             placeholder="Ej: Un vecino vio el cartel en la app y me llamó..."
                             required
@@ -96,7 +96,7 @@ const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClo
                                 type="date" 
                                 value={reunionDate}
                                 onChange={(e) => setReunionDate(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                className="w-full p-2 border border-gray-300 rounded-lg text-sm text-gray-900"
                                 max={new Date().toISOString().split('T')[0]}
                             />
                         </div>

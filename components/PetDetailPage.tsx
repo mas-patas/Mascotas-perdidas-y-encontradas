@@ -1,11 +1,10 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
-import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon } from './icons';
+import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon } from './icons';
 import { PET_STATUS, USER_ROLES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
@@ -34,7 +33,7 @@ interface PetDetailPageProps {
     onLikeComment: (petId: string, commentId: string) => void;
 }
 
-// Recursive Comment Component
+// Recursive Comment Component (unchanged logic, just used below)
 const CommentItem: React.FC<{
     comment: Comment;
     allComments: Comment[];
@@ -77,7 +76,6 @@ const CommentItem: React.FC<{
     };
 
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
-    // Prefer ID check, fallback to email check if ID not available on comment
     const isCommentOwner = comment.userId ? currentUser?.id === comment.userId : currentUser?.email === comment.userEmail;
     const canDelete = isAdmin || (currentUser?.email === postOwnerEmail) || isCommentOwner;
 
@@ -87,7 +85,7 @@ const CommentItem: React.FC<{
                 {comment.userName.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0 group relative">
-                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 pr-8 relative">
+                <div className="bg-gray-50 p-3 rounded-lg shadow-sm border border-gray-200 pr-8 relative">
                     <div className="flex justify-between items-baseline mb-1">
                         <span className="font-semibold text-sm text-brand-dark">@{comment.userName}</span>
                         <span className="text-xs text-gray-500">{dateStr} {timeStr}</span>
@@ -163,6 +161,7 @@ const CommentItem: React.FC<{
     );
 };
 
+// Full list component used in Modal
 const CommentListAndInput: React.FC<{ 
     petId: string, 
     postOwnerEmail?: string,
@@ -209,7 +208,7 @@ const CommentListAndInput: React.FC<{
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-[300px] max-h-[50vh] rounded-t-lg border border-gray-200 border-b-0">
+            <div className="flex-1 overflow-y-auto p-4 bg-white min-h-[300px]">
                 {rootComments.length > 0 ? (
                     rootComments.map(comment => (
                         <CommentItem 
@@ -230,11 +229,11 @@ const CommentListAndInput: React.FC<{
                     </div>
                 )}
             </div>
-            <div className="p-4 bg-white border border-gray-200 rounded-b-lg">
+            <div className="p-4 bg-gray-50 border-t border-gray-200">
                 {replyTo && (
-                    <div className="flex justify-between items-center mb-2 text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded">
+                    <div className="flex justify-between items-center mb-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded">
                         <span>Respondiendo a <strong>@{replyTo.userName}</strong></span>
-                        <button onClick={cancelReply} className="hover:text-blue-800"><XCircleIcon className="h-4 w-4" /></button>
+                        <button onClick={cancelReply} className="hover:text-blue-900"><XCircleIcon className="h-4 w-4" /></button>
                     </div>
                 )}
                 <form onSubmit={handleSubmit} className="flex gap-2">
@@ -243,7 +242,7 @@ const CommentListAndInput: React.FC<{
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder={currentUser ? "Escribe un comentario o avistamiento..." : "Inicia sesión para comentar"}
-                        className="flex-1 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-primary focus:border-brand-primary resize-none"
+                        className="flex-1 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-primary focus:border-brand-primary resize-none text-black"
                         rows={1}
                         disabled={!currentUser || isSubmitting}
                     />
@@ -259,6 +258,25 @@ const CommentListAndInput: React.FC<{
         </div>
     );
 };
+
+const CommentsModal: React.FC<any> = ({ isOpen, onClose, ...props }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[3000] flex justify-center items-center p-4 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+                    <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                        <ChatBubbleIcon className="h-5 w-5" /> Comentarios
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><XCircleIcon className="h-6 w-6" /></button>
+                </div>
+                <div className="flex-grow overflow-hidden">
+                    <CommentListAndInput {...props} />
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export const PetDetailPage: React.FC<PetDetailPageProps> = ({ 
     pet: propPet, 
@@ -290,15 +308,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isReunionModalOpen, setIsReunionModalOpen] = useState(false);
+    const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
+    const [newCommentPreview, setNewCommentPreview] = useState('');
 
     // Map Ref
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
 
     useEffect(() => {
-        // Small delay to ensure container is rendered and sized
         const timer = setTimeout(() => {
             if (!pet) return;
             if (!pet.lat || !pet.lng) return;
@@ -307,7 +326,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             const L = (window as any).L;
             if (!L) return;
 
-            // Cleanup previous instance if coordinates changed significantly or force re-init
             if (mapInstance.current) {
                 mapInstance.current.invalidateSize();
                 mapInstance.current.setView([pet.lat, pet.lng], 15);
@@ -349,9 +367,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     
     // Status Logic
     const isLost = pet.status === PET_STATUS.PERDIDO;
-    const isFound = pet.status === PET_STATUS.ENCONTRADO;
-    const isReunited = pet.status === PET_STATUS.REUNIDO;
-
+    
     // Handlers
     const handleReunionSubmit = async (story: string, date: string, image?: string) => {
         try {
@@ -365,7 +381,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 updateData.image_urls = [image, ...pet.imageUrls];
             }
 
-            // Using standard update method from parent would be better but direct here for custom fields
             const { error } = await supabase
                 .from('pets')
                 .update(updateData)
@@ -380,11 +395,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             
         } catch (error: any) {
             console.error("Error updating reunion status:", error);
-            alert("Hubo un error al guardar. Asegúrate de haber ejecutado el script SQL proporcionado.");
+            alert("Hubo un error al guardar.");
         }
     };
 
     const handleRevealContact = () => {
+        if (!currentUser) {
+            navigate('/login');
+            return;
+        }
         setContactRevealed(true);
         trackContactOwner(pet.id, 'phone_reveal');
         if (onRecordContactRequest) onRecordContactRequest(pet.id);
@@ -410,8 +429,23 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
+    // Filter comments for preview (last 2)
+    const previewComments = pet.comments ? pet.comments.filter(c => !c.parentId).slice(-2) : [];
+    const totalComments = pet.comments ? pet.comments.length : 0;
+
+    const handleQuickComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newCommentPreview.trim()) return;
+        if (!currentUser) {
+            alert("Inicia sesión para comentar");
+            return;
+        }
+        await onAddComment(pet.id, newCommentPreview);
+        setNewCommentPreview('');
+    };
+
     return (
-        <div className="max-w-6xl mx-auto pb-10 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto pb-10 px-4 sm:px-6">
             <Helmet>
                 <title>{pet.name} - {pet.status} | Pets</title>
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
@@ -421,12 +455,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 <ChevronLeftIcon className="h-5 w-5 mr-1" /> Volver al listado
             </button>
 
-            {/* CLASSIC CARD LAYOUT */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2">
-                    
-                    {/* LEFT: Image Carousel (Simple) */}
-                    <div className="relative bg-gray-200 h-[400px] md:h-auto min-h-[400px]">
+            {/* --- NEW 2-COLUMN LAYOUT --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* --- LEFT COLUMN: Images, Description, Comments --- */}
+                <div className="space-y-6">
+                    {/* 1. Fixed Height Image Container */}
+                    <div className="relative bg-gray-200 rounded-lg overflow-hidden h-[400px] md:h-[500px] shadow-md border border-gray-200">
                         <img 
                             src={pet.imageUrls[currentImageIndex] || 'https://placehold.co/600x400?text=Sin+Imagen'} 
                             alt={pet.name} 
@@ -450,198 +485,232 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         )}
                     </div>
 
-                    {/* RIGHT: Information */}
-                    <div className="p-6 md:p-8 flex flex-col">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900 capitalize mb-1">{pet.name}</h1>
-                                <p className="text-gray-500 font-medium">{pet.animalType} • {pet.breed}</p>
+                    {/* 2. Description */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 className="font-bold text-gray-900 text-lg mb-3 border-b pb-2">Historia / Descripción</h3>
+                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                            {pet.description}
+                        </p>
+                        {pet.adoptionRequirements && (
+                            <div className="mt-4 bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                <h4 className="font-bold text-purple-900 text-sm mb-1">Requisitos de Adopción</h4>
+                                <p className="text-purple-800 text-sm">{pet.adoptionRequirements}</p>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setIsShareModalOpen(true)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Compartir">
-                                    <ShareIcon className="h-5 w-5" />
-                                </button>
-                                <button onClick={() => onGenerateFlyer(pet)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Imprimir Afiche">
-                                    <PrinterIcon className="h-5 w-5" />
-                                </button>
-                                {!isOwner && (
-                                    <button onClick={() => setIsReportModalOpen(true)} className="p-2 text-gray-500 hover:text-red-500 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Reportar">
-                                        <FlagIcon className="h-5 w-5" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        )}
+                    </div>
 
-                        <div className="space-y-4 mb-6 flex-grow">
-                            <div className="flex items-start gap-3">
-                                <LocationMarkerIcon className="text-brand-primary h-5 w-5 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-xs text-gray-400 font-bold uppercase">Ubicación</p>
-                                    <p className="text-gray-800">{pet.location}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <CalendarIcon className="text-brand-primary h-5 w-5 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-xs text-gray-400 font-bold uppercase">Fecha</p>
-                                    <p className="text-gray-800 capitalize">
-                                        {new Date(pet.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <TagIcon className="text-brand-primary h-5 w-5 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <p className="text-xs text-gray-400 font-bold uppercase">Detalles</p>
-                                    <p className="text-gray-800">{pet.color} • {pet.size}</p>
-                                </div>
-                            </div>
-                            
-                            {pet.reward && (
-                                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3">
-                                    <span className="text-2xl">💰</span>
-                                    <div>
-                                        <p className="text-xs text-yellow-800 font-bold uppercase">Recompensa</p>
-                                        <p className="text-yellow-900 font-bold">{pet.currency} {pet.reward}</p>
-                                    </div>
-                                </div>
+                    {/* 3. Comments (Moved here) */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-700 text-sm flex items-center gap-2">
+                                <ChatBubbleIcon className="h-4 w-4" /> Comentarios ({totalComments})
+                            </h3>
+                            {totalComments > 2 && (
+                                <button onClick={() => setIsCommentsModalOpen(true)} className="text-xs text-brand-primary font-bold hover:underline">
+                                    Ver todos
+                                </button>
                             )}
                         </div>
-
-                        {/* Actions Footer */}
-                        <div className="pt-6 border-t border-gray-100 space-y-3">
-                            {(isOwner || isAdmin) ? (
-                                <div className="space-y-3">
-                                    {isLost && (
-                                        <button 
-                                            onClick={() => setIsReunionModalOpen(true)}
-                                            className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                        >
-                                            <SparklesIcon className="h-5 w-5 text-yellow-300" />
-                                            He encontrado a mi mascota
-                                        </button>
-                                    )}
-                                    <div className="flex gap-3">
-                                        <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition-colors">
-                                            <EditIcon className="h-4 w-4" /> Editar
-                                        </button>
-                                        <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors">
-                                            <TrashIcon className="h-4 w-4" /> Eliminar
-                                        </button>
-                                    </div>
+                        <div className="p-4">
+                            {previewComments.length > 0 ? (
+                                <div className="space-y-4 mb-4">
+                                    {previewComments.map(comment => (
+                                        <CommentItem 
+                                            key={comment.id} 
+                                            comment={comment} 
+                                            allComments={pet.comments || []} 
+                                            onReply={() => setIsCommentsModalOpen(true)}
+                                            onLike={(cid) => onLikeComment(pet.id, cid)}
+                                            onReportComment={(cid) => console.log(cid)} 
+                                            currentUser={currentUser}
+                                            postOwnerEmail={pet.userEmail}
+                                        />
+                                    ))}
                                 </div>
                             ) : (
-                                <>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer">
-                                            {petOwner?.avatarUrl ? (
-                                                <img src={petOwner.avatarUrl} className="w-10 h-10 rounded-full object-cover border border-gray-200" alt="avatar" />
-                                            ) : (
-                                                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold">
-                                                    {(petOwner?.firstName || 'U').charAt(0)}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500">Publicado por</p>
-                                            <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-bold text-gray-900 hover:text-brand-primary">
-                                                @{petOwner?.username || 'Usuario'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {pet.shareContactInfo && !isOwner ? (
-                                        contactRevealed ? (
-                                            <div className="bg-green-50 p-3 rounded-lg border border-green-200 text-center mb-2">
-                                                <a href={`tel:${pet.contact}`} className="text-xl font-bold text-green-800 hover:underline block">{pet.contact}</a>
-                                                <a href={`https://wa.me/51${pet.contact}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-green-600 hover:text-green-800">
-                                                    Abrir WhatsApp
-                                                </a>
-                                            </div>
-                                        ) : (
-                                            <button onClick={handleRevealContact} className="w-full py-3 bg-brand-primary text-white font-bold rounded-lg shadow-sm hover:bg-brand-dark transition-all flex items-center justify-center gap-2 mb-2">
-                                                <PhoneIcon className="h-5 w-5" /> Ver Teléfono
-                                            </button>
-                                        )
-                                    ) : null}
-
-                                    {!isOwner && (
-                                        <button onClick={() => onStartChat(pet)} className="w-full py-3 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
-                                            <ChatBubbleIcon className="h-5 w-5" /> Enviar Mensaje
-                                        </button>
-                                    )}
-                                </>
+                                <p className="text-sm text-gray-400 italic mb-4 text-center">Aún no hay comentarios.</p>
                             )}
+                            
+                            {/* Quick Comment Input */}
+                            <form onSubmit={handleQuickComment} className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder={currentUser ? "Escribe un comentario..." : "Inicia sesión para comentar"} 
+                                    className="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-brand-primary text-black"
+                                    value={newCommentPreview}
+                                    onChange={(e) => setNewCommentPreview(e.target.value)}
+                                    disabled={!currentUser}
+                                />
+                                <button type="submit" disabled={!currentUser || !newCommentPreview.trim()} className="bg-brand-primary text-white p-2 rounded-md hover:bg-brand-dark transition-colors disabled:opacity-50">
+                                    <SendIcon className="h-4 w-4" />
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
 
-                {/* Bottom Section: Description, Map, Comments */}
-                <div className="p-6 md:p-8 border-t border-gray-200 bg-gray-50">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* --- RIGHT COLUMN: Info, Details, Map, Actions --- */}
+                <div className="flex flex-col h-full bg-white p-6 rounded-lg shadow-md border border-gray-200 relative">
+                    
+                    {/* Header: Name, Type, Buttons */}
+                    <div className="flex justify-between items-start mb-6">
                         <div>
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-                                <h3 className="font-bold text-gray-900 text-lg mb-3 border-b pb-2">Historia / Descripción</h3>
-                                <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                                    {pet.description}
-                                </p>
-                                {pet.adoptionRequirements && (
-                                    <div className="mt-4 bg-purple-50 p-4 rounded-lg border border-purple-100">
-                                        <h4 className="font-bold text-purple-900 text-sm mb-1">Requisitos de Adopción</h4>
-                                        <p className="text-purple-800 text-sm">{pet.adoptionRequirements}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Interactive Map */}
-                            {pet.lat && pet.lng && (
-                                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                    <h3 className="font-bold text-gray-900 text-lg mb-3 border-b pb-2 flex items-center gap-2">
-                                        <LocationMarkerIcon className="h-5 w-5 text-gray-500" /> Ubicación Exacta
-                                    </h3>
-                                    <div className="w-full h-64 rounded-lg overflow-hidden shadow-inner border border-gray-200 relative z-0 mb-3">
-                                        <div ref={mapRef} className="w-full h-full"></div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button 
-                                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank')}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors"
-                                        >
-                                            <GoogleMapsIcon className="h-4 w-4" /> Google Maps
-                                        </button>
-                                        <button 
-                                            onClick={() => window.open(`https://waze.com/ul?ll=${pet.lat},${pet.lng}&navigate=yes`, '_blank')}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 hover:bg-blue-100 rounded text-xs font-bold text-blue-700 transition-colors"
-                                        >
-                                            <WazeIcon className="h-4 w-4" /> Waze
-                                        </button>
-                                    </div>
-                                </div>
+                            <h1 className="text-3xl font-black text-gray-900 capitalize leading-tight">{pet.name}</h1>
+                            <p className="text-gray-500 font-medium text-lg mt-1">{pet.animalType} • {pet.breed}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setIsShareModalOpen(true)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Compartir">
+                                <ShareIcon className="h-5 w-5" />
+                            </button>
+                            <button onClick={() => onGenerateFlyer(pet)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Imprimir Afiche">
+                                <PrinterIcon className="h-5 w-5" />
+                            </button>
+                            {!isOwner && (
+                                <button onClick={() => setIsReportModalOpen(true)} className="p-2 text-gray-500 hover:text-red-500 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Reportar">
+                                    <FlagIcon className="h-5 w-5" />
+                                </button>
                             )}
                         </div>
+                    </div>
 
-                        <div>
-                            {/* Comments Section */}
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full max-h-[600px]">
-                                <div className="p-4 border-b border-gray-200 bg-gray-50">
-                                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                        <ChatBubbleIcon className="h-5 w-5" /> Comentarios y Avistamientos
-                                    </h3>
-                                </div>
-                                <div className="flex-grow overflow-hidden">
-                                    <CommentListAndInput 
-                                        petId={pet.id} 
-                                        postOwnerEmail={pet.userEmail}
-                                        comments={pet.comments} 
-                                        onAddComment={onAddComment}
-                                        onLikeComment={onLikeComment}
-                                        onReportComment={(cid) => console.log('Report comment', cid)}
-                                        onDeleteComment={handleDeleteComment}
-                                        currentUser={currentUser} 
-                                    />
-                                </div>
+                    <div className="space-y-6 flex-grow">
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-xs text-gray-400 font-bold uppercase mb-1">Tamaño</p>
+                                <p className="font-semibold text-gray-800">{pet.size}</p>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-xs text-gray-400 font-bold uppercase mb-1">Color</p>
+                                <p className="font-semibold text-gray-800">{pet.color}</p>
                             </div>
                         </div>
+
+                        {/* Date */}
+                        <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                            <CalendarIcon className="text-brand-primary h-5 w-5 flex-shrink-0" />
+                            <div>
+                                <p className="text-xs text-gray-400 font-bold uppercase">Fecha del Suceso</p>
+                                <p className="text-gray-800 font-medium capitalize">
+                                    {new Date(pet.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Location Text */}
+                        <div className="flex items-start gap-3">
+                            <LocationMarkerIcon className="text-brand-primary h-5 w-5 mt-1 flex-shrink-0" />
+                            <div>
+                                <p className="text-xs text-gray-400 font-bold uppercase">Ubicación</p>
+                                <p className="text-gray-800 font-medium leading-tight">{pet.location}</p>
+                            </div>
+                        </div>
+
+                        {/* Reward */}
+                        {pet.reward && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3 shadow-sm">
+                                <span className="text-2xl">💰</span>
+                                <div>
+                                    <p className="text-xs text-yellow-800 font-bold uppercase">Recompensa</p>
+                                    <p className="text-yellow-900 font-bold">{pet.currency} {pet.reward}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Interactive Map */}
+                        {pet.lat && pet.lng && (
+                            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                                <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">
+                                    Ubicación Exacta
+                                </div>
+                                <div className="w-full h-48 relative z-0">
+                                    <div ref={mapRef} className="w-full h-full"></div>
+                                </div>
+                                <div className="flex">
+                                    <button 
+                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank')}
+                                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors border-r border-gray-200 flex items-center justify-center gap-1"
+                                    >
+                                        <GoogleMapsIcon className="h-3 w-3" /> Maps
+                                    </button>
+                                    <button 
+                                        onClick={() => window.open(`https://waze.com/ul?ll=${pet.lat},${pet.lng}&navigate=yes`, '_blank')}
+                                        className="flex-1 py-2 bg-white hover:bg-blue-50 text-xs font-bold text-blue-700 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <WazeIcon className="h-3 w-3" /> Waze
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Sticky Bottom Actions */}
+                    <div className="mt-8 pt-4 border-t border-gray-100">
+                        {/* Owner Actions */}
+                        {(isOwner || isAdmin) ? (
+                            <div className="space-y-3">
+                                {isLost && (
+                                    <button 
+                                        onClick={() => setIsReunionModalOpen(true)}
+                                        className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                                    >
+                                        <SparklesIcon className="h-5 w-5 text-yellow-300" />
+                                        ¡Ya encontré a mi mascota!
+                                    </button>
+                                )}
+                                <div className="flex gap-3">
+                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+                                        <EditIcon className="h-4 w-4" /> Editar
+                                    </button>
+                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">
+                                        <TrashIcon className="h-4 w-4" /> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Public User Actions */
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer">
+                                        {petOwner?.avatarUrl ? (
+                                            <img src={petOwner.avatarUrl} className="w-10 h-10 rounded-full object-cover border border-gray-200" alt="avatar" />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold">
+                                                {(petOwner?.firstName || 'U').charAt(0)}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500">Publicado por</p>
+                                        <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-bold text-gray-900 hover:text-brand-primary text-sm">
+                                            @{petOwner?.username || 'Usuario'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {pet.shareContactInfo && !isOwner && (
+                                    contactRevealed ? (
+                                        <div className="bg-green-50 p-3 rounded-lg border border-green-200 text-center animate-fade-in">
+                                            <a href={`tel:${pet.contact}`} className="text-xl font-bold text-green-800 hover:underline block">{pet.contact}</a>
+                                            <a href={`https://wa.me/51${pet.contact}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-green-600 hover:text-green-800 flex items-center justify-center gap-1 mt-1">
+                                                <PhoneIcon className="h-3 w-3" /> Abrir WhatsApp
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <button onClick={handleRevealContact} className={`w-full py-3 ${currentUser ? 'bg-brand-primary text-white hover:bg-brand-dark' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2`}>
+                                            {!currentUser ? <LockIcon className="h-5 w-5" /> : <PhoneIcon className="h-5 w-5" />}
+                                            {currentUser ? 'Ver Teléfono' : 'Ver Teléfono (Ingresa)'}
+                                        </button>
+                                    )
+                                )}
+
+                                {!isOwner && (
+                                    <button onClick={() => onStartChat(pet)} className="w-full py-3 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                                        <ChatBubbleIcon className="h-5 w-5" /> Enviar Mensaje
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -675,6 +744,19 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 onClose={() => setIsReunionModalOpen(false)}
                 pet={pet}
                 onSubmit={handleReunionSubmit}
+            />
+
+            <CommentsModal 
+                isOpen={isCommentsModalOpen} 
+                onClose={() => setIsCommentsModalOpen(false)}
+                petId={pet.id} 
+                postOwnerEmail={pet.userEmail}
+                comments={pet.comments} 
+                onAddComment={onAddComment}
+                onLikeComment={onLikeComment}
+                onReportComment={(cid: string) => console.log('Report', cid)}
+                onDeleteComment={handleDeleteComment}
+                currentUser={currentUser} 
             />
 
             {publicProfileUser && (

@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { User, Pet, OwnedPet, UserRating, Business } from '../types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon } from './icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -15,6 +15,7 @@ import GamificationBadge from './GamificationBadge';
 import GamificationDashboard from './GamificationDashboard';
 import BusinessManagementModal from './BusinessManagementModal';
 import { businessService } from '../services/businessService';
+import { OnboardingTour, TourStep } from './OnboardingTour';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -34,6 +35,7 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propReportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet, currentUser } = useAuth();
+    const queryClient = useQueryClient();
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
     const [isDashboardOpen, setIsDashboardOpen] = useState(false);
@@ -100,6 +102,42 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             })) as Pet[];
         }
     });
+
+    const { data: savedSearches = [] } = useQuery({
+        queryKey: ['savedSearches', user.id],
+        enabled: !!user.id,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('saved_searches')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                if(error.code === '42P01') return [];
+                console.error("Error fetching saved searches:", error);
+                return [];
+            }
+            
+            return (data || []).map((s: any) => ({
+                id: s.id,
+                userId: s.user_id,
+                name: s.name,
+                filters: s.filters,
+                createdAt: s.created_at
+            })) as SavedSearch[];
+        }
+    });
+
+    const handleDeleteSavedSearch = async (id: string) => {
+        if(!confirm('¿Eliminar esta alerta?')) return;
+        try {
+            await supabase.from('saved_searches').delete().eq('id', id);
+            queryClient.invalidateQueries({ queryKey: ['savedSearches', user.id] });
+        } catch(e) {
+            console.error(e);
+        }
+    };
 
     const { data: myRatings = [], isLoading: isLoadingRatings } = useQuery({
         queryKey: ['ratings', user.id],
@@ -235,10 +273,46 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     };
     
+    // --- PROFILE TOUR STEPS ---
+    const profileTourSteps: TourStep[] = [
+        {
+            target: '[data-tour="gamification-card"]',
+            title: 'Tu Progreso',
+            content: 'Aquí verás tu nivel como héroe de mascotas. Ganas puntos reportando, comentando y ayudando.',
+            position: 'left'
+        },
+        {
+            target: '[data-tour="gamification-dashboard-btn"]',
+            title: 'Doggy Dashboard',
+            content: 'Haz clic aquí para ver misiones diarias y el ranking de usuarios.',
+            position: 'bottom'
+        },
+        {
+            target: '[data-tour="my-pets-section"]',
+            title: 'Mis Mascotas',
+            content: 'Agrega a tus mascotas aquí. Si alguna se pierde, podrás reportarla con un solo clic.',
+            position: 'top'
+        },
+        {
+            target: '[data-tour="saved-pets-section"]',
+            title: 'Publicaciones Guardadas',
+            content: 'Aquí aparecerán los reportes que marques con el ícono de "guardar" para seguirlos de cerca.',
+            position: 'top'
+        },
+        {
+            target: '[data-tour="ratings-section"]',
+            title: 'Mis Calificaciones',
+            content: 'Construye tu reputación. Otros usuarios pueden calificarte si los ayudas o adoptas.',
+            position: 'top'
+        }
+    ];
+
     const inputClass = "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
 
     return (
         <div className="space-y-8">
+            <OnboardingTour steps={profileTourSteps} tourId="profile_v1" />
+
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <div className="flex justify-between items-start mb-4">
                     <h2 className="text-3xl font-bold text-brand-dark">Mi Perfil</h2>
@@ -368,13 +442,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             </div>
                         </div>
 
-                        <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center min-w-[220px] shadow-sm">
+                        <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center min-w-[220px] shadow-sm" data-tour="gamification-card">
                             <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">Insignia de Comunidad</h4>
                             <GamificationBadge points={gamificationPoints} size="lg" showProgress={true} />
                             
                             <button 
                                 onClick={() => setIsDashboardOpen(true)}
                                 className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs uppercase tracking-wide py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                data-tour="gamification-dashboard-btn"
                             >
                                 <TrophyIcon className="h-4 w-4" />
                                 Ver Doggy Dashboard
@@ -384,7 +459,36 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 )}
             </div>
             
-            <div className="space-y-4">
+            {/* SAVED SEARCHES SECTION */}
+            {savedSearches.length > 0 && (
+                <div className="space-y-4">
+                    <h3 className="text-2xl font-semibold text-gray-700 flex items-center gap-2">
+                        <BellIcon className="text-brand-secondary h-6 w-6"/> Mis Alertas de Búsqueda
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {savedSearches.map(search => (
+                            <div key={search.id} className="bg-white p-4 rounded-lg shadow border border-gray-200 relative group hover:border-brand-secondary transition-colors">
+                                <h4 className="font-bold text-gray-800">{search.name}</h4>
+                                <p className="text-xs text-gray-500 mt-1">Creada el {new Date(search.createdAt).toLocaleDateString()}</p>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                    {Object.entries(search.filters).map(([key, val]) => (
+                                        val !== 'Todos' && <span key={key} className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-600">{val}</span>
+                                    ))}
+                                </div>
+                                <button 
+                                    onClick={() => handleDeleteSavedSearch(search.id)}
+                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Eliminar alerta"
+                                >
+                                    <TrashIcon />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-4" data-tour="my-pets-section">
                 <div className="flex justify-between items-center">
                     <h3 className="text-2xl font-semibold text-gray-700">Mis Mascotas</h3>
                     <button onClick={() => { setEditingOwnedPet(null); setIsAddPetModalOpen(true); }} className="flex items-center gap-2 bg-brand-secondary hover:bg-amber-400 text-brand-dark font-bold py-2 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105">
@@ -434,7 +538,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4" data-tour="saved-pets-section">
                 <h3 className="text-2xl font-semibold text-gray-700">Publicaciones guardadas</h3>
                 {savedPets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -488,7 +592,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             </div>
 
             {/* Ratings Section */}
-            <div className="space-y-4">
+            <div className="space-y-4" data-tour="ratings-section">
                 <h3 className="text-2xl font-semibold text-gray-700">Mis Calificaciones</h3>
                 {isLoadingRatings ? (
                     <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>

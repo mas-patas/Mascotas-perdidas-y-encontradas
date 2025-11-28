@@ -111,7 +111,12 @@ export const Header: React.FC<HeaderProps> = ({
         <header className="bg-gray-100 text-gray-800 shadow-md px-3 py-2 sm:px-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-50 flex-shrink-0">
             <div className="flex items-center gap-2 sm:gap-4">
                  {isMainView && (
-                    <button onClick={onToggleSidebar} className="lg:hidden text-gray-600 hover:text-sidebar-dark" aria-label="Abrir menú de filtros">
+                    <button 
+                        onClick={onToggleSidebar} 
+                        className="lg:hidden text-gray-600 hover:text-sidebar-dark" 
+                        aria-label="Abrir menú de filtros"
+                        data-tour="mobile-menu-btn"
+                    >
                         <MenuIcon />
                     </button>
                  )}
@@ -126,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1 sm:gap-2">
                 <nav className="flex items-center gap-1 sm:gap-2">
                     {/* Reportar */}
-                    <div className="relative" ref={reportDropdownRef}>
+                    <div className="relative" ref={reportDropdownRef} data-tour="header-report-btn">
                         <button
                             onClick={() => setIsReportDropdownOpen(prev => !prev)}
                             className="flex items-center gap-1 sm:gap-2 bg-brand-secondary hover:bg-amber-400 text-brand-dark font-bold py-1.5 px-2 sm:py-2 sm:px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 text-sm sm:text-base"
@@ -187,6 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
                             onClick={() => navigate('/mensajes')} 
                             className={navButtonClass} 
                             aria-label="Mensajes"
+                            data-tour="header-messages-btn"
                         >
                             <ChatBubbleIcon />
                             {hasUnreadMessages && (
@@ -198,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                     {/* Notifications (Only if logged in) */}
                     {currentUser && (
-                        <div className="relative" ref={notificationsRef}>
+                        <div className="relative" ref={notificationsRef} data-tour="header-notifications-btn">
                             <button onClick={handleToggleNotifications} className={navButtonClass} aria-label="Notificaciones">
                                 <BellIcon />
                                 {unreadNotificationsCount > 0 && (
@@ -219,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                     {/* Mi Cuenta / Login */}
                     {currentUser ? (
-                        <div className="relative" ref={accountDropdownRef}>
+                        <div className="relative" ref={accountDropdownRef} data-tour="header-account-btn">
                             <button 
                                 onClick={() => setIsAccountDropdownOpen(prev => !prev)} 
                                 className="flex items-center gap-2 text-gray-600 hover:text-sidebar-dark rounded-full p-1 hover:bg-purple-100 transition-colors ml-1"
@@ -277,6 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <Link
                             to="/login"
                             className="flex items-center gap-2 text-gray-600 hover:text-sidebar-dark hover:bg-purple-100 font-semibold px-3 py-2 rounded-lg transition-colors text-sm"
+                            data-tour="header-login-btn"
                         >
                             <UserIcon />
                             <span className="hidden sm:inline">Ingresar</span>

@@ -15,6 +15,20 @@ export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeo
 export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
 export type BusinessType = typeof BUSINESS_TYPES[keyof typeof BUSINESS_TYPES];
 
+export interface SavedSearch {
+    id: string;
+    userId: string;
+    name: string;
+    filters: {
+        status: PetStatus | 'Todos';
+        type: AnimalType | 'Todos';
+        breed: string;
+        department: string;
+        // Simplified filters for saving
+    };
+    createdAt: string;
+}
+
 export interface BusinessProduct {
     id: string;
     businessId: string;

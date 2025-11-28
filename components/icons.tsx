@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 import React from 'react';
 
 export const PlusIcon: React.FC<{className?: string}> = ({ className }) => (
@@ -29,6 +23,12 @@ export const CalendarIcon: React.FC<{className?: string}> = ({ className }) => (
 export const PhoneIcon: React.FC<{className?: string}> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+    </svg>
+);
+
+export const LockIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
     </svg>
 );
 
@@ -116,8 +116,8 @@ export const CatIcon: React.FC<{className?: string}> = ({ className }) => (
     </svg>
 );
 
-export const EditIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+export const EditIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
     </svg>
 );
@@ -129,8 +129,8 @@ export const SendIcon: React.FC = () => (
 );
 
 
-export const TrashIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+export const TrashIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
 );
@@ -242,8 +242,8 @@ export const WarningIcon: React.FC<{className?: string}> = ({ className }) => (
     </svg>
 );
 
-export const FlagIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+export const FlagIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H12.5l-1-1H5a2 2 0 00-2 2zm0 0h18" />
     </svg>
 );
@@ -284,8 +284,8 @@ export const MegaphoneIcon: React.FC<{className?: string}> = ({ className }) => 
     </svg>
 );
 
-export const ExternalLinkIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+export const ExternalLinkIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
     </svg>
 );
@@ -296,14 +296,14 @@ export const DirectionIcon: React.FC = () => (
     </svg>
 );
 
-export const GoogleMapsIcon: React.FC = () => (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+export const GoogleMapsIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
 );
 
-export const WazeIcon: React.FC = () => (
-     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+export const WazeIcon: React.FC<{className?: string}> = ({ className }) => (
+     <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
         <path d="M18.26 4.91c-1.88-1.61-4.3-2.5-6.85-2.5C7.16 2.41 3.35 5.47 2.14 9.57c-1.3 4.42.38 8.98 4.03 11.35 1.36.88 2.93 1.35 4.53 1.35.84 0 1.69-.13 2.52-.4 1.43.89 2.44 1.3 4.32 1.3 1.81 0 3.72-.77 4.42-2.54.34-.85.2-1.56-.36-2.13 2.1-1.68 3.02-4.58 2.31-7.28-.54-2.07-2.08-4.27-5.65-6.31zM13.7 17.4c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5-1.5-.67 1.5-1.5 1.5zm-6.8 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5-1.5-.67 1.5-1.5 1.5z"/>
     </svg>
 );
@@ -410,5 +410,11 @@ export const MedicalIcon: React.FC<{className?: string}> = ({ className }) => (
 export const ScissorsIcon: React.FC<{className?: string}> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+    </svg>
+);
+
+export const ArrowDownIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
     </svg>
 );

@@ -8,7 +8,6 @@ import { departments } from '../data/locations';
 import { HomeIcon, MegaphoneIcon, MapIcon, TrashIcon, StoreIcon, HeartIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 
-
 type Filters = {
     status: PetStatus | 'Todos',
     type: AnimalType | 'Todos',
@@ -39,6 +38,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     onClose,
     onClearFilters
 }) => {
+    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [breeds, setBreeds] = useState<string[]>(['Todos']);
@@ -110,14 +110,17 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
         <>
             {isSidebarOpen && <div onClick={onClose} className="fixed inset-0 bg-black bg-opacity-60 z-30 lg:hidden" />}
             
-            <aside className={`
-                bg-sidebar-dark text-white flex flex-col shadow-2xl 
-                transition-transform duration-300 ease-in-out
-                fixed inset-y-0 left-0 w-64 z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
-                pt-20 lg:pt-0
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
-            `}>
+            <aside 
+                className={`
+                    bg-sidebar-dark text-white flex flex-col shadow-2xl 
+                    transition-transform duration-300 ease-in-out
+                    fixed inset-y-0 left-0 w-64 z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
+                    pt-20 lg:pt-0
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                    ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
+                `}
+                data-tour="sidebar-menu"
+            >
                 <div className="p-6">
                     <div className="flex justify-between items-center">
                         <h2 className="text-xl font-bold text-white">Menú</h2>
@@ -125,16 +128,16 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     </div>
                 </div>
 
-                <nav className="px-6 mb-6 space-y-2">
+                <nav className="px-6 mb-6 space-y-2" data-tour="sidebar-navigation">
                     <button onClick={() => navigate('/')} className={navLinkClass(isHome)}>
                         <HomeIcon />
                         <span>Inicio</span>
                     </button>
-                     <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')}>
+                     <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
                         <MapIcon />
                         <span>Mapa de Mascotas</span>
                     </button>
-                    <button onClick={() => navigate('/campanas')} className={navLinkClass(location.pathname === '/campanas')}>
+                    <button onClick={() => navigate('/campanas')} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
                         <MegaphoneIcon />
                         <span>Campañas</span>
                     </button>
@@ -142,7 +145,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                         <StoreIcon />
                         <span>Servicios</span>
                     </button>
-                    <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')}>
+                    <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
                         <HeartIcon />
                         <span>Mascotas Reunidas</span>
                     </button>
@@ -151,7 +154,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
 
                 {/* Filters Section for HOME (Lost Pets) */}
                 {isHome && (
-                    <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-gray-700 pt-6">
+                    <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-gray-700 pt-6 scrollbar-thin scrollbar-thumb-gray-600">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Filtros</h3>
                             <button 
@@ -163,7 +166,8 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                             </button>
                         </div>
                         
-                        <div className="space-y-4">
+                        {/* Moved ID to inner container for tighter highlight */}
+                        <div className="space-y-4" data-tour="sidebar-filters">
                             <div>
                                 <label htmlFor="status-filter" className="block text-sm font-medium text-gray-300 mb-1">Estado:</label>
                                 <select
