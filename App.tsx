@@ -415,11 +415,44 @@ const App: React.FC = () => {
     
     const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { if(currentUser) { await supabase.from('support_tickets').insert({ id: generateUUID(), user_email: currentUser.email, category, subject, description, status: SUPPORT_TICKET_STATUS.PENDING }); } };
     const handleUpdateSupportTicket = async (ticket: SupportTicket) => { await supabase.from('support_tickets').update({ status: ticket.status, response: ticket.response, assigned_to: ticket.assignedTo }).eq('id', ticket.id); };
-    const handleSaveCampaign = async (data: any, id?: string) => { 
-        if(id) await supabase.from('campaigns').update(data).eq('id', id);
-        else if(currentUser) await supabase.from('campaigns').insert({ ...data, id: generateUUID(), user_email: currentUser.email });
+    
+    const handleSaveCampaign = async (data: any, id?: string) => {
+        // Map camelCase to snake_case for DB
+        const dbData = {
+            title: data.title,
+            description: data.description,
+            type: data.type,
+            location: data.location,
+            date: data.date,
+            contact_phone: data.contactPhone,
+            image_urls: data.imageUrls,
+            lat: data.lat,
+            lng: data.lng
+        };
+
+        try {
+            if(id) {
+                const { error } = await supabase.from('campaigns').update(dbData).eq('id', id);
+                if (error) throw error;
+            } else if(currentUser) {
+                const { error } = await supabase.from('campaigns').insert({ 
+                    ...dbData, 
+                    id: generateUUID(), 
+                    user_email: currentUser.email 
+                });
+                if (error) throw error;
+            }
+            queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+        } catch (err: any) {
+            console.error("Error saving campaign:", err);
+            alert("Error al guardar la campaña: " + err.message);
+        }
     };
-    const handleDeleteCampaign = async (id: string) => { await supabase.from('campaigns').delete().eq('id', id); };
+
+    const handleDeleteCampaign = async (id: string) => { 
+        await supabase.from('campaigns').delete().eq('id', id); 
+        queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+    };
     
     const handleViewAdminUser = (user: User) => { setSelectedUserProfile(user); setIsUserDetailModalOpen(true); };
     const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };

@@ -1,6 +1,6 @@
 
 import { supabase } from '../services/supabaseClient';
-import { STORAGE_PROVIDER, AWS_CONFIG } from '../config';
+import { STORAGE_BUCKET } from '../config';
 
 // Helper to prevent indefinite hanging
 const timeoutPromise = (ms: number, errorMessage: string) => {
@@ -9,8 +9,8 @@ const timeoutPromise = (ms: number, errorMessage: string) => {
     });
 };
 
-export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quality = 0.6): Promise<string> => {
-    const compressionLogic = new Promise<string>((resolve, reject) => {
+export const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.7): Promise<string> => {
+    return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = (event) => {
@@ -49,7 +49,7 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quali
                         return;
                     }
 
-                    // Draw white background for transparent PNGs to avoid black backgrounds in JPEG
+                    // Draw white background for transparent PNGs
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, width, height);
 
@@ -60,11 +60,11 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quali
                     resolve(compressedBase64);
                 } catch (e) {
                     console.error("Compression logic error", e);
-                    reject(new Error("Error procesando la imagen. Intente con otra."));
+                    reject(new Error("Error procesando la imagen."));
                 }
             };
             
-            img.onerror = () => reject(new Error("Error al cargar la imagen para compresión."));
+            img.onerror = () => reject(new Error("Error al cargar la imagen."));
         };
         
         reader.onerror = () => reject(new Error("Error al leer el archivo."));
@@ -75,77 +75,35 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 600, quali
             reject(e);
         }
     });
-
-    return Promise.race([
-        compressionLogic,
-        timeoutPromise(10000, "Tiempo de espera agotado al procesar la imagen.")
-    ]);
-};
-
-// --- AWS S3 UPLOAD LOGIC ---
-const uploadToS3 = async (file: File, base64: string): Promise<string> => {
-    if (!AWS_CONFIG.SIGNING_ENDPOINT) {
-        throw new Error("AWS Signing Endpoint no configurado en config.ts");
-    }
-
-    // 1. Convert Base64 back to Blob for upload
-    const res = await fetch(base64);
-    const blob = await res.blob();
-    const fileExt = 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-
-    // 2. Request Pre-signed URL from Backend
-    // Your backend should return: { uploadUrl: "https://s3...", publicUrl: "https://s3.../file.jpg" }
-    const signResponse = await fetch(AWS_CONFIG.SIGNING_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName, fileType: 'image/jpeg' })
-    });
-
-    if (!signResponse.ok) {
-        throw new Error("Error obteniendo permiso de subida a S3");
-    }
-
-    const { uploadUrl, publicUrl } = await signResponse.json();
-
-    // 3. Upload directly to S3 using the signed URL
-    const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: blob,
-        headers: {
-            'Content-Type': 'image/jpeg'
-        }
-    });
-
-    if (!uploadResponse.ok) {
-        throw new Error("Error subiendo imagen a AWS S3");
-    }
-
-    return publicUrl;
 };
 
 // --- SUPABASE STORAGE UPLOAD LOGIC ---
-const uploadToSupabase = async (file: File, base64: string, bucket: string): Promise<string> => {
-    // Convert Base64 to Blob
+const uploadToSupabase = async (base64: string, bucket: string): Promise<string> => {
+    // 1. Convert Base64 back to Blob for upload
     const res = await fetch(base64);
     const blob = await res.blob();
 
     const fileExt = 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    // Create a clean file path: year/month/timestamp-random.jpg
+    const date = new Date();
+    const path = `${date.getFullYear()}/${date.getMonth() + 1}`;
+    const fileName = `${path}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
     
+    // 2. Upload to Supabase Bucket
     const { error } = await supabase.storage
         .from(bucket)
         .upload(fileName, blob, {
             contentType: 'image/jpeg',
-            upsert: false
+            upsert: false,
+            cacheControl: '31536000' // 1 year cache
         });
 
     if (error) {
-        console.warn("Supabase Storage Error:", error.message);
-        // Fallback to base64 if storage fails (temporary fix for development)
-        return base64; 
+        console.error("Supabase Storage Upload Error:", error);
+        throw new Error("No se pudo subir la imagen a la nube. Verifica tu conexión.");
     }
 
+    // 3. Get Public URL
     const { data } = supabase.storage
         .from(bucket)
         .getPublicUrl(fileName);
@@ -154,29 +112,20 @@ const uploadToSupabase = async (file: File, base64: string, bucket: string): Pro
 };
 
 // --- MAIN UPLOAD FUNCTION ---
-export const uploadImage = async (file: File, bucket: string = 'pet-images'): Promise<string> => {
-    let base64 = '';
-    
+export const uploadImage = async (file: File): Promise<string> => {
     try {
-        // 1. Always compress first (Standard for performance)
-        base64 = await compressImage(file);
+        // 1. Always compress first (Standardize size and format to JPEG)
+        const base64 = await compressImage(file);
         
-        // 2. Route to configured provider
-        if ((STORAGE_PROVIDER as string) === 'aws') {
-            return await uploadToS3(file, base64);
-        } else {
-            // Default to Supabase
-            return await Promise.race([
-                uploadToSupabase(file, base64, bucket),
-                timeoutPromise(20000, "La subida a la nube tardó demasiado.") as any 
-            ]);
-        }
+        // 2. Upload to Supabase with timeout
+        // Removed fallback: We want to force cloud storage to keep DB clean.
+        return await Promise.race([
+            uploadToSupabase(base64, STORAGE_BUCKET),
+            timeoutPromise(25000, "La subida a la nube tardó demasiado.") as any 
+        ]);
 
     } catch (error: any) {
-        console.error('Error uploading image wrapper:', error);
-        // Critical Fallback: If cloud upload fails, return the compressed Base64 
-        // so the user can still submit the form (image will be stored in DB text field, not ideal but works)
-        if (base64) return base64;
+        console.error('Error uploading image:', error);
         throw error;
     }
 };

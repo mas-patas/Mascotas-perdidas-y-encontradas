@@ -46,6 +46,9 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     
     // Safety guard against unmounted state updates
     const isMounted = useRef(true);
+    
+    // AbortController for cancelling stale requests
+    const reverseGeocodingAbortController = useRef<AbortController | null>(null);
 
     useEffect(() => {
         return () => {
@@ -114,8 +117,23 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
 
             const updateAddressFromCoords = async (lat: number, lng: number) => {
                 if (!isMounted.current) return;
+                
+                // Cancel previous request
+                if (reverseGeocodingAbortController.current) {
+                    reverseGeocodingAbortController.current.abort();
+                }
+                reverseGeocodingAbortController.current = new AbortController();
+
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+                        headers: {
+                            'Accept-Language': 'es-ES,es;q=0.9',
+                        },
+                        signal: reverseGeocodingAbortController.current.signal
+                    });
+                    
+                    if (!response.ok) return;
+
                     const data = await response.json();
                     
                     if (data && data.address && isMounted.current) {
@@ -182,8 +200,9 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
 
                         setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
                     }
-                } catch (err) {
-                    console.error("Reverse geocoding error", err);
+                } catch (err: any) {
+                    if (err.name === 'AbortError') return;
+                    console.warn("Reverse geocoding error (ignoring):", err);
                 }
             };
 
@@ -245,7 +264,12 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                 
                 if (!query) return;
 
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+                });
+                
+                if (!response.ok) return;
+
                 const data = await response.json();
 
                 if (data && data.length > 0 && isMounted.current) {
@@ -284,9 +308,9 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                     }
                 }
             } catch (error) {
-                console.error("Geocoding error:", error);
+                console.warn("Geocoding fetch error:", error);
             }
-        }, 1000);
+        }, 1000); // 1000ms debounce
 
         return () => clearTimeout(timeoutId);
     }, [formData.address, formData.district, formData.province, formData.department]);
@@ -420,7 +444,9 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                 }
 
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+                        headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+                    });
                     const data = await response.json();
                     if (data && data.address && isMounted.current) {
                         const addr = data.address;
@@ -615,7 +641,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                                         onClick={() => handleAnimalTypeChange(ANIMAL_TYPES.OTRO)}
                                         className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${formData.animalType === ANIMAL_TYPES.OTRO ? 'border-brand-primary bg-blue-50 text-brand-primary' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
                                     >
-                                        <InfoIcon />
+                                        <InfoIcon className="h-8 w-8 mb-1" />
                                         <span className="text-xs font-bold mt-1">Otro</span>
                                     </button>
                                 </div>

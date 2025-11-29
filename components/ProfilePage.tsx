@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch } from '../types';
@@ -64,7 +63,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         checkBusiness();
     }, [user.id]);
 
-    const { data: myReportedPets = [], isLoading: isLoadingMyPets } = useQuery({
+    const { data: myReportedPets = [], isLoading: isLoadingMyPets } = useQuery<Pet[]>({
         queryKey: ['myPets', user.id],
         enabled: !!user.id,
         queryFn: async () => {
@@ -103,7 +102,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     });
 
-    const { data: savedSearches = [] } = useQuery({
+    const { data: savedSearches = [] } = useQuery<SavedSearch[]>({
         queryKey: ['savedSearches', user.id],
         enabled: !!user.id,
         queryFn: async () => {
@@ -139,7 +138,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     };
 
-    const { data: myRatings = [], isLoading: isLoadingRatings } = useQuery({
+    const { data: myRatings = [], isLoading: isLoadingRatings } = useQuery<UserRating[]>({
         queryKey: ['ratings', user.id],
         enabled: !!user.id,
         queryFn: async () => {
@@ -432,7 +431,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                 
                                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4 justify-center md:justify-start">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-3xl font-bold text-gray-800">{averageRating}</span>
+                                        <span className="text-3xl font-bold text-gray-800">{String(averageRating)}</span>
                                         <div className="flex flex-col">
                                             <StarRating rating={Number(averageRating)} size="sm" />
                                             <span className="text-xs text-gray-500">{myRatings.length} calificaciones</span>
@@ -472,7 +471,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                 <p className="text-xs text-gray-500 mt-1">Creada el {new Date(search.createdAt).toLocaleDateString()}</p>
                                 <div className="mt-2 flex flex-wrap gap-1">
                                     {Object.entries(search.filters).map(([key, val]) => (
-                                        val !== 'Todos' && <span key={key} className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-600">{val}</span>
+                                        val !== 'Todos' && <span key={key} className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-600">{val as string}</span>
                                     ))}
                                 </div>
                                 <button 

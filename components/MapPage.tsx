@@ -50,7 +50,9 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         setIsSearching(true);
         try {
             const query = `${searchQuery}, Peru`; // Bias to Peru
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&polygon_geojson=1&limit=1`);
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&polygon_geojson=1&limit=1`, {
+                headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+            });
             const data = await response.json();
             
             if (data && data.length > 0) {
@@ -88,7 +90,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 alert('No se encontró la ubicación.');
             }
         } catch (error) {
-            console.error("Search error:", error);
+            console.warn("Map search error:", error);
         } finally {
             setIsSearching(false);
         }

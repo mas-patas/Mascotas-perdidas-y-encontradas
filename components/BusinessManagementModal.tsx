@@ -163,7 +163,9 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
             // Logic to reverse geocode coordinates to address
             const updateAddressFromCoords = async (latitude: number, longitude: number) => {
                 try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+                        headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+                    });
                     const data = await response.json();
                     
                     if (data && data.address && isMounted.current) {
@@ -224,7 +226,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                         setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 1000);
                     }
                 } catch (err) {
-                    console.error("Reverse geocoding error", err);
+                    console.warn("Reverse geocoding error:", err);
                 }
             };
 
@@ -234,7 +236,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
 
                 mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors'
+                    attribution: '© OpenStreetMap contributors'
                 }).addTo(mapInstance.current);
 
                 const icon = L.divIcon({
@@ -289,7 +291,9 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
             if (!isMounted.current) return;
             const query = `${streetAddress}, ${selectedDist}, ${selectedProv}, ${selectedDept}, Peru`;
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+                });
                 const data = await response.json();
                 if (data && data.length > 0 && mapInstance.current) {
                     const { lat, lon } = data[0];
@@ -312,7 +316,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                         markerInstance.current = L.marker([newLat, newLng], { icon, draggable: true }).addTo(mapInstance.current);
                     }
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.warn(e); }
         }, 1500);
         return () => clearTimeout(timeoutId);
     }, [streetAddress, selectedDist, selectedProv, selectedDept]);

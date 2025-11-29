@@ -37,17 +37,22 @@ export async function analyzePetImage(imageUrl: string): Promise<{
             model: 'gemini-2.5-flash',
             contents: [
                 {
-                    inlineData: {
-                        mimeType: 'image/jpeg', // Assuming JPEG/PNG, Gemini handles standard image types
-                        data: base64Image
-                    }
-                },
-                {
-                    text: `Analyze this image of a pet and extract the following details in JSON format:
-                    1. animalType: Must be one of "Perro", "Gato", or "Otro".
-                    2. breed: The most likely breed.
-                    3. colors: An array of up to 3 colors that best match the pet from this specific list: ${petColors.join(', ')}.
-                    4. description: A very short visual description (max 20 words) in Spanish.`
+                    role: "user",
+                    parts: [
+                        {
+                            inlineData: {
+                                mimeType: 'image/jpeg', // Assuming JPEG/PNG, Gemini handles standard image types
+                                data: base64Image
+                            }
+                        },
+                        {
+                            text: `Analyze this image of a pet and extract the following details in JSON format:
+                            1. animalType: Must be one of "Perro", "Gato", or "Otro".
+                            2. breed: The most likely breed.
+                            3. colors: An array of up to 3 colors that best match the pet from this specific list: ${petColors.join(', ')}.
+                            4. description: A very short visual description (max 20 words) in Spanish.`
+                        }
+                    ]
                 }
             ],
             config: {
@@ -82,16 +87,29 @@ export async function analyzePetImage(imageUrl: string): Promise<{
 
 export async function generatePetEmbedding(text: string): Promise<number[]> {
     try {
-        const result = await ai.models.embedContent({
+        // Use 'contents' array to satisfy API requirements for this model/SDK version
+        const result: any = await ai.models.embedContent({
             model: 'text-embedding-004',
-            content: { parts: [{ text }] }
+            contents: [{ parts: [{ text }] }]
         });
         
-        if (!result.embedding || !result.embedding.values) {
-            throw new Error("Failed to generate embedding");
+        let values: number[] | undefined;
+
+        // Handle response: Check for plural 'embeddings' first (batch/list response), then singular 'embedding'
+        if (result.embeddings && result.embeddings.length > 0 && result.embeddings[0].values) {
+            values = result.embeddings[0].values;
+        } else if (result.embedding && result.embedding.values) {
+            values = result.embedding.values;
         }
         
-        return result.embedding.values;
+        if (values) {
+            // CRITICAL FIX: Explicitly convert to plain array to ensure compatibility with Supabase RPC
+            // Some SDK versions return Float32Array which fails in JSON serialization for Postgres vector
+            return Array.from(values);
+        }
+        
+        console.error("Unexpected embedding response:", JSON.stringify(result));
+        throw new Error("Failed to generate embedding");
     } catch (error) {
         console.error("Error generating embedding:", error);
         return [];
@@ -136,7 +154,8 @@ export async function findMatchingPets(
         });
 
         if (error) {
-            console.error("Vector search RPC error:", error);
+            // Improved error logging to see the real message
+            console.error("Vector search RPC error:", JSON.stringify(error, null, 2));
             continue;
         }
 
@@ -189,7 +208,7 @@ export async function generatePetDescription(
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
+            contents: [{ parts: [{ text: prompt }] }],
         });
 
         return response.text?.trim() || `${animalType} de raza ${breed} y color ${color}.`;
