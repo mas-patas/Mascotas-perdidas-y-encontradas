@@ -204,7 +204,7 @@ export const useAppData = () => {
         }
     });
 
-    const { data: bannedIps = [], setBannedIps } = useQuery({
+    const { data: bannedIps = [] } = useQuery({
         queryKey: ['bannedIps'],
         // Always fetch banned IPs to check against current user, but write actions are protected by RLS
         queryFn: async () => {

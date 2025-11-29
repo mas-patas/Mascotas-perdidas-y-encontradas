@@ -32,6 +32,10 @@
             'brand-light': '#EFF6FF',
             'brand-dark': '#1E3A8A',
             'sidebar-dark': '#483D8B', // Un morado oscuro como en la imagen
+          },
+          animation: {
+            'bounce-slow': 'bounce 3s infinite',
+            'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
           }
         }
       }
@@ -179,6 +183,36 @@
         top: 2px; 
         z-index: 10;
         color: white;
+    }
+
+    /* Micro-interactions */
+    .btn-press {
+        transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s;
+    }
+    .btn-press:active {
+        transform: scale(0.95);
+    }
+    
+    /* Subtle Ripple effect via pure CSS for hover states */
+    .hover-ripple {
+        position: relative;
+        overflow: hidden;
+    }
+    .hover-ripple::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: width 0.3s ease-out, height 0.3s ease-out;
+    }
+    .hover-ripple:hover::after {
+        width: 200%;
+        height: 200%;
     }
 
 </style>

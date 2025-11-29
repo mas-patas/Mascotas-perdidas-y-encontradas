@@ -359,6 +359,35 @@ const App: React.FC = () => {
             navigate(`/chat/${chatId}`);
         } catch(e:any){ alert(e.message); }
     };
+
+    const handleStartUserChat = async (email: string) => {
+        if (!currentUser) return navigate('/login');
+        
+        const existingChat = chats.find(c => c.participantEmails.includes(currentUser.email) && c.participantEmails.includes(email) && !c.petId);
+        
+        if (existingChat) {
+             navigate(`/chat/${existingChat.id}`);
+             return;
+        }
+        
+        const chatId = generateUUID();
+        const now = new Date().toISOString();
+        
+        const { error } = await supabase.from('chats').insert({
+            id: chatId,
+            pet_id: null,
+            participant_emails: [currentUser.email, email],
+            last_read_timestamps: { [currentUser.email]: now, [email]: new Date(0).toISOString() },
+            created_at: now
+        });
+        
+        if (!error) {
+             setChats(prev => [...prev, { id: chatId, petId: undefined, participantEmails: [currentUser.email, email], messages: [], lastReadTimestamps: {} }]);
+             navigate(`/chat/${chatId}`);
+        } else {
+            alert('Error starting chat');
+        }
+    };
     
     const handleSendMessage = useCallback(async (chatId: string, text: string) => {
         if (!currentUser) return;
@@ -367,6 +396,10 @@ const App: React.FC = () => {
 
     const handleMarkChatAsRead = useCallback(async (chatId: string) => {
         if (!currentUser) return;
+        const now = new Date().toISOString();
+        // Optimistic update
+        setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: { ...c.lastReadTimestamps, [currentUser.email]: now } } : c));
+        await supabase.from('chats').update({ last_read_timestamps: { [currentUser.email]: now } }).eq('id', chatId); 
     }, [currentUser]);
 
     const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
@@ -514,20 +547,24 @@ const App: React.FC = () => {
             <Routes>
                 <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={<PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />} />
-                    <Route path="mascota/:id" element={<PetDetailPage pet={undefined} onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} users={users} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} />} />
+                    
+                    {/* Static Routes FIRST to take precedence */}
                     <Route path="perfil" element={<ProtectedRoute><ProfilePage user={currentUser!} reportedPets={pets.filter(p => p.userEmail === currentUser?.email)} allPets={pets} users={users} onBack={() => navigate('/')} onReportOwnedPetAsLost={(ownedPet) => { setReportStatus(PET_STATUS.PERDIDO); setIsReportModalOpen(true); }} onNavigate={(path) => navigate(path)} onViewUser={handleViewPublicProfile} onRenewPet={(pet) => setPetToRenew(pet)} /></ProtectedRoute>} />
                     <Route path="setup-profile" element={<ProfileSetupPage />} />
                     <Route path="mensajes" element={<ProtectedRoute><MessagesPage chats={chats.filter(c => c.participantEmails.includes(currentUser!.email)).map(c => ({ ...c, isUnread: false })).sort((a, b) => new Date(b.messages[b.messages.length-1]?.timestamp || 0).getTime() - new Date(a.messages[a.messages.length-1]?.timestamp || 0).getTime())} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ProtectedRoute>} />
-                    <Route path="chat/:id" element={<ProtectedRoute><ChatPage chat={undefined} pet={undefined} users={users} currentUser={currentUser!} onSendMessage={handleSendMessage} onBack={() => navigate('/mensajes')} onMarkAsRead={handleMarkChatAsRead} /></ProtectedRoute>} />
                     <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ProtectedRoute>} />
                     <Route path="soporte" element={<ProtectedRoute><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.userEmail === currentUser?.email)} userReports={reports.filter(r => r.reporterEmail === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ProtectedRoute>} />
                     <Route path="campanas" element={<CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} />} />
-                    <Route path="campanas/:id" element={<CampaignDetailPage campaign={undefined} onClose={() => navigate('/campanas')} />} />
                     <Route path="mapa" element={<MapPage pets={pets} onNavigate={(path) => navigate(path)} />} />
                     <Route path="servicios" element={<ServicesMapPage />} />
-                    <Route path="negocio/:id" element={<BusinessDetailPage />} />
                     <Route path="nosotros" element={<AboutPage />} />
                     <Route path="reunidos" element={<ReunitedPetsPage />} />
+
+                    {/* Dynamic Routes LAST */}
+                    <Route path="mascota/:id" element={<PetDetailPage pet={undefined} onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} users={users} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} />} />
+                    <Route path="chat/:id" element={<ProtectedRoute><ChatPage chat={undefined} pet={undefined} users={users} currentUser={currentUser!} onSendMessage={handleSendMessage} onBack={() => navigate('/mensajes')} onMarkAsRead={handleMarkChatAsRead} /></ProtectedRoute>} />
+                    <Route path="campanas/:id" element={<CampaignDetailPage campaign={undefined} onClose={() => navigate('/campanas')} />} />
+                    <Route path="negocio/:id" element={<BusinessDetailPage />} />
                 </Route>
                 <Route path="/login" element={<AuthPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -537,7 +574,7 @@ const App: React.FC = () => {
             {isAdoptionModalOpen && <ReportAdoptionForm onClose={() => setIsAdoptionModalOpen(false)} onSubmit={(pet) => finalizePetSubmission(pet)} />}
             {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
-            {isUserDetailModalOpen && selectedUserProfile && <AdminUserDetailModal user={selectedUserProfile} allPets={pets} allChats={chats} allUsers={users} onClose={() => setIsUserDetailModalOpen(false)} onUpdateStatus={handleUpdateUserStatus} onUpdateRole={handleUpdateUserRole} onStartChat={handleStartChat} onGhostLogin={ghostLogin} onViewUser={handleViewAdminUser} />}
+            {isUserDetailModalOpen && selectedUserProfile && <AdminUserDetailModal user={selectedUserProfile} allPets={pets} allChats={chats} allUsers={users} onClose={() => setIsUserDetailModalOpen(false)} onUpdateStatus={handleUpdateUserStatus} onUpdateRole={handleUpdateUserRole} onStartChat={handleStartUserChat} onGhostLogin={ghostLogin} onViewUser={handleViewAdminUser} />}
             {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={handleRenewPet} onMarkAsFound={handleMarkAsFound} />}
             {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={handleMarkAsFound} onKeepLooking={handleKeepLooking} />}
             {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={handleViewAdminUser} />}

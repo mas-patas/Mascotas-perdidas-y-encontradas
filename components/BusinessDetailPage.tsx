@@ -31,34 +31,73 @@ const BusinessDetailPage: React.FC = () => {
             const L = (window as any).L;
             if (!L) return;
 
-            if (!mapInstance.current) {
-                mapInstance.current = L.map(mapRef.current, {
-                    center: [business.lat, business.lng],
-                    zoom: 15,
-                    zoomControl: false, // Minimal UI
-                    dragging: false,
-                    scrollWheelZoom: false,
-                    doubleClickZoom: false
-                });
+            // Function to setup map
+            const setupMap = () => {
+                if (!mapInstance.current) {
+                    mapInstance.current = L.map(mapRef.current, {
+                        center: [business.lat, business.lng],
+                        zoom: 16, // Slightly closer zoom for detail view
+                        zoomControl: false, 
+                        dragging: true, // Allow dragging to see surroundings
+                        scrollWheelZoom: false,
+                        doubleClickZoom: false
+                    });
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(mapInstance.current);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(mapInstance.current);
 
-                // Custom marker based on type
-                const isVet = business.type === 'Veterinaria';
-                const medicalIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M18 10h-4V6a2 2 0 00-4 0v4H6a2 2 0 000 4h4v4a2 2 0 004 0v-4h4a2 2 0 000-4z" /></svg>`;
-                const storeIconSVG = `<svg class="marker-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>`;
+                    // Custom marker based on type - REDUCED SIZE manually (22px)
+                    const isVet = business.type === 'Veterinaria';
+                    const pinColor = isVet ? '#EF4444' : '#3B82F6';
+                    
+                    // SVG Icons with explicit smaller styling (10px) and centered positioning relative to rotated parent
+                    const medicalIconSVG = `<svg viewBox="0 0 24 24" fill="white" stroke="none" style="position: absolute; width: 10px; height: 10px; left: 6px; top: 4px; z-index: 10; transform: rotate(45deg);"><path d="M18 10h-4V6a2 2 0 00-4 0v4H6a2 2 0 000 4h4v4a2 2 0 004 0v-4h4a2 2 0 000-4z" /></svg>`;
+                    const storeIconSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; width: 10px; height: 10px; left: 6px; top: 4px; z-index: 10; color: white; transform: rotate(45deg);"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>`;
 
-                const icon = L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div class='marker-pin ${isVet ? 'lost' : 'sighted'}' style='background-color: ${isVet ? '#EF4444' : '#3B82F6'}'></div>${isVet ? medicalIconSVG : storeIconSVG}`,
-                    iconSize: [25, 35],
-                    iconAnchor: [12, 35]
-                });
+                    // Manually construct the pin HTML to control size (22px)
+                    // Note: The rotation happens on the container div
+                    const pinHtml = `
+                        <div style="position: relative; width: 22px; height: 32px; display: flex; justify-content: center;">
+                            <div style="
+                                width: 22px; 
+                                height: 22px; 
+                                border-radius: 50% 50% 50% 0; 
+                                background: ${pinColor}; 
+                                transform: rotate(-45deg); 
+                                box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                ${isVet ? medicalIconSVG : storeIconSVG}
+                            </div>
+                        </div>
+                    `;
 
-                L.marker([business.lat, business.lng], { icon }).addTo(mapInstance.current);
-            }
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: pinHtml,
+                        iconSize: [22, 32], // Width, Total Height
+                        iconAnchor: [11, 32] // Horizontal center, Bottom tip
+                    });
+
+                    L.marker([business.lat, business.lng], { icon }).addTo(mapInstance.current);
+                } else {
+                    // Update view if map exists
+                    mapInstance.current.setView([business.lat, business.lng], 16);
+                }
+                
+                // Force resize to fix grey tiles issue
+                setTimeout(() => {
+                    if (mapInstance.current) {
+                        mapInstance.current.invalidateSize();
+                    }
+                }, 200);
+            };
+
+            // Delay setup slightly to ensure container render
+            setTimeout(setupMap, 100);
         }
     }, [loading, business]);
 

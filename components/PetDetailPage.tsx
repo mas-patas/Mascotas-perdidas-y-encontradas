@@ -33,7 +33,7 @@ interface PetDetailPageProps {
     onLikeComment: (petId: string, commentId: string) => void;
 }
 
-// Recursive Comment Component (unchanged logic, just used below)
+// Recursive Comment Component (unchanged logic)
 const CommentItem: React.FC<{
     comment: Comment;
     allComments: Comment[];
@@ -249,7 +249,7 @@ const CommentListAndInput: React.FC<{
                     <button 
                         type="submit" 
                         disabled={!currentUser || !newComment.trim() || isSubmitting}
-                        className="bg-brand-primary text-white p-3 rounded-lg hover:bg-brand-dark disabled:opacity-50 transition-colors"
+                        className="bg-brand-primary text-white p-3 rounded-lg hover:bg-brand-dark disabled:opacity-50 transition-colors btn-press"
                     >
                         <SendIcon />
                     </button>
@@ -448,7 +448,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         <div className="max-w-5xl mx-auto pb-10 px-4 sm:px-6">
             <Helmet>
                 <title>{pet.name} - {pet.status} | Pets</title>
-                <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
+                <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}. Ayuda a encontrarlo.`} />
+                
+                {/* Open Graph Tags for Social Sharing */}
+                <meta property="og:title" content={`${pet.status}: ${pet.name}`} />
+                <meta property="og:description" content={`${pet.breed} - ${pet.color}. ${pet.location}. ${pet.description.substring(0, 100)}...`} />
+                <meta property="og:image" content={pet.imageUrls[0] || 'https://placehold.co/1200x630/1D4ED8/ffffff?text=Pets+App'} />
+                <meta property="og:url" content={window.location.href} />
+                <meta property="og:type" content="website" />
             </Helmet>
 
             <button onClick={onClose} className="mb-4 flex items-center text-gray-600 hover:text-brand-primary font-bold transition-colors">
@@ -541,7 +548,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                     onChange={(e) => setNewCommentPreview(e.target.value)}
                                     disabled={!currentUser}
                                 />
-                                <button type="submit" disabled={!currentUser || !newCommentPreview.trim()} className="bg-brand-primary text-white p-2 rounded-md hover:bg-brand-dark transition-colors disabled:opacity-50">
+                                <button type="submit" disabled={!currentUser || !newCommentPreview.trim()} className="bg-brand-primary text-white p-2 rounded-md hover:bg-brand-dark transition-colors disabled:opacity-50 btn-press">
                                     <SendIcon className="h-4 w-4" />
                                 </button>
                             </form>
@@ -559,14 +566,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             <p className="text-gray-500 font-medium text-lg mt-1">{pet.animalType} • {pet.breed}</p>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => setIsShareModalOpen(true)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Compartir">
+                            <button onClick={() => setIsShareModalOpen(true)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors btn-press" title="Compartir">
                                 <ShareIcon className="h-5 w-5" />
                             </button>
-                            <button onClick={() => onGenerateFlyer(pet)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Imprimir Afiche">
+                            <button onClick={() => onGenerateFlyer(pet)} className="p-2 text-gray-500 hover:text-brand-primary bg-gray-100 rounded-full hover:bg-gray-200 transition-colors btn-press" title="Imprimir Afiche">
                                 <PrinterIcon className="h-5 w-5" />
                             </button>
                             {!isOwner && (
-                                <button onClick={() => setIsReportModalOpen(true)} className="p-2 text-gray-500 hover:text-red-500 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors" title="Reportar">
+                                <button onClick={() => setIsReportModalOpen(true)} className="p-2 text-gray-500 hover:text-red-500 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors btn-press" title="Reportar">
                                     <FlagIcon className="h-5 w-5" />
                                 </button>
                             )}
@@ -597,9 +604,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             </div>
                         </div>
 
-                        {/* Location Text */}
+                        {/* Location Text - ICON REDUCED HERE based on request */}
                         <div className="flex items-start gap-3">
-                            <LocationMarkerIcon className="text-brand-primary h-5 w-5 mt-1 flex-shrink-0" />
+                            <LocationMarkerIcon className="text-brand-primary h-4 w-4 mt-1 flex-shrink-0" />
                             <div>
                                 <p className="text-xs text-gray-400 font-bold uppercase">Ubicación</p>
                                 <p className="text-gray-800 font-medium leading-tight">{pet.location}</p>
@@ -629,13 +636,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 <div className="flex">
                                     <button 
                                         onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank')}
-                                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors border-r border-gray-200 flex items-center justify-center gap-1"
+                                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors border-r border-gray-200 flex items-center justify-center gap-1 btn-press"
                                     >
                                         <GoogleMapsIcon className="h-3 w-3" /> Maps
                                     </button>
                                     <button 
                                         onClick={() => window.open(`https://waze.com/ul?ll=${pet.lat},${pet.lng}&navigate=yes`, '_blank')}
-                                        className="flex-1 py-2 bg-white hover:bg-blue-50 text-xs font-bold text-blue-700 transition-colors flex items-center justify-center gap-1"
+                                        className="flex-1 py-2 bg-white hover:bg-blue-50 text-xs font-bold text-blue-700 transition-colors flex items-center justify-center gap-1 btn-press"
                                     >
                                         <WazeIcon className="h-3 w-3" /> Waze
                                     </button>
@@ -652,17 +659,17 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 {isLost && (
                                     <button 
                                         onClick={() => setIsReunionModalOpen(true)}
-                                        className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                                        className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 btn-press"
                                     >
                                         <SparklesIcon className="h-5 w-5 text-yellow-300" />
                                         ¡Ya encontré a mi mascota!
                                     </button>
                                 )}
                                 <div className="flex gap-3">
-                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 btn-press">
                                         <EditIcon className="h-4 w-4" /> Editar
                                     </button>
-                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200">
+                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press">
                                         <TrashIcon className="h-4 w-4" /> Eliminar
                                     </button>
                                 </div>
@@ -682,7 +689,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Publicado por</p>
-                                        <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-bold text-gray-900 hover:text-brand-primary text-sm">
+                                        <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-bold text-gray-900 hover:text-brand-primary text-sm hover:underline">
                                             @{petOwner?.username || 'Usuario'}
                                         </button>
                                     </div>
@@ -697,7 +704,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                             </a>
                                         </div>
                                     ) : (
-                                        <button onClick={handleRevealContact} className={`w-full py-3 ${currentUser ? 'bg-brand-primary text-white hover:bg-brand-dark' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2`}>
+                                        <button onClick={handleRevealContact} className={`w-full py-3 ${currentUser ? 'bg-brand-primary text-white hover:bg-brand-dark' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 btn-press`}>
                                             {!currentUser ? <LockIcon className="h-5 w-5" /> : <PhoneIcon className="h-5 w-5" />}
                                             {currentUser ? 'Ver Teléfono' : 'Ver Teléfono (Ingresa)'}
                                         </button>
@@ -705,7 +712,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 )}
 
                                 {!isOwner && (
-                                    <button onClick={() => onStartChat(pet)} className="w-full py-3 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                                    <button onClick={() => onStartChat(pet)} className="w-full py-3 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 btn-press">
                                         <ChatBubbleIcon className="h-5 w-5" /> Enviar Mensaje
                                     </button>
                                 )}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon, HeartIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
@@ -21,6 +21,56 @@ interface PetListProps {
     isError?: boolean;
     onRetry?: () => void;
 }
+
+// Wrapper for Lazy Loading & Animation
+const LazyLoadSection: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.disconnect(); // Stop observing once loaded
+                }
+            },
+            {
+                rootMargin: '100px', // Load 100px before it comes into view
+                threshold: 0.1
+            }
+        );
+
+        if (ref.current) {
+            observer.observe(ref.current);
+        }
+
+        return () => {
+            observer.disconnect();
+        };
+    }, []);
+
+    return (
+        <div 
+            ref={ref} 
+            className={`transition-all duration-1000 ease-out transform ${
+                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            } min-h-[300px]`}
+        >
+            {isVisible ? children : (
+                // Skeleton loading state
+                <div className="w-full space-y-4">
+                    <div className="h-8 bg-gray-100 rounded w-1/4 animate-pulse"></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="h-64 bg-gray-100 rounded-xl animate-pulse"></div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const PetSection: React.FC<{
     title: string;
@@ -148,7 +198,7 @@ const PetSection: React.FC<{
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
             >
-                <div className={`grid ${gridClass} gap-4 transition-all duration-300`}>
+                <div className={`grid ${gridClass} gap-4 transition-all duration-500`}>
                     {visiblePets.filter(p => p).map(pet => {
                         const petOwner = users.find(u => u.email === pet.userEmail);
                         return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
@@ -240,7 +290,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     // View 1: Specific Category Selected (Infinite Scroll Grid)
     if (filters.status !== 'Todos') {
         return (
-             <div className="space-y-6">
+             <div className="space-y-6 animate-fade-in">
                 <div>
                     <button 
                         onClick={onReset} 
@@ -320,7 +370,6 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     const foundPets = pets.filter(p => p && p.status === PET_STATUS.ENCONTRADO);
     const sightedPets = pets.filter(p => p && p.status === PET_STATUS.AVISTADO);
     const adoptionPets = pets.filter(p => p && p.status === PET_STATUS.EN_ADOPCION);
-    const reunitedPets = pets.filter(p => p && p.status === PET_STATUS.REUNIDO);
 
     if (isLoading && pets.length === 0) {
         return (
@@ -335,58 +384,84 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     }
 
     return (
-        <div className="space-y-10">
+        <div className="space-y-10 animate-fade-in">
+            {/* Banner Promocional para Reunidos */}
+            <div 
+                className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-2xl p-6 md:p-10 text-white shadow-xl relative overflow-hidden group cursor-pointer transition-transform transform hover:-translate-y-1" 
+                onClick={() => onNavigate('/reunidos')}
+            >
+                {/* Elementos decorativos */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700"></div>
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-yellow-300 opacity-20 rounded-full translate-y-1/2 -translate-x-1/3 blur-xl"></div>
+                
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                            <span className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm"><HeartIcon className="h-5 w-5 text-white" filled /></span>
+                            <span className="font-bold text-purple-100 uppercase tracking-wider text-xs">Finales Felices</span>
+                        </div>
+                        <h2 className="text-3xl md:text-4xl font-black mb-3 leading-tight drop-shadow-md">
+                            Mascotas que regresaron a casa
+                        </h2>
+                        <p className="text-purple-50 max-w-lg text-sm md:text-base font-medium opacity-90">
+                            Descubre historias conmovedoras de reencuentros posibles gracias a esta comunidad. ¡La esperanza es lo último que se pierde!
+                        </p>
+                    </div>
+                    <button className="bg-white text-purple-700 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-purple-50 hover:text-purple-900 transition-all transform hover:scale-105 flex items-center gap-2 whitespace-nowrap">
+                        Ver Historias <ChevronRightIcon />
+                    </button>
+                </div>
+            </div>
+
             {pets.length > 0 ? (
                 <>
                     {lostPets.length > 0 && (
-                        <PetSection 
-                            title="Mascotas Perdidas"
-                            pets={lostPets}
-                            users={users}
-                            onViewUser={onViewUser}
-                            onNavigate={onNavigate}
-                            onSeeMore={() => onSelectStatus(PET_STATUS.PERDIDO)}
-                        />
+                        <LazyLoadSection>
+                            <PetSection 
+                                title="Mascotas Perdidas"
+                                pets={lostPets}
+                                users={users}
+                                onViewUser={onViewUser}
+                                onNavigate={onNavigate}
+                                onSeeMore={() => onSelectStatus(PET_STATUS.PERDIDO)}
+                            />
+                        </LazyLoadSection>
                     )}
                     {foundPets.length > 0 && (
-                         <PetSection 
-                            title="Mascotas Encontradas"
-                            pets={foundPets}
-                            users={users}
-                            onViewUser={onViewUser}
-                            onNavigate={onNavigate}
-                            onSeeMore={() => onSelectStatus(PET_STATUS.ENCONTRADO)}
-                        />
+                         <LazyLoadSection>
+                            <PetSection 
+                                title="Mascotas Encontradas"
+                                pets={foundPets}
+                                users={users}
+                                onViewUser={onViewUser}
+                                onNavigate={onNavigate}
+                                onSeeMore={() => onSelectStatus(PET_STATUS.ENCONTRADO)}
+                            />
+                        </LazyLoadSection>
                     )}
                     {adoptionPets.length > 0 && (
-                        <PetSection 
-                            title="En Adopción"
-                            pets={adoptionPets}
-                            users={users}
-                            onViewUser={onViewUser}
-                            onNavigate={onNavigate}
-                            onSeeMore={() => onSelectStatus(PET_STATUS.EN_ADOPCION)}
-                        />
+                        <LazyLoadSection>
+                            <PetSection 
+                                title="En Adopción"
+                                pets={adoptionPets}
+                                users={users}
+                                onViewUser={onViewUser}
+                                onNavigate={onNavigate}
+                                onSeeMore={() => onSelectStatus(PET_STATUS.EN_ADOPCION)}
+                            />
+                        </LazyLoadSection>
                     )}
                     {sightedPets.length > 0 && (
-                         <PetSection 
-                            title="Mascotas Avistadas"
-                            pets={sightedPets}
-                            users={users}
-                            onViewUser={onViewUser}
-                            onNavigate={onNavigate}
-                            onSeeMore={() => onSelectStatus(PET_STATUS.AVISTADO)}
-                        />
-                    )}
-                    {reunitedPets.length > 0 && (
-                         <PetSection 
-                            title="Historias de Éxito (Reunidos)"
-                            pets={reunitedPets}
-                            users={users}
-                            onViewUser={onViewUser}
-                            onNavigate={onNavigate}
-                            onSeeMore={() => onSelectStatus(PET_STATUS.REUNIDO)}
-                        />
+                         <LazyLoadSection>
+                            <PetSection 
+                                title="Mascotas Avistadas"
+                                pets={sightedPets}
+                                users={users}
+                                onViewUser={onViewUser}
+                                onNavigate={onNavigate}
+                                onSeeMore={() => onSelectStatus(PET_STATUS.AVISTADO)}
+                            />
+                        </LazyLoadSection>
                     )}
                 </>
             ) : (
