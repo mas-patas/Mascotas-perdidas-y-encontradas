@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import type { Pet, PetStatus, AnimalType, PetSize } from '../types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
@@ -15,373 +16,356 @@ interface ReportPetFormProps {
     isSubmitting?: boolean;
 }
 
+// Define the Form Values Interface
+interface FormValues {
+    status: PetStatus;
+    name: string;
+    animalType: AnimalType;
+    breed: string;
+    customBreed: string;
+    customAnimalType: string;
+    size: PetSize;
+    description: string;
+    color1: string;
+    color2: string;
+    color3: string;
+    department: string;
+    province: string;
+    district: string;
+    address: string;
+    lat: number;
+    lng: number;
+    date: string;
+    contact: string;
+    reward: number | '';
+    currency: string;
+    shareContactInfo: boolean;
+    createAlert: boolean;
+    imageUrls: string[]; 
+    adoptionRequirements?: string;
+}
+
+// Helper robusto para normalizar nombres de lugares y compararlos
 const normalizeLocationName = (name: string) => {
     if (!name) return '';
     return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-        .replace(/(provincia|departamento|distrito|region|municipalidad) de /g, "") 
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar tildes
+        .replace(/(provincia|departamento|distrito|region|municipalidad|gobierno) de /g, "") // Quitar prefijos administrativos
+        .replace(/\s+/g, " ") // Unificar espacios
         .trim();
 };
 
 export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit, isSubmitting }) => {
     const isEditMode = !!petToEdit;
+    
+    // RHF Setup
+    const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<FormValues>({
+        defaultValues: {
+            status: initialStatus,
+            animalType: ANIMAL_TYPES.PERRO,
+            breed: dogBreeds[0],
+            size: SIZES.MEDIANO,
+            department: 'Lima',
+            province: '',
+            district: '',
+            date: new Date().toISOString().split('T')[0],
+            shareContactInfo: true,
+            createAlert: true,
+            currency: 'S/',
+            imageUrls: [],
+            ... (isEditMode && petToEdit ? {
+                status: petToEdit.status,
+                name: petToEdit.name,
+                animalType: petToEdit.animalType,
+                size: petToEdit.size,
+                description: petToEdit.description,
+                contact: petToEdit.contact,
+                date: petToEdit.date.split('T')[0],
+                shareContactInfo: petToEdit.shareContactInfo,
+                reward: petToEdit.reward,
+                currency: petToEdit.currency || 'S/',
+                lat: petToEdit.lat,
+                lng: petToEdit.lng,
+                imageUrls: petToEdit.imageUrls || []
+            } : {})
+        }
+    });
+
+    // Watch fields for logic
+    const watchedStatus = watch('status');
+    const watchedAnimalType = watch('animalType');
+    const watchedBreed = watch('breed');
+    const watchedDepartment = watch('department');
+    const watchedProvince = watch('province');
+    const watchedDistrict = watch('district');
+    const watchedAddress = watch('address');
+    const watchedImageUrls = watch('imageUrls');
+    const watchedLat = watch('lat');
+    const watchedLng = watch('lng');
+
+    // Local State for Non-Form UI interactions
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
-    const isUpdatingFromMapRef = useRef(false);
     
-    // AbortControllers for cancelling stale requests
+    // Refs to control flow and prevent infinite loops
+    const isUpdatingFromMapRef = useRef(false); 
+    const mapClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     const reverseGeocodingAbortController = useRef<AbortController | null>(null);
     const forwardGeocodingAbortController = useRef<AbortController | null>(null);
 
-    // Form States
-    const [status, setStatus] = useState<PetStatus>(initialStatus);
-    
-    // Section 1: Details
-    const [name, setName] = useState('');
-    const [animalType, setAnimalType] = useState<AnimalType>(ANIMAL_TYPES.PERRO);
-    const [breed, setBreed] = useState(dogBreeds[0]);
-    const [customAnimalType, setCustomAnimalType] = useState('');
-    const [customBreed, setCustomBreed] = useState('');
-    const [size, setSize] = useState<PetSize>(SIZES.MEDIANO);
-    const [description, setDescription] = useState('');
-    
-    // Colors (Explicitly 3)
-    const [color1, setColor1] = useState('');
-    const [color2, setColor2] = useState('');
-    const [color3, setColor3] = useState('');
-
-    // Section 2: Location
-    const [department, setDepartment] = useState('Lima');
-    const [province, setProvince] = useState('');
-    const [district, setDistrict] = useState('');
-    const [address, setAddress] = useState('');
-    const [lat, setLat] = useState<number | undefined>(undefined);
-    const [lng, setLng] = useState<number | undefined>(undefined);
-    
-    // Address Autocomplete States
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-    
-    // Section 3: Contact & Meta
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [contact, setContact] = useState('');
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-    const [reward, setReward] = useState<number | ''>('');
-    const [currency, setCurrency] = useState('S/');
-    const [shareContactInfo, setShareContactInfo] = useState(true);
-    const [createAlert, setCreateAlert] = useState(true);
-
-    // Helpers
     const [breeds, setBreeds] = useState(dogBreeds);
     const [provinces, setProvinces] = useState<string[]>([]);
     const [districts, setDistricts] = useState<string[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [error, setError] = useState('');
+    const [uploadError, setUploadError] = useState('');
 
-    // Dynamic Header Text Logic
-    const getHeaderInfo = () => {
-        if (isEditMode) {
-            return {
-                title: 'Editar Publicación',
-                description: 'Actualiza los datos de tu reporte para mantener informada a la comunidad.'
-            };
-        }
-
-        switch (status) {
-            case PET_STATUS.PERDIDO:
-                return {
-                    title: 'Vas a reportar una mascota perdida',
-                    description: 'Estás reportando que es tu mascota y tienes los datos necesarios para recuperarla.'
-                };
-            case PET_STATUS.ENCONTRADO:
-                return {
-                    title: 'Vas a reportar una mascota encontrada',
-                    description: 'Has encontrado una mascota en la calle y la tienes en tu casa o en un lugar seguro donde sabes que puedes ubicarla hasta que pueda encontrar a su dueño.'
-                };
-            case PET_STATUS.AVISTADO:
-                return {
-                    title: 'Vas a reportar una mascota avistada',
-                    description: 'Has visto en la calle o algún lugar a una mascota que parece estar perdida y está buscando a sus dueños. Completa la siguiente información para poder ayudar a que esta mascota vuelva a su casa o a su hogar.'
-                };
-            default:
-                return {
-                    title: 'Reportar Mascota',
-                    description: 'Completa los datos para ayudar a la comunidad.'
-                };
-        }
-    };
-
-    const headerInfo = getHeaderInfo();
-
-    // Initialize from petToEdit
+    // --- EFFECT: Initialize from Edit Mode ---
     useEffect(() => {
         if (isEditMode && petToEdit) {
-            setStatus(petToEdit.status);
-            setName(petToEdit.name);
-            setAnimalType(petToEdit.animalType);
-            
-            // Handle Breed initialization (Check if it's in the list or custom)
+            // Colors
+            const colors = petToEdit.color ? petToEdit.color.split(',').map(c => c.trim()) : [];
+            setValue('color1', colors[0] || '');
+            setValue('color2', colors[1] || '');
+            setValue('color3', colors[2] || '');
+
+            // Breed logic
             const currentList = petToEdit.animalType === ANIMAL_TYPES.GATO ? catBreeds : dogBreeds;
             if (petToEdit.animalType !== ANIMAL_TYPES.OTRO && currentList.includes(petToEdit.breed)) {
-                setBreed(petToEdit.breed);
+                setValue('breed', petToEdit.breed);
             } else {
-                setBreed('Otro');
-                setCustomBreed(petToEdit.breed);
+                setValue('breed', 'Otro');
+                setValue('customBreed', petToEdit.breed);
             }
-            
-            // Extract colors
-            const colors = petToEdit.color ? petToEdit.color.split(',').map(c => c.trim()) : [];
-            setColor1(colors[0] || '');
-            setColor2(colors[1] || '');
-            setColor3(colors[2] || '');
-            
-            setSize(petToEdit.size || SIZES.MEDIANO);
-            setDate(petToEdit.date.split('T')[0]);
-            setContact(petToEdit.contact);
-            
-            // Handle Description & Custom Type Extraction
+
+            // Description / Custom Type
             if (petToEdit.animalType === ANIMAL_TYPES.OTRO) {
-                // Try to extract [Tipo: Conejo] from description
                 const match = petToEdit.description.match(/^\[Tipo: (.*?)\]\s*(.*)/s);
                 if (match) {
-                    setCustomAnimalType(match[1]);
-                    setDescription(match[2]);
+                    setValue('customAnimalType', match[1]);
+                    setValue('description', match[2]);
                 } else {
-                    setCustomAnimalType('');
-                    setDescription(petToEdit.description);
+                    setValue('description', petToEdit.description);
                 }
-            } else {
-                setDescription(petToEdit.description);
             }
 
-            setImagePreviews(petToEdit.imageUrls || []);
-            setReward(petToEdit.reward || '');
-            setCurrency(petToEdit.currency || 'S/');
-            setShareContactInfo(petToEdit.shareContactInfo ?? true);
-            setLat(petToEdit.lat);
-            setLng(petToEdit.lng);
-
+            // Location Parsing Logic for Edit
             if (petToEdit.location) {
+                // Try to split by comma (reverse order: Addr, Dist, Prov, Dept)
                 const parts = petToEdit.location.split(',').map(s => s.trim());
                 if (parts.length >= 3) {
-                    setDepartment(parts[parts.length - 1]);
-                    setProvince(parts[parts.length - 2]);
-                    setDistrict(parts[parts.length - 3]);
-                    setAddress(parts.slice(0, parts.length - 3).join(', '));
+                    // Try to match department
+                    const deptCand = parts[parts.length - 1];
+                    const deptMatch = departments.find(d => normalizeLocationName(d) === normalizeLocationName(deptCand));
+                    
+                    if (deptMatch) {
+                        setValue('department', deptMatch);
+                        // We must update the state lists manually here because useEffects might be too slow or racey
+                        const provList = getProvinces(deptMatch);
+                        setProvinces(provList);
+
+                        const provCand = parts[parts.length - 2];
+                        const provMatch = provList.find(p => normalizeLocationName(p) === normalizeLocationName(provCand));
+                        
+                        if (provMatch) {
+                            setValue('province', provMatch);
+                            const distList = getDistricts(deptMatch, provMatch);
+                            setDistricts(distList);
+
+                            const distCand = parts[parts.length - 3];
+                            const distMatch = distList.find(d => normalizeLocationName(d) === normalizeLocationName(distCand));
+                            if (distMatch) {
+                                setValue('district', distMatch);
+                                // The rest is the address
+                                setValue('address', parts.slice(0, parts.length - 3).join(', '));
+                            } else {
+                                setValue('address', parts.slice(0, parts.length - 2).join(', '));
+                            }
+                        } else {
+                             setValue('address', parts.slice(0, parts.length - 1).join(', '));
+                        }
+                    } else {
+                        setValue('address', petToEdit.location);
+                    }
                 } else {
-                    setAddress(petToEdit.location);
+                    setValue('address', petToEdit.location);
                 }
             }
         }
-    }, [isEditMode, petToEdit]);
+    }, [isEditMode, petToEdit, setValue]);
 
-    // Update Breeds list when Type changes
+    // --- EFFECT: Update Breeds List ---
     useEffect(() => {
-        if (animalType === ANIMAL_TYPES.PERRO) {
+        if (watchedAnimalType === ANIMAL_TYPES.PERRO) {
             setBreeds(dogBreeds);
-            if (!isEditMode) setBreed(dogBreeds[0]);
-        } else if (animalType === ANIMAL_TYPES.GATO) {
+            if (!isEditMode) setValue('breed', dogBreeds[0]);
+        } else if (watchedAnimalType === ANIMAL_TYPES.GATO) {
             setBreeds(catBreeds);
-            if (!isEditMode) setBreed(catBreeds[0]);
+            if (!isEditMode) setValue('breed', catBreeds[0]);
         } else {
             setBreeds(['Otro']);
-            if (!isEditMode) setBreed('Otro');
+            if (!isEditMode) setValue('breed', 'Otro');
         }
-    }, [animalType, isEditMode]);
+    }, [watchedAnimalType, isEditMode, setValue]);
 
-    // Update Provinces/Districts
+    // --- EFFECT: Update Location Lists (Normal User Selection) ---
     useEffect(() => {
-        if (department) {
-            setProvinces(getProvinces(department));
-            if (!isEditMode && !isUpdatingFromMapRef.current) {
-                setProvince('');
-                setDistrict('');
+        // Only run this logic if NOT currently driven by map click to prevent overwriting
+        if (!isUpdatingFromMapRef.current && watchedDepartment) {
+            setProvinces(getProvinces(watchedDepartment));
+            // Reset children if manually changed
+            if (!isEditMode) { 
+                setValue('province', '');
+                setValue('district', '');
             }
         }
-    }, [department, isEditMode]);
+    }, [watchedDepartment]); // Removed dependent props to avoid loops
 
     useEffect(() => {
-        if (department && province) {
-            setDistricts(getDistricts(department, province));
-            if (!isEditMode && !isUpdatingFromMapRef.current) {
-                setDistrict('');
+        if (!isUpdatingFromMapRef.current && watchedDepartment && watchedProvince) {
+            setDistricts(getDistricts(watchedDepartment, watchedProvince));
+            if (!isEditMode) {
+                setValue('district', '');
             }
         }
-    }, [department, province, isEditMode]);
+    }, [watchedDepartment, watchedProvince]);
 
-    // Address Autocomplete Logic
+
+    // --- ADDRESS AUTOCOMPLETE (FORWARD GEOCODING - TYPING) ---
     useEffect(() => {
-        // Don't search if the update comes from map dragging or if address is too short
-        if (isUpdatingFromMapRef.current || address.length < 4) {
+        // Skip search if:
+        // 1. The update came from a map click (reverse geo)
+        // 2. Address is too short
+        // 3. No address
+        if (isUpdatingFromMapRef.current || !watchedAddress || watchedAddress.length < 4) {
             setSuggestions([]);
             return;
         }
 
         const timer = setTimeout(async () => {
             setIsSearchingAddress(true);
-            
-            // Abort previous request if exists
-            if (forwardGeocodingAbortController.current) {
-                forwardGeocodingAbortController.current.abort();
-            }
+            if (forwardGeocodingAbortController.current) forwardGeocodingAbortController.current.abort();
             forwardGeocodingAbortController.current = new AbortController();
 
             try {
-                // Prioritize Peru with countrycodes=pe
+                // CONTEXTUAL SEARCH: Prioritize selected location
+                let searchQuery = watchedAddress;
+                
+                // Append context if available to narrow down search
+                const contextParts = [];
+                if (watchedDistrict && watchedDistrict !== 'Todos') contextParts.push(watchedDistrict);
+                if (watchedProvince && watchedProvince !== 'Todos') contextParts.push(watchedProvince);
+                if (watchedDepartment && watchedDepartment !== 'Todos') contextParts.push(watchedDepartment);
+                contextParts.push('Peru');
+
+                if (contextParts.length > 0) {
+                    searchQuery += `, ${contextParts.join(', ')}`;
+                }
+
                 const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=pe&limit=5&addressdetails=1`,
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=pe&limit=5&addressdetails=1`,
                     {
-                        headers: {
-                            'Accept-Language': 'es-ES,es;q=0.9', // Improve result language
-                        },
+                        headers: { 'Accept-Language': 'es-ES,es;q=0.9' },
                         signal: forwardGeocodingAbortController.current.signal
                     }
                 );
                 
-                if (!response.ok) throw new Error("Network response was not ok");
-                
-                const data = await response.json();
-                setSuggestions(data);
-                setShowSuggestions(true);
-            } catch (err: any) {
-                if (err.name === 'AbortError') return;
-                console.warn("Error fetching address suggestions (skipping):", err);
-            } finally {
-                setIsSearchingAddress(false);
+                if (response.ok) {
+                    const data = await response.json();
+                    setSuggestions(data);
+                    setShowSuggestions(true);
+                }
+            } catch (err: any) { 
+                if (err.name !== 'AbortError') console.error(err);
             }
-        }, 1000); // 1000ms debounce to prevent "Failed to fetch" (Rate Limit)
+            finally { setIsSearchingAddress(false); }
+        }, 800); // 800ms debounce
 
         return () => clearTimeout(timer);
-    }, [address]);
+    }, [watchedAddress, watchedDistrict, watchedProvince, watchedDepartment]);
 
     const handleSelectSuggestion = (suggestion: any) => {
         const lat = parseFloat(suggestion.lat);
         const lon = parseFloat(suggestion.lon);
         
-        // Update Map
+        // 1. Set coordinates
+        setValue('lat', lat);
+        setValue('lng', lon);
+
+        // 2. Move Map
         if (mapInstance.current) {
             mapInstance.current.setView([lat, lon], 16);
-            updateMarker(lat, lon);
+            updateMarker(lat, lon, false); // false = don't trigger recursive update
         }
 
-        // Parse Address Details to Auto-fill Dept/Prov/Dist
-        const addr = suggestion.address;
-        let newDept = '';
-        let newProv = '';
-        let newDist = '';
-        let newProvincesList: string[] = [];
-        let newDistrictsList: string[] = [];
-
-        const apiState = addr.state || addr.region;
-        if (apiState) {
-            const normalizedApiState = normalizeLocationName(apiState);
-            newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || '';
-        }
-
-        if (newDept) {
-            newProvincesList = getProvinces(newDept);
-            const apiProv = addr.province || addr.region || addr.city;
-            if (apiProv) {
-                const normalizedApiProv = normalizeLocationName(apiProv);
-                newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || '';
-            }
-        }
-
-        if (newDept && newProv) {
-            newDistrictsList = getDistricts(newDept, newProv);
-            const apiDist = addr.district || addr.town || addr.suburb || addr.city_district;
-            if (apiDist) {
-                const normalizedApiDist = normalizeLocationName(apiDist);
-                newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) || '';
-            }
-        }
-
-        isUpdatingFromMapRef.current = true; // Prevent the address text from triggering a new search loop immediately
+        // 3. Extract and Set Address Text (Avoid overwrite loop)
+        isUpdatingFromMapRef.current = true;
         
-        // Update Lists
-        if (newProvincesList.length > 0) setProvinces(newProvincesList);
-        if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
-
-        // Update Fields
-        if (newDept) setDepartment(newDept);
-        if (newProv) setProvince(newProv);
-        if (newDist) setDistrict(newDist);
+        // Extract street name only
+        let streetName = suggestion.address?.road || 
+                         suggestion.address?.pedestrian ||
+                         suggestion.address?.building ||
+                         suggestion.display_name.split(',')[0];
+                         
+        if (suggestion.address?.house_number) streetName += ` ${suggestion.address.house_number}`;
         
-        // Use the display name part that matches the street/place
-        const road = addr.road || addr.pedestrian || addr.construction || '';
-        const houseNumber = addr.house_number || '';
-        const placeName = addr.amenity || addr.shop || addr.tourism || addr.historic || '';
+        setValue('address', streetName);
         
-        let newAddressText = suggestion.display_name.split(',')[0]; // Fallback
-        if (road) newAddressText = `${road} ${houseNumber}`.trim();
-        else if (placeName) newAddressText = placeName;
+        // 4. Try to match hierarchy from result
+        parseAndSetHierarchy(suggestion.address);
 
-        setAddress(newAddressText);
         setSuggestions([]);
         setShowSuggestions(false);
 
-        // Reset the flag after state updates settle
-        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 1000);
+        // Reset flag after a safe delay
+        if (mapClickTimeoutRef.current) clearTimeout(mapClickTimeoutRef.current);
+        mapClickTimeoutRef.current = setTimeout(() => { isUpdatingFromMapRef.current = false; }, 1500);
     };
 
-    // Map Logic
-    useEffect(() => {
-        if (!mapRef.current) return;
-        if (mapInstance.current) return; // Already initialized
+    // --- REVERSE GEOCODING HELPER ---
+    const parseAndSetHierarchy = (addr: any) => {
+        if (!addr) return;
 
-        let L: any;
-        const checkLeaflet = setInterval(() => {
-            if (typeof (window as any).L !== 'undefined') {
-                clearInterval(checkLeaflet);
-                L = (window as any).L;
+        // 1. Find Department
+        const apiState = normalizeLocationName(addr.state || addr.region || '');
+        const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
+        
+        if (deptMatch) {
+            setValue('department', deptMatch);
+            const newProvs = getProvinces(deptMatch);
+            setProvinces(newProvs); // Force update state immediately
 
-                const initialLat = lat || -12.046374;
-                const initialLng = lng || -77.042793;
+            // 2. Find Province
+            const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
+            const provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
 
-                mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
+            if (provMatch) {
+                setValue('province', provMatch);
+                const newDists = getDistricts(deptMatch, provMatch);
+                setDistricts(newDists); // Force update state immediately
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap'
-                }).addTo(mapInstance.current);
-
-                mapInstance.current.on('click', (e: any) => {
-                    const { lat, lng } = e.latlng;
-                    updateMarker(lat, lng);
-                    updateAddressFromCoords(lat, lng);
-                });
-
-                // Invalidate size after a short delay to ensure the container is visible
-                setTimeout(() => {
-                    mapInstance.current?.invalidateSize();
-                }, 100);
-
-                if (lat && lng) {
-                    updateMarker(lat, lng, false);
+                // 3. Find District
+                const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
+                const distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
+                
+                if (distMatch) {
+                    setValue('district', distMatch);
                 }
             }
-        }, 100);
+        }
+    };
 
-        return () => {
-            clearInterval(checkLeaflet);
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-    }, []);
-
-    const updateMarker = (latitude: number, longitude: number, updateState = true) => {
+    // --- MAP LOGIC ---
+    const updateMarker = (latitude: number, longitude: number, shouldReverseGeocode = true) => {
         const L = (window as any).L;
         if (!mapInstance.current || !L) return;
 
-        if (updateState) {
-            setLat(latitude);
-            setLng(longitude);
-        }
-
-        const iconClass = status === PET_STATUS.ENCONTRADO ? 'found' : status === PET_STATUS.AVISTADO ? 'sighted' : 'lost';
+        // Visual update
+        const iconClass = watchedStatus === PET_STATUS.ENCONTRADO ? 'found' : watchedStatus === PET_STATUS.AVISTADO ? 'sighted' : 'lost';
         const icon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div class='marker-pin ${iconClass}'></div><i class='material-icons'></i>`,
@@ -394,191 +378,225 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             markerInstance.current.setIcon(icon);
         } else {
             markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
+            
+            // Drag Event
+            markerInstance.current.on('dragstart', () => {
+                isUpdatingFromMapRef.current = true;
+            });
             markerInstance.current.on('dragend', (event: any) => {
                 const pos = event.target.getLatLng();
-                setLat(pos.lat);
-                setLng(pos.lng);
-                updateAddressFromCoords(pos.lat, pos.lng);
+                setValue('lat', pos.lat);
+                setValue('lng', pos.lng);
+                performReverseGeocoding(pos.lat, pos.lng);
             });
+        }
+
+        if (shouldReverseGeocode) {
+            performReverseGeocoding(latitude, longitude);
         }
     };
 
-    // Update marker color dynamically when status changes
-    useEffect(() => {
-        if(markerInstance.current && lat && lng) {
-            updateMarker(lat, lng, false);
-        }
-    }, [status]);
-
-    const updateAddressFromCoords = async (latitude: number, longitude: number) => {
-        // Abort previous pending request
-        if (reverseGeocodingAbortController.current) {
-            reverseGeocodingAbortController.current.abort();
-        }
+    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+        isUpdatingFromMapRef.current = true;
+        
+        if (reverseGeocodingAbortController.current) reverseGeocodingAbortController.current.abort();
         reverseGeocodingAbortController.current = new AbortController();
 
         try {
-            // Using generic headers to avoid some fetch blocks, and Accept-Language for Spanish
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
                 {
-                    headers: {
-                        'Accept-Language': 'es-ES,es;q=0.9',
-                    },
+                    headers: { 'Accept-Language': 'es-ES,es;q=0.9' },
                     signal: reverseGeocodingAbortController.current.signal
                 }
             );
             
-            if (!response.ok) {
-                console.warn('Nominatim reverse fetch failed (silent ignore):', response.status);
-                return;
-            }
-
+            if (!response.ok) return;
             const data = await response.json();
             
             if (data && data.address) {
                 const addr = data.address;
-                const road = addr.road || '';
-                const number = addr.house_number || '';
-                const newAddress = `${road} ${number}`.trim();
                 
-                let newDept = '';
-                let newProv = '';
-                let newDist = '';
-                let newProvincesList: string[] = [];
-                let newDistrictsList: string[] = [];
-
-                const apiState = addr.state || addr.region;
-                if (apiState) {
-                    const normalizedApiState = normalizeLocationName(apiState);
-                    newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || '';
+                // Construct basic street address
+                let addressText = addr.road || addr.pedestrian || addr.footway || addr.path || '';
+                if (addr.house_number) addressText += ` ${addr.house_number}`;
+                
+                // Fallbacks
+                if (!addressText) {
+                    addressText = addr.amenity || addr.building || addr.park || addr.leisure || '';
+                }
+                
+                // Avoid setting empty address if we are clicking middle of nowhere
+                if (addressText) {
+                    setValue('address', addressText, { shouldValidate: true });
                 }
 
-                if (newDept) {
-                    newProvincesList = getProvinces(newDept);
-                    const apiProv = addr.province || addr.region || addr.city;
-                    if (apiProv) {
-                        const normalizedApiProv = normalizeLocationName(apiProv);
-                        newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || '';
-                    }
-                }
-
-                if (newDept && newProv) {
-                    newDistrictsList = getDistricts(newDept, newProv);
-                    const apiDist = addr.district || addr.town || addr.suburb;
-                    if (apiDist) {
-                        const normalizedApiDist = normalizeLocationName(apiDist);
-                        newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) || '';
-                    }
-                }
-
-                isUpdatingFromMapRef.current = true;
-                if (newProvincesList.length > 0) setProvinces(newProvincesList);
-                if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
-
-                if (newDept) setDepartment(newDept);
-                if (newProv) setProvince(newProv);
-                if (newDist) setDistrict(newDist);
-                if (newAddress) setAddress(newAddress);
-
-                setTimeout(() => { isUpdatingFromMapRef.current = false; }, 1000);
+                // Update Hierarchy
+                parseAndSetHierarchy(addr);
             }
-        } catch (err: any) {
-            if (err.name === 'AbortError') return; // Ignore cancelled requests
-            console.warn("Geocoding error (likely network or rate limit):", err);
-            // Non-blocking error: allow user to type address manually
+        } catch (err: any) { 
+            // Ignore aborts
+        } finally {
+            // Release lock after delay
+            if (mapClickTimeoutRef.current) clearTimeout(mapClickTimeoutRef.current);
+            mapClickTimeoutRef.current = setTimeout(() => { isUpdatingFromMapRef.current = false; }, 2000);
         }
     };
+
+    // Initialize Map
+    useEffect(() => {
+        if (!mapRef.current || mapInstance.current) return;
+
+        const timer = setTimeout(() => {
+            if (typeof (window as any).L !== 'undefined') {
+                const L = (window as any).L;
+                // Default to Lima or existing coords
+                const initialLat = watchedLat || -12.046374;
+                const initialLng = watchedLng || -77.042793;
+
+                mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance.current);
+
+                // Map Click Event
+                mapInstance.current.on('click', (e: any) => {
+                    const { lat, lng } = e.latlng;
+                    setValue('lat', lat);
+                    setValue('lng', lng);
+                    updateMarker(lat, lng, true);
+                });
+
+                if (watchedLat && watchedLng) {
+                    updateMarker(watchedLat, watchedLng, false);
+                }
+                
+                mapInstance.current.invalidateSize();
+            }
+        }, 100);
+        
+        return () => { 
+            clearTimeout(timer); 
+            if(mapInstance.current) { 
+                mapInstance.current.remove(); 
+                mapInstance.current = null; 
+            } 
+        };
+    }, []);
+
+    // Center map when Dept/Prov changes manually (NOT from map click)
+    useEffect(() => {
+        if (isUpdatingFromMapRef.current || !mapInstance.current) return;
+        
+        const coords = locationCoordinates[watchedProvince] || locationCoordinates[watchedDepartment];
+        if (coords) {
+            mapInstance.current.setView([coords.lat, coords.lng], 12);
+        }
+    }, [watchedDepartment, watchedProvince]);
+
+    // Update marker icon when status changes
+    useEffect(() => {
+        if(markerInstance.current && watchedLat && watchedLng) {
+            updateMarker(watchedLat, watchedLng, false);
+        }
+    }, [watchedStatus]);
 
     const handleGetCurrentLocation = () => {
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition((pos) => {
             const { latitude, longitude } = pos.coords;
+            setValue('lat', latitude);
+            setValue('lng', longitude);
+            
             if (mapInstance.current) {
                 mapInstance.current.setView([latitude, longitude], 16);
-                updateMarker(latitude, longitude);
-                updateAddressFromCoords(latitude, longitude);
+                updateMarker(latitude, longitude, true);
             }
         });
     };
 
+    // --- IMAGES ---
     const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files) {
-            if (imagePreviews.length + files.length > 3) {
-                setError('Puedes subir un máximo de 3 fotos.');
+            if (watchedImageUrls.length + files.length > 3) {
+                setUploadError('Puedes subir un máximo de 3 fotos.');
                 return;
             }
             setIsUploading(true);
-            setError('');
+            setUploadError('');
             try {
                 const newImages: string[] = [];
                 for (let i = 0; i < files.length; i++) {
                     const url = await uploadImage(files[i]);
                     newImages.push(url);
                 }
-                setImagePreviews(prev => [...prev, ...newImages]);
+                setValue('imageUrls', [...watchedImageUrls, ...newImages]);
             } catch (err) {
                 console.error(err);
-                setError('Error al subir imagen. Por favor intenta de nuevo.');
+                setUploadError('Error al subir imagen. Por favor intenta de nuevo.');
             } finally {
                 setIsUploading(false);
             }
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
+    const removeImage = (index: number) => {
+        setValue('imageUrls', watchedImageUrls.filter((_, i) => i !== index));
+    };
 
-        if (imagePreviews.length === 0) {
-            setError('Sube al menos una foto.');
-            return;
-        }
-        if (!color1) {
-            setError('Debes seleccionar al menos el color primario.');
-            return;
-        }
-        if (!contact) {
-            setError('El contacto es obligatorio.');
+    // --- SUBMIT ---
+    const onFormSubmit: SubmitHandler<FormValues> = (data) => {
+        setUploadError('');
+        if (data.imageUrls.length === 0) {
+            setUploadError('Sube al menos una foto.');
             return;
         }
 
-        // Concatenate colors
-        const finalColors = [color1, color2, color3].filter(Boolean).join(', ');
-        const finalLocation = [address, district, province, department].filter(Boolean).join(', ');
-        const finalBreed = breed === 'Otro' ? customBreed : breed;
-        const finalType = animalType === 'Otro' ? ANIMAL_TYPES.OTRO : animalType;
+        const finalColors = [data.color1, data.color2, data.color3].filter(Boolean).join(', ');
+        const finalLocation = [data.address, data.district, data.province, data.department].filter(Boolean).join(', ');
+        const finalBreed = data.breed === 'Otro' ? data.customBreed : data.breed;
+        const finalType = data.animalType === 'Otro' ? ANIMAL_TYPES.OTRO : data.animalType;
         
-        let finalDescription = description;
-        if (animalType === 'Otro' && customAnimalType) {
-            finalDescription = `[Tipo: ${customAnimalType}] ${description}`;
+        let finalDescription = data.description;
+        if (data.animalType === 'Otro' && data.customAnimalType) {
+            finalDescription = `[Tipo: ${data.customAnimalType}] ${data.description}`;
         }
 
-        const petData: any = {
-            status,
-            name: name || 'Desconocido',
+        const petData = {
+            status: data.status,
+            name: data.name || 'Desconocido',
             animalType: finalType,
             breed: finalBreed || 'Mestizo',
             color: finalColors,
-            size,
+            size: data.size,
             location: finalLocation,
-            date: new Date(date).toISOString(),
-            contact,
+            date: new Date(data.date).toISOString(),
+            contact: data.contact,
             description: finalDescription,
-            imageUrls: imagePreviews,
-            shareContactInfo,
-            reward: reward ? Number(reward) : undefined,
-            currency,
-            lat,
-            lng,
-            createAlert: createAlert && status === PET_STATUS.PERDIDO && !isEditMode
+            imageUrls: data.imageUrls,
+            shareContactInfo: data.shareContactInfo,
+            reward: data.reward ? Number(data.reward) : undefined,
+            currency: data.currency,
+            lat: data.lat,
+            lng: data.lng,
+            createAlert: data.createAlert && data.status === PET_STATUS.PERDIDO && !isEditMode
         };
 
         onSubmit(petData, petToEdit?.id);
     };
 
-    const inputClass = "w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900 shadow-sm";
+    // Header Logic
+    const getHeaderInfo = () => {
+        if (isEditMode) return { title: 'Editar Publicación', description: 'Actualiza los datos de tu reporte.' };
+        switch (watchedStatus) {
+            case PET_STATUS.PERDIDO: return { title: 'Reportar Mascota Perdida', description: 'Ayuda a que regrese a casa.' };
+            case PET_STATUS.ENCONTRADO: return { title: 'Reportar Mascota Encontrada', description: 'Ayuda a encontrar a su dueño.' };
+            case PET_STATUS.AVISTADO: return { title: 'Reportar Avistamiento', description: 'Informa si viste una mascota perdida.' };
+            default: return { title: 'Reportar Mascota', description: 'Completa los datos.' };
+        }
+    };
+    const headerInfo = getHeaderInfo();
+    
+    const inputClass = "w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900 shadow-sm disabled:bg-gray-100";
     const labelClass = "block text-sm font-bold text-gray-700 mb-1";
 
     return (
@@ -593,17 +611,23 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><XCircleIcon className="h-8 w-8"/></button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-gray-300">
-                    {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">{error}</div>}
+                <form onSubmit={handleSubmit(onFormSubmit)} className="flex-grow overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-gray-300">
+                    {uploadError && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">{uploadError}</div>}
 
-                    {/* --- SECTION 1: DETAILS --- */}
+                    {/* SECTION 1: DETAILS */}
                     <section className="space-y-4">
-                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><InfoIcon className="h-6 w-6 text-brand-primary"/> Detalles de la Mascota</h3>
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><InfoIcon className="h-6 w-6 text-brand-primary"/> Detalles</h3>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className={labelClass}>Nombre {status !== PET_STATUS.PERDIDO && '(Opcional)'}</label>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputClass} placeholder={status === PET_STATUS.PERDIDO ? 'Ej: Rocky' : 'Ej: Desconocido'} required={status === PET_STATUS.PERDIDO} />
+                                <label className={labelClass}>Nombre {watchedStatus !== PET_STATUS.PERDIDO && '(Opcional)'}</label>
+                                <input 
+                                    type="text" 
+                                    {...register('name', { required: watchedStatus === PET_STATUS.PERDIDO ? "El nombre es obligatorio" : false })} 
+                                    className={inputClass} 
+                                    placeholder={watchedStatus === PET_STATUS.PERDIDO ? 'Ej: Rocky' : 'Ej: Desconocido'} 
+                                />
+                                {errors.name && <span className="text-red-500 text-xs">{errors.name.message}</span>}
                             </div>
                             <div>
                                 <label className={labelClass}>Tipo de Animal</label>
@@ -612,8 +636,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                         <button
                                             key={t}
                                             type="button"
-                                            onClick={() => setAnimalType(t)}
-                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${animalType === t ? 'bg-white shadow text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
+                                            onClick={() => setValue('animalType', t)}
+                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${watchedAnimalType === t ? 'bg-white shadow text-brand-primary' : 'text-gray-500 hover:text-gray-700'}`}
                                         >
                                             {t}
                                         </button>
@@ -622,57 +646,60 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             </div>
                         </div>
 
-                        {animalType === ANIMAL_TYPES.OTRO && (
+                        {watchedAnimalType === ANIMAL_TYPES.OTRO && (
                             <div>
                                 <label className={labelClass}>Especificar Tipo</label>
-                                <input type="text" value={customAnimalType} onChange={e => setCustomAnimalType(e.target.value)} className={inputClass} placeholder="Ej: Conejo, Loro..." required />
+                                <input type="text" {...register('customAnimalType', { required: "Especifique el tipo" })} className={inputClass} placeholder="Ej: Conejo" />
+                                {errors.customAnimalType && <span className="text-red-500 text-xs">{errors.customAnimalType.message}</span>}
                             </div>
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Raza <span className="text-red-500">*</span></label>
-                                <select value={breed} onChange={e => setBreed(e.target.value)} className={inputClass} required>
+                                <select {...register('breed', { required: true })} className={inputClass}>
                                     {breeds.map(b => <option key={b} value={b}>{b}</option>)}
                                 </select>
                             </div>
-                            {breed === 'Otro' && (
+                            {watchedBreed === 'Otro' && (
                                 <div>
                                     <label className={labelClass}>Especificar Raza</label>
-                                    <input type="text" value={customBreed} onChange={e => setCustomBreed(e.target.value)} className={inputClass} required />
+                                    <input type="text" {...register('customBreed', { required: "Especifique la raza" })} className={inputClass} />
+                                    {errors.customBreed && <span className="text-red-500 text-xs">{errors.customBreed.message}</span>}
                                 </div>
                             )}
                             <div>
                                 <label className={labelClass}>Tamaño</label>
-                                <select value={size} onChange={e => setSize(e.target.value as PetSize)} className={inputClass}>
+                                <select {...register('size')} className={inputClass}>
                                     {Object.values(SIZES).map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
                         </div>
 
-                        {/* COLORS SECTION */}
+                        {/* COLORS */}
                         <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
                             <h4 className="font-bold text-blue-900 mb-3 text-sm uppercase tracking-wide">Colores (Identificación)</h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-blue-800 mb-1">Color Principal <span className="text-red-500">*</span></label>
-                                    <select value={color1} onChange={e => setColor1(e.target.value)} className={inputClass} required>
+                                    <select {...register('color1', { required: "Color principal obligatorio" })} className={inputClass}>
                                         <option value="">Seleccionar</option>
                                         {petColors.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
+                                    {errors.color1 && <span className="text-red-500 text-xs">{errors.color1.message}</span>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-blue-800 mb-1">Color Secundario</label>
-                                    <select value={color2} onChange={e => setColor2(e.target.value)} className={inputClass}>
+                                    <select {...register('color2')} className={inputClass}>
                                         <option value="">(Opcional)</option>
-                                        {petColors.filter(c => c !== color1).map(c => <option key={c} value={c}>{c}</option>)}
+                                        {petColors.filter(c => c !== watch('color1')).map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-blue-800 mb-1">Tercer Color</label>
-                                    <select value={color3} onChange={e => setColor3(e.target.value)} className={inputClass}>
+                                    <select {...register('color3')} className={inputClass}>
                                         <option value="">(Opcional)</option>
-                                        {petColors.filter(c => c !== color1 && c !== color2).map(c => <option key={c} value={c}>{c}</option>)}
+                                        {petColors.filter(c => c !== watch('color1') && c !== watch('color2')).map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -680,11 +707,11 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
                         <div>
                             <label className={labelClass}>Descripción Adicional</label>
-                            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className={inputClass} placeholder="Collar, cicatrices, comportamiento..."></textarea>
+                            <textarea {...register('description')} rows={3} className={inputClass} placeholder="Collar, cicatrices, comportamiento..."></textarea>
                         </div>
                     </section>
 
-                    {/* --- SECTION 2: LOCATION --- */}
+                    {/* SECTION 2: LOCATION */}
                     <section className="space-y-4 border-t pt-4 border-gray-100">
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><LocationMarkerIcon className="h-6 w-6 text-brand-primary"/> Ubicación</h3>
@@ -696,20 +723,20 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-600 mb-1">Departamento</label>
-                                <select value={department} onChange={e => { setDepartment(e.target.value); setProvince(''); setDistrict(''); }} className={inputClass}>
+                                <select {...register('department')} className={inputClass}>
                                     {departments.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-600 mb-1">Provincia</label>
-                                <select value={province} onChange={e => { setProvince(e.target.value); setDistrict(''); }} className={inputClass} disabled={!department}>
+                                <select {...register('province')} className={inputClass} disabled={!watchedDepartment}>
                                     <option value="">Seleccionar</option>
                                     {provinces.map(p => <option key={p} value={p}>{p}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-600 mb-1">Distrito</label>
-                                <select value={district} onChange={e => setDistrict(e.target.value)} className={inputClass} disabled={!province}>
+                                <select {...register('district')} className={inputClass} disabled={!watchedProvince}>
                                     <option value="">Seleccionar</option>
                                     {districts.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
@@ -721,11 +748,9 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             <div className="relative">
                                 <input 
                                     type="text" 
-                                    value={address} 
-                                    onChange={e => setAddress(e.target.value)} 
+                                    {...register('address', { required: "La dirección es obligatoria" })}
                                     className={`${inputClass} pr-8`} 
                                     placeholder="Ej: Parque Kennedy, Miraflores" 
-                                    required 
                                     autoComplete="off"
                                 />
                                 {isSearchingAddress && (
@@ -749,9 +774,9 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                     ))}
                                 </ul>
                             )}
+                            {errors.address && <span className="text-red-500 text-xs">{errors.address.message}</span>}
                         </div>
                         
-                        {/* Map Container - Explicit Height */}
                         <div className="w-full rounded-xl overflow-hidden border border-gray-300 relative z-0 shadow-inner" style={{ height: '300px' }}>
                             <div ref={mapRef} className="w-full h-full" style={{ height: '100%' }}></div>
                             <div className="absolute bottom-2 left-2 bg-white/90 text-xs px-2 py-1 rounded shadow pointer-events-none text-gray-600 z-[1000]">
@@ -760,23 +785,23 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         </div>
                     </section>
 
-                    {/* --- SECTION 3: MEDIA & CONTACT --- */}
+                    {/* SECTION 3: MEDIA & CONTACT */}
                     <section className="space-y-4 border-t pt-4 border-gray-100">
                         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><CameraIcon className="h-6 w-6 text-brand-primary"/> Fotos y Contacto</h3>
 
                         <div className="bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300 text-center">
                             <label className="cursor-pointer block">
                                 <span className="block text-sm font-bold text-gray-600 mb-2">Sube hasta 3 fotos <span className="text-red-500">*</span></span>
-                                <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" disabled={isUploading || imagePreviews.length >= 3} />
+                                <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" disabled={isUploading || watchedImageUrls.length >= 3} />
                                 <div className="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
                                     {isUploading ? 'Subiendo...' : 'Seleccionar Fotos'}
                                 </div>
                             </label>
                             <div className="flex gap-4 mt-4 justify-center flex-wrap">
-                                {imagePreviews.map((url, idx) => (
+                                {watchedImageUrls.map((url, idx) => (
                                     <div key={idx} className="relative w-24 h-24 border rounded-lg overflow-hidden shadow-sm group">
-                                        <img src={url} className="w-full h-full object-cover" />
-                                        <button type="button" onClick={() => setImagePreviews(prev => prev.filter((_, i) => i !== idx))} className="absolute top-0 right-0 bg-red-500 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <img src={url} className="w-full h-full object-cover" alt="preview" />
+                                        <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <XCircleIcon className="h-4 w-4"/>
                                         </button>
                                     </div>
@@ -787,55 +812,56 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Fecha del Suceso</label>
-                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} required max={new Date().toISOString().split('T')[0]} />
+                                <input type="date" {...register('date', { required: true })} className={inputClass} max={new Date().toISOString().split('T')[0]} />
                             </div>
                             <div>
                                 <label className={labelClass}>Teléfono de Contacto <span className="text-red-500">*</span></label>
-                                <input type="tel" value={contact} onChange={e => setContact(e.target.value)} className={inputClass} placeholder="999888777" required />
+                                <input type="tel" {...register('contact', { required: "El contacto es obligatorio" })} className={inputClass} placeholder="999888777" />
+                                {errors.contact && <span className="text-red-500 text-xs">{errors.contact.message}</span>}
                                 <div className="flex items-center mt-2">
-                                    <input type="checkbox" id="shareContact" checked={shareContactInfo} onChange={e => setShareContactInfo(e.target.checked)} className="mr-2 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded" />
-                                    <label htmlFor="shareContact" className="text-sm text-gray-600">Mostrar número públicamente</label>
+                                    <input type="checkbox" {...register('shareContactInfo')} className="mr-2 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded" />
+                                    <label className="text-sm text-gray-600">Mostrar número públicamente</label>
                                 </div>
                             </div>
                         </div>
 
-                        {status === PET_STATUS.PERDIDO && (
+                        {watchedStatus === PET_STATUS.PERDIDO && (
                             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="text-xl">💰</span>
                                     <h4 className="font-bold text-yellow-800 text-sm">Recompensa (Opcional)</h4>
                                 </div>
                                 <div className="flex gap-2">
-                                    <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-24 p-2 border border-yellow-300 rounded-lg bg-white font-bold text-gray-700">
+                                    <select {...register('currency')} className="w-24 p-2 border border-yellow-300 rounded-lg bg-white font-bold text-gray-700">
                                         <option value="S/">S/</option>
                                         <option value="$">$</option>
                                     </select>
-                                    <input type="number" value={reward} onChange={e => setReward(e.target.value === '' ? '' : Number(e.target.value))} className="flex-1 p-2 border border-yellow-300 rounded-lg" placeholder="Monto" />
+                                    <input type="number" {...register('reward')} className="flex-1 p-2 border border-yellow-300 rounded-lg" placeholder="Monto" />
                                 </div>
                             </div>
                         )}
 
-                        {!isEditMode && status === PET_STATUS.PERDIDO && (
+                        {!isEditMode && watchedStatus === PET_STATUS.PERDIDO && (
                             <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
                                 <InfoIcon className="text-blue-500 h-5 w-5 mt-0.5" />
                                 <div className="flex-grow">
                                     <div className="flex items-center justify-between">
-                                        <label htmlFor="createAlert" className="text-sm font-bold text-blue-900 cursor-pointer">Crear Alerta Automática</label>
-                                        <input type="checkbox" id="createAlert" checked={createAlert} onChange={e => setCreateAlert(e.target.checked)} className="h-5 w-5 text-brand-primary border-gray-300 rounded focus:ring-brand-primary" />
+                                        <label className="text-sm font-bold text-blue-900 cursor-pointer">Crear Alerta Automática</label>
+                                        <input type="checkbox" {...register('createAlert')} className="h-5 w-5 text-brand-primary border-gray-300 rounded focus:ring-brand-primary" />
                                     </div>
                                     <p className="text-xs text-blue-700 mt-1">Te avisaremos inmediatamente si alguien reporta haber encontrado una mascota con estas características.</p>
                                 </div>
                             </div>
                         )}
                     </section>
-                </form>
 
-                <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0">
-                    <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
-                    <button type="button" onClick={handleSubmit} disabled={isUploading || isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
-                        {isSubmitting ? 'Publicando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
-                    </button>
-                </div>
+                    <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0 -mx-6 -mb-6">
+                        <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+                        <button type="submit" disabled={isUploading || isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
+                            {isSubmitting ? 'Publicando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
