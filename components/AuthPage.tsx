@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GoogleIcon, AppleIcon, WarningIcon, CheckCircleIcon, EyeIcon, EyeOffIcon } from './icons';
 
@@ -10,12 +10,14 @@ const AuthPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     
     // Honeypot field (anti-bot)
     const [website, setWebsite] = useState('');
 
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [socialLoading, setSocialLoading] = useState(false);
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
@@ -60,7 +62,6 @@ const AuthPage: React.FC = () => {
         
         // 1. Honeypot Check (Security)
         if (website) {
-            // Silently fail if bot filled the hidden field
             console.warn("Bot detected via honeypot");
             return; 
         }
@@ -70,17 +71,19 @@ const AuthPage: React.FC = () => {
 
         setError('');
         
-        // Sanitize email input
         const cleanEmail = email.trim();
 
         if (!isLogin) {
-            // Registration Validations
             if (password !== confirmPassword) {
                 setError('Las contraseñas no coinciden.');
                 return;
             }
             if (passwordStrength < 3) {
                 setError('La contraseña es muy débil. Usa mayúsculas, números y al menos 8 caracteres.');
+                return;
+            }
+            if (!acceptedTerms) {
+                setError('Debes aceptar los Términos y Condiciones para crear una cuenta.');
                 return;
             }
         }
@@ -97,21 +100,19 @@ const AuthPage: React.FC = () => {
             console.error(err);
             let msg = 'Ocurrió un error.';
             
-            // Translate Supabase errors
             if (err.message.includes('Invalid login credentials')) msg = 'Credenciales incorrectas o correo no confirmado.';
             else if (err.message.includes('User already registered')) msg = 'Este email ya está registrado.';
             else if (err.message.includes('Password should be')) msg = 'La contraseña es muy débil.';
-            else if (err.message.toLowerCase().includes('invalid') && err.message.toLowerCase().includes('email')) msg = 'El formato del correo electrónico no es válido. Asegúrate de no dejar espacios.';
+            else if (err.message.toLowerCase().includes('invalid') && err.message.toLowerCase().includes('email')) msg = 'El formato del correo electrónico no es válido.';
             else msg = err.message;
 
             setError(msg);
             
-            // Increment failed attempts for login
             if (isLogin) {
                 const newAttempts = failedAttempts + 1;
                 setFailedAttempts(newAttempts);
                 if (newAttempts >= 5) {
-                    setLockoutTime(Date.now() + 30000); // 30 seconds lockout
+                    setLockoutTime(Date.now() + 30000); 
                     setError('Demasiados intentos fallidos. Espera 30 segundos.');
                 }
             }
@@ -121,9 +122,10 @@ const AuthPage: React.FC = () => {
     };
 
     const handleSocialLogin = async (provider: 'google' | 'apple') => {
-        if (loading || lockoutTime) return;
+        if (loading || socialLoading || lockoutTime) return;
+        
         setError('');
-        setLoading(true);
+        setSocialLoading(true);
         try {
             if (provider === 'google') {
                 await loginWithGoogle();
@@ -132,13 +134,13 @@ const AuthPage: React.FC = () => {
             }
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error con el inicio de sesión social.');
-        } finally {
-            setLoading(false);
+            setSocialLoading(false);
         }
+        // Note: We don't setSocialLoading(false) on success because the page will redirect
     }
 
     const inputClass = "w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
-    const socialButtonClass = "w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    const socialButtonClass = "w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white relative";
 
     return (
         <div className="min-h-screen bg-brand-light flex items-center justify-center p-4">
@@ -160,7 +162,6 @@ const AuthPage: React.FC = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Honeypot Field (Hidden) */}
                     <div className="opacity-0 absolute -z-10 h-0 w-0 overflow-hidden">
                         <input 
                             type="text" 
@@ -210,7 +211,6 @@ const AuthPage: React.FC = () => {
                             </button>
                         </div>
                         
-                        {/* Password Strength Meter (Only for Registration) */}
                         {!isLogin && password.length > 0 && (
                             <div className="mt-2">
                                 <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -228,38 +228,48 @@ const AuthPage: React.FC = () => {
                                      passwordStrength === 2 ? 'Regular' : 
                                      passwordStrength === 3 ? 'Buena' : 'Fuerte'}
                                 </p>
-                                {passwordStrength < 3 && (
-                                    <p className="text-xs text-gray-400 mt-1">
-                                        * Usa mayúsculas, números y símbolos.
-                                    </p>
-                                )}
                             </div>
                         )}
                     </div>
 
                     {!isLogin && (
-                        <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-900">Confirmar Contraseña</label>
-                            <input
-                                id="confirmPassword"
-                                type="password"
-                                name="confirmPassword"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className={`${inputClass} ${confirmPassword && confirmPassword !== password ? 'border-red-500 focus:ring-red-500' : ''}`}
-                                placeholder="••••••••"
-                                required
-                            />
-                            {confirmPassword && confirmPassword !== password && (
-                                <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
-                            )}
-                        </div>
+                        <>
+                            <div>
+                                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-900">Confirmar Contraseña</label>
+                                <input
+                                    id="confirmPassword"
+                                    type="password"
+                                    name="confirmPassword"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className={`${inputClass} ${confirmPassword && confirmPassword !== password ? 'border-red-500 focus:ring-red-500' : ''}`}
+                                    placeholder="••••••••"
+                                    required
+                                />
+                                {confirmPassword && confirmPassword !== password && (
+                                    <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
+                                )}
+                            </div>
+
+                            <div className="flex items-start gap-2 pt-1">
+                                <input 
+                                    id="terms" 
+                                    type="checkbox" 
+                                    checked={acceptedTerms}
+                                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                    className="mt-1 h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                                />
+                                <label htmlFor="terms" className="text-sm text-gray-600 select-none">
+                                    He leído y acepto los <Link to="/terminos" target="_blank" rel="noopener noreferrer" className="text-brand-primary hover:underline font-semibold">Términos y Condiciones</Link>
+                                </label>
+                            </div>
+                        </>
                     )}
 
                     <div>
                         <button
                             type="submit"
-                            disabled={loading || !!lockoutTime}
+                            disabled={loading || !!lockoutTime || socialLoading}
                             className="w-full py-3 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                         >
                             {loading ? 'Procesando...' : (
@@ -281,16 +291,15 @@ const AuthPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                    <button onClick={() => handleSocialLogin('google')} disabled={loading || !!lockoutTime} className={socialButtonClass}>
-                        <GoogleIcon />
+                    <button onClick={() => handleSocialLogin('google')} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
+                        {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <GoogleIcon />}
                         <span className="font-medium text-gray-900">Google</span>
                     </button>
-                    <button onClick={() => handleSocialLogin('apple')} disabled={loading || !!lockoutTime} className={socialButtonClass}>
+                    <button onClick={() => handleSocialLogin('apple')} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
                         <AppleIcon />
                          <span className="font-medium text-gray-900">Apple</span>
                     </button>
                 </div>
-
 
                 <div className="mt-6 text-center">
                     <button 
@@ -299,6 +308,7 @@ const AuthPage: React.FC = () => {
                             setError(''); 
                             setPassword('');
                             setConfirmPassword('');
+                            setAcceptedTerms(false);
                         }} 
                         className="text-sm text-brand-primary hover:underline font-medium"
                     >

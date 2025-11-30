@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import { Header } from './Header';
 import { FilterControls } from './FilterControls';
 import { useAuth } from '../contexts/AuthContext';
@@ -88,7 +88,11 @@ export const Layout: React.FC<LayoutProps> = ({
                             </div>
                             <div className="flex flex-col items-center md:items-end text-sm text-purple-700">
                                 <p>&copy; {new Date().getFullYear()} Pets. Todos los derechos reservados.</p>
-                                <p className="mt-1">Hecho con <span className="text-red-500">♥</span> en Perú</p>
+                                <div className="mt-2 flex gap-4">
+                                    <Link to="/terminos" className="hover:underline">Términos y Condiciones</Link>
+                                    <span>|</span>
+                                    <p>Hecho con <span className="text-red-500">♥</span> en Perú</p>
+                                </div>
                             </div>
                         </div>
                     </footer>

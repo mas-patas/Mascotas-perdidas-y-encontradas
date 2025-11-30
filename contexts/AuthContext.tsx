@@ -68,9 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         const initAuth = async () => {
             try {
-                // Race condition: 
-                // If Supabase is cold, getSession might take long. 
-                // We race it against a timeout to ensure the app loads for guests.
+                // Race condition protection
                 const sessionPromise = supabase.auth.getSession();
                 const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) => 
                     setTimeout(() => reject(new Error('Auth timeout')), 8000)
@@ -80,14 +78,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 
                 if (mountedRef.current) {
                     if (session?.user) {
-                        await fetchProfile(session.user.email!, session.user.id);
+                        // Pass the full user object to extract metadata if needed
+                        await fetchProfile(session.user);
                     } else {
                         setCurrentUser(null);
                         setLoading(false);
                     }
                 }
             } catch (error) {
-                // Silent recovery: treat as guest if timeout or error
                 console.log("Auth init info: Defaulting to guest mode due to timeout or network.");
                 if (mountedRef.current) {
                     setCurrentUser(null);
@@ -102,14 +100,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (mountedRef.current) {
                 if (session?.user) {
                     if (!currentUser || currentUser.id !== session.user.id) {
-                        // We don't await here to avoid blocking UI on auth state change
-                        fetchProfile(session.user.email!, session.user.id);
+                        await fetchProfile(session.user);
                     }
                 } else if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
                     setLoading(false);
                 } else {
-                    // Fallback
                     if (!currentUser) setLoading(false);
                 }
             }
@@ -120,12 +116,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
-    const fetchProfile = async (email: string, uid: string, retryCount = 0) => {
+    const fetchProfile = async (authUser: any, retryCount = 0) => {
         // Stop retrying after 3 attempts
         if (retryCount > 2) {
             if (mountedRef.current) setLoading(false);
             return;
         }
+
+        const email = authUser.email;
+        const uid = authUser.id;
 
         try {
             const { data, error } = await supabase
@@ -136,26 +135,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // Profile missing (Self-healing for new OAuth users)
-                    const tempUsername = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                    // Profile missing: Create it using Google/Provider Metadata if available
+                    // This is the Robust Logic: Extract real data from Google
+                    const metadata = authUser.user_metadata || {};
+                    
+                    // Generate a cleaner username from email or name
+                    let baseUsername = (metadata.full_name || email.split('@')[0]).replace(/\s+/g, '_').toLowerCase();
+                    const tempUsername = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
+                    
+                    const firstName = metadata.given_name || metadata.full_name?.split(' ')[0] || '';
+                    const lastName = metadata.family_name || metadata.full_name?.split(' ').slice(1).join(' ') || '';
+                    const avatarUrl = metadata.avatar_url || metadata.picture || '';
+
                     const { error: insertError } = await supabase.from('profiles').insert({
                         id: uid,
                         email: email,
                         username: tempUsername,
+                        first_name: firstName,
+                        last_name: lastName,
+                        avatar_url: avatarUrl,
                         role: USER_ROLES.USER,
                         status: USER_STATUS.ACTIVE,
-                        country: 'Perú',
+                        country: 'Perú', // Default
                         updated_at: new Date().toISOString()
                     });
 
                     if (!insertError) {
                         // Retry fetch after creating profile
-                        return fetchProfile(email, uid, retryCount + 1);
+                        return fetchProfile(authUser, retryCount + 1);
+                    } else {
+                        console.error("Error creating profile from OAuth:", insertError);
                     }
                 }
                 
-                // If we can't get the profile, we create a minimal user object from auth data
-                // This ensures the user is still logged in even if profile fetch fails
+                // Fallback for UI if DB insert failed
                 console.warn("Using fallback profile data due to error:", error.message);
                 if (mountedRef.current) {
                     setCurrentUser({
@@ -205,10 +218,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const loginWithGoogle = async (): Promise<void> => {
+        // Robust implementation:
+        // 1. redirectTo: Ensures user comes back to the correct URL (handles subdomains/deploy previews).
+        // 2. prompt: 'consent' forces the Google account picker, ensuring the user can choose the correct account if they have multiple.
         const { error } = await supabase.auth.signInWithOAuth({ 
             provider: 'google',
             options: {
-                redirectTo: window.location.origin 
+                redirectTo: `${window.location.origin}/`,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent',
+                }
             }
         });
         if (error) throw new Error(error.message);
@@ -218,7 +238,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { error } = await supabase.auth.signInWithOAuth({ 
             provider: 'apple',
             options: {
-                redirectTo: window.location.origin
+                redirectTo: `${window.location.origin}/`
             }
         });
         if (error) throw new Error(error.message);
@@ -361,7 +381,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         const adminUser = JSON.parse(storedAdmin);
         const { data: { user } } = await supabase.auth.getUser();
-        if(user) await fetchProfile(user.email!, user.id);
+        if(user) await fetchProfile(user);
         
         localStorage.removeItem('ghostingAdmin');
         setIsGhosting(null);
@@ -392,4 +412,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         </AuthContext.Provider>
     );
 };
-    

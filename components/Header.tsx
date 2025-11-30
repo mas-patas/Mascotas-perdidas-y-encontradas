@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon } from './icons';
+import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon, DocumentIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 import { PetStatus, Notification, User } from '../types';
 import { PET_STATUS, USER_ROLES } from '../constants';
@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     // Updated Styling: Light gray background, dark gray text, Purple hover
     const navButtonClass = "flex items-center gap-2 px-2 sm:px-3 py-2 text-gray-600 hover:text-sidebar-dark hover:bg-purple-100 rounded-lg transition-all duration-200 relative font-medium";
-    const isMainView = ['/', '/campanas', '/mapa', '/servicios', '/tips'].includes(location.pathname);
+    const isMainView = ['/', '/campanas', '/mapa', '/servicios', '/tips', '/terminos'].includes(location.pathname);
 
     return (
         <header className="bg-gray-100 text-gray-800 shadow-md px-3 py-2 sm:px-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-50 flex-shrink-0">
@@ -269,6 +269,15 @@ export const Header: React.FC<HeaderProps> = ({
                                     )}
 
                                     <div className="border-t border-gray-100 my-1"></div>
+                                    
+                                    <button
+                                        onClick={() => { navigate('/terminos'); setIsAccountDropdownOpen(false); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-sidebar-dark flex items-center gap-3"
+                                    >
+                                        <DocumentIcon className="h-4 w-4" />
+                                        <span>Términos y Condiciones</span>
+                                    </button>
+
                                     <button
                                         onClick={() => { logout(); setIsAccountDropdownOpen(false); }}
                                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
