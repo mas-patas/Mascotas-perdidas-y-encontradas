@@ -174,16 +174,10 @@ export const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
                     
-                    {/* Inicio - Hidden on mobile since Logo does the same */}
-                    <button onClick={handleHomeClick} className={`${navButtonClass} hidden lg:flex`} aria-label="Inicio">
-                        <HomeIcon />
-                        <span className="hidden xl:inline">Inicio</span>
-                    </button>
-
-                    {/* Nosotros Link - Always visible on mobile (Icon) */}
-                    <button onClick={() => navigate('/nosotros')} className={`${navButtonClass} hidden md:flex`} aria-label="Quiénes Somos">
+                    {/* Nosotros Link - Always visible, text visible on tablet (md) and up */}
+                    <button onClick={() => navigate('/nosotros')} className={navButtonClass} aria-label="Quiénes Somos">
                         <HeartIcon className="h-5 w-5" />
-                        <span className="hidden lg:inline">Nosotros</span>
+                        <span className="hidden md:inline">Nosotros</span>
                     </button>
                     
                     {/* Messages (Visible if logged in) */}

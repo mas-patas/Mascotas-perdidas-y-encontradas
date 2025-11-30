@@ -464,7 +464,13 @@ const App: React.FC = () => {
     const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };
     
     const handleMarkNotificationAsRead = async (id: string) => { await supabase.from('notifications').update({ is_read: true }).eq('id', id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
-    const handleMarkAllNotificationsAsRead = async () => { if(currentUser) await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id); };
+    const handleMarkAllNotificationsAsRead = async () => {
+        if (!currentUser) return;
+        // Optimistic update for instant UI feedback
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        // Update database in the background
+        await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+    };
     
     const handleRecordContactRequest = async (petId: string) => { 
         if(!currentUser) return;

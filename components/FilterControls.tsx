@@ -100,11 +100,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
         }));
     };
     
-    const selectClass = "w-full p-2 border border-gray-500 rounded-md focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition bg-sidebar-dark bg-opacity-50 text-white disabled:opacity-50 disabled:cursor-not-allowed";
+    // Styling updated for blue background (white text, semi-transparent backgrounds)
+    const selectClass = "w-full p-2 border border-white/20 rounded-md focus:ring-2 focus:ring-brand-secondary focus:border-brand-secondary transition bg-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed";
     
     const showAdvancedFilters = filters.type === ANIMAL_TYPES.PERRO || filters.type === ANIMAL_TYPES.GATO || filters.type === ANIMAL_TYPES.OTRO;
     
-    const navLinkClass = (isActive: boolean) => `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-semibold' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`;
+    const navLinkClass = (isActive: boolean) => `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-semibold shadow-inner' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
 
     return (
         <>
@@ -123,16 +124,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
             >
                 <div className="p-6">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-white">Menú</h2>
-                        <button onClick={onClose} className="lg:hidden text-gray-300 hover:text-white text-3xl">&times;</button>
+                        <h2 className="text-xl font-bold text-white tracking-wide">Menú</h2>
+                        <button onClick={onClose} className="lg:hidden text-blue-200 hover:text-white text-3xl">&times;</button>
                     </div>
                 </div>
 
                 <nav className="px-6 mb-6 space-y-2" data-tour="sidebar-navigation">
-                    <button onClick={() => navigate('/')} className={navLinkClass(isHome)}>
-                        <HomeIcon />
-                        <span>Inicio</span>
-                    </button>
                      <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
                         <MapIcon />
                         <span>Mapa de Mascotas</span>
@@ -154,12 +151,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
 
                 {/* Filters Section for HOME (Lost Pets) */}
                 {isHome && (
-                    <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-gray-700 pt-6 scrollbar-thin scrollbar-thumb-gray-600">
+                    <div className="flex-grow space-y-4 px-6 overflow-y-auto border-t border-white/10 pt-6 scrollbar-thin scrollbar-thumb-blue-800">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Filtros</h3>
+                            <h3 className="text-sm font-semibold text-blue-200 uppercase tracking-wider">Filtros</h3>
                             <button 
                                 onClick={onClearFilters}
-                                className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                                className="text-xs text-blue-300 hover:text-white flex items-center gap-1 transition-colors"
                                 title="Limpiar todos los filtros"
                             >
                                 <TrashIcon /> Limpiar
@@ -169,7 +166,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                         {/* Moved ID to inner container for tighter highlight */}
                         <div className="space-y-4" data-tour="sidebar-filters">
                             <div>
-                                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-300 mb-1">Estado:</label>
+                                <label htmlFor="status-filter" className="block text-sm font-medium text-blue-100 mb-1">Estado:</label>
                                 <select
                                     id="status-filter"
                                     value={filters.status}
@@ -177,12 +174,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                     className={selectClass}
                                 >
                                     {statusOptions.map(status => (
-                                        <option key={status} value={status}>{status}</option>
+                                        <option key={status} value={status} className="text-gray-900 bg-white">{status}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label htmlFor="type-filter" className="block text-sm font-medium text-gray-300 mb-1">Tipo de Animal:</label>
+                                <label htmlFor="type-filter" className="block text-sm font-medium text-blue-100 mb-1">Tipo de Animal:</label>
                                 <select
                                     id="type-filter"
                                     value={filters.type}
@@ -190,31 +187,31 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                     className={selectClass}
                                 >
                                     {typeOptions.map(type => (
-                                        <option key={type} value={type}>{type}</option>
+                                        <option key={type} value={type} className="text-gray-900 bg-white">{type}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label htmlFor="department-filter" className="block text-sm font-medium text-gray-300 mb-1">Departamento:</label>
+                                <label htmlFor="department-filter" className="block text-sm font-medium text-blue-100 mb-1">Departamento:</label>
                                 <select
                                     id="department-filter"
                                     value={filters.department}
                                     onChange={(e) => setFilters(f => ({ ...f, department: e.target.value }))}
                                     className={selectClass}
                                 >
-                                    <option value="Todos">Todos</option>
+                                    <option value="Todos" className="text-gray-900 bg-white">Todos</option>
                                     {departments.map(dept => (
-                                        <option key={dept} value={dept}>{dept}</option>
+                                        <option key={dept} value={dept} className="text-gray-900 bg-white">{dept}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
 
-                        <div className={`pt-4 mt-4 border-t border-gray-700 transition-opacity duration-300 ${showAdvancedFilters ? 'opacity-100' : 'opacity-50'}`}>
-                            <h3 className="text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider">Filtros Avanzados</h3>
+                        <div className={`pt-4 mt-4 border-t border-white/10 transition-opacity duration-300 ${showAdvancedFilters ? 'opacity-100' : 'opacity-50'}`}>
+                            <h3 className="text-sm font-semibold text-blue-200 mb-4 uppercase tracking-wider">Filtros Avanzados</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label htmlFor="breed-filter" className="block text-sm font-medium text-gray-300 mb-1">Raza:</label>
+                                    <label htmlFor="breed-filter" className="block text-sm font-medium text-blue-100 mb-1">Raza:</label>
                                     <select
                                         id="breed-filter"
                                         value={filters.breed}
@@ -223,12 +220,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                         disabled={!showAdvancedFilters}
                                     >
                                         {breeds.map(breed => (
-                                            <option key={breed} value={breed}>{breed}</option>
+                                            <option key={breed} value={breed} className="text-gray-900 bg-white">{breed}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="size-filter" className="block text-sm font-medium text-gray-300 mb-1">Tamaño:</label>
+                                    <label htmlFor="size-filter" className="block text-sm font-medium text-blue-100 mb-1">Tamaño:</label>
                                     <select
                                         id="size-filter"
                                         value={filters.size}
@@ -237,12 +234,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                         disabled={!showAdvancedFilters}
                                     >
                                         {sizeOptions.map(size => (
-                                            <option key={size} value={size}>{size}</option>
+                                            <option key={size} value={size} className="text-gray-900 bg-white">{size}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="color1-filter" className="block text-sm font-medium text-gray-300 mb-1">Color Primario:</label>
+                                    <label htmlFor="color1-filter" className="block text-sm font-medium text-blue-100 mb-1">Color Primario:</label>
                                     <select
                                         id="color1-filter"
                                         value={filters.color1}
@@ -251,7 +248,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                         disabled={!showAdvancedFilters}
                                     >
                                         {colorOptions.map(color => (
-                                            <option key={color} value={color}>{color}</option>
+                                            <option key={color} value={color} className="text-gray-900 bg-white">{color}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -262,27 +259,27 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
 
                 {/* Sidebar Content for SERVICES Route */}
                 {isServices && (
-                    <div className="flex-grow px-6 border-t border-gray-700 pt-6 overflow-y-auto">
-                        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Mapa de Servicios</h3>
+                    <div className="flex-grow px-6 border-t border-white/10 pt-6 overflow-y-auto">
+                        <h3 className="text-sm font-semibold text-blue-200 uppercase tracking-wider mb-4">Mapa de Servicios</h3>
                         
                         <div className="mb-6">
-                            <p className="text-xs text-gray-400 mb-2">Explora veterinarias y tiendas cercanas en el mapa interactivo.</p>
+                            <p className="text-xs text-blue-200 mb-2">Explora veterinarias y tiendas cercanas en el mapa interactivo.</p>
                             
                             {/* Decorative Mini Map */}
-                            <div className="w-full h-32 rounded-lg overflow-hidden border border-gray-600 relative mb-3 opacity-80 hover:opacity-100 transition-opacity">
-                                <div ref={miniMapRef} className="w-full h-full bg-gray-800"></div>
-                                <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center pointer-events-none">
+                            <div className="w-full h-32 rounded-lg overflow-hidden border border-white/20 relative mb-3 opacity-90 hover:opacity-100 transition-opacity shadow-lg">
+                                <div ref={miniMapRef} className="w-full h-full bg-slate-700"></div>
+                                <div className="absolute inset-0 bg-blue-900 bg-opacity-30 flex items-center justify-center pointer-events-none">
                                     <MapIcon className="h-8 w-8 text-white drop-shadow-md" />
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-sm text-gray-300">
-                                <div className="w-3 h-3 rounded-full bg-red-500"></div> Veterinarias
+                            <div className="flex items-center gap-2 text-sm text-blue-100">
+                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm border border-white/50"></div> Veterinarias
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-300">
-                                <div className="w-3 h-3 rounded-full bg-blue-500"></div> Tiendas / Grooming
+                            <div className="flex items-center gap-2 text-sm text-blue-100">
+                                <div className="w-3 h-3 rounded-full bg-blue-500 shadow-sm border border-white/50"></div> Tiendas / Grooming
                             </div>
                         </div>
                     </div>
@@ -292,7 +289,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 {!isHome && !isServices && <div className="flex-grow"></div>}
                 
                 <div className="mt-auto p-6">
-                    <p className="text-xs text-gray-400 text-center">
+                    <p className="text-xs text-blue-300 text-center">
                         &copy; {new Date().getFullYear()} Mascotas. Todos los derechos reservados.
                     </p>
                 </div>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
@@ -20,6 +21,9 @@ if ('serviceWorker' in navigator) {
       console.log('Force Unregistering SW:', registration);
       registration.unregister();
     }
+  }).catch(err => {
+    // Catch errors like "The document is in an invalid state" which can happen during reloads
+    console.warn('Service Worker unregistration skipped:', err);
   });
 }
 
