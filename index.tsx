@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
@@ -13,42 +12,25 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Robust Service Worker Registration
-const registerServiceWorker = () => {
-  if ('serviceWorker' in navigator) {
-    // Use window.location.origin to ensure the path is absolute
-    const swUrl = `${window.location.origin}/sw.js`;
-    
-    navigator.serviceWorker.register(swUrl)
-      .then(registration => {
-        console.log('SW registered: ', registration);
-      })
-      .catch(registrationError => {
-        // Suppress specific errors common in previews/iframes to avoid console noise
-        const msg = registrationError.message || '';
-        if (msg.includes('invalid state') || msg.includes('script evaluation failed') || msg.includes('document is in an invalid state')) {
-            return;
-        }
-        console.warn('SW registration note: ', msg);
-      });
-  }
-};
-
-// Execute registration logic based on document state
-if (document.readyState === 'complete') {
-  registerServiceWorker();
-} else {
-  window.addEventListener('load', registerServiceWorker);
+// --- NUCLEAR OPTION: FORCE UNREGISTER ALL SERVICE WORKERS ---
+// This ensures that any old, buggy, or caching SW is completely removed.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      console.log('Force Unregistering SW:', registration);
+      registration.unregister();
+    }
+  });
 }
 
-// Create a client with retry strategy for robust loading (Cold Starts)
+// Create a client with retry strategy for robust loading
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
-      retry: 2, // Increased from 1 to 2 to handle cold starts better
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Increase max delay to 10s
+      retry: 1, 
+      retryDelay: 1000, 
     },
   },
 });

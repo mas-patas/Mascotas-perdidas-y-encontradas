@@ -116,10 +116,8 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         let mounted = true;
 
         // Safety timeout to ensure loading state doesn't stick forever
-        // Increased to 15s to prevent false positives on cold starts
         const safetyTimer = setTimeout(() => {
             if (mounted) {
-                // Quietly stop loading if it takes too long, removed console warning
                 setIsLoadingMapData(false);
             }
         }, 15000);
@@ -147,7 +145,6 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                     .gte('date', nowIso.split('T')[0]); // Only future or today campaigns
 
                 if (petError) {
-                    console.warn("Map: Primary pet fetch failed, using fallback.", petError.message);
                     const { data: fallbackData, error: fallbackError } = await supabase
                         .from('pets')
                         .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, reward, currency')
@@ -206,7 +203,6 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
             } catch (err) {
                 console.error("Error loading map data:", err);
             } finally {
-                // Important: Clear the safety timer if data loaded successfully to prevent the warning
                 clearTimeout(safetyTimer);
                 if (mounted) setIsLoadingMapData(false);
             }
@@ -220,39 +216,46 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         };
     }, []);
 
-    // 1. Map Initialization and Cleanup Effect
+    // 1. Map Initialization and Cleanup Effect - WITH WAIT LOOP
     useEffect(() => {
-        if (!mapRef.current) return;
+        // Wait loop for Leaflet to be ready
+        const checkLeaflet = setInterval(() => {
+            const L = (window as any).L;
+            if (!L || !mapRef.current) return;
 
-        const L = (window as any).L;
-        if (!L) return;
+            clearInterval(checkLeaflet);
 
-        // Initialize map if not already done
-        if (!mapInstance.current) {
-            const map = L.map(mapRef.current, { zoomControl: false }).setView([-12.046374, -77.042793], 12); // Default to Lima
+            // Initialize map if not already done
+            if (!mapInstance.current) {
+                const map = L.map(mapRef.current, { zoomControl: false }).setView([-12.046374, -77.042793], 12); // Default to Lima
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-            
-            L.control.zoom({ position: 'bottomright' }).addTo(map);
-            
-            mapInstance.current = map;
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+                
+                mapInstance.current = map;
 
-            // Initialize Marker Cluster Group
-            if (L.markerClusterGroup) {
-                markerClusterGroupRef.current = L.markerClusterGroup({
-                    showCoverageOnHover: false,
-                    maxClusterRadius: 50,
-                });
-                map.addLayer(markerClusterGroupRef.current);
-            } else {
-                console.warn("Leaflet.markercluster plugin not loaded.");
+                // Initialize Marker Cluster Group
+                if (L.markerClusterGroup) {
+                    markerClusterGroupRef.current = L.markerClusterGroup({
+                        showCoverageOnHover: false,
+                        maxClusterRadius: 50,
+                    });
+                    map.addLayer(markerClusterGroupRef.current);
+                }
+                
+                // Force resize
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 200);
             }
-        }
+        }, 100);
 
         // Cleanup on unmount
         return () => {
+            clearInterval(checkLeaflet);
             if (mapInstance.current) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
@@ -384,7 +387,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     }, [mapPets, mapCampaigns, visibleStatuses]); 
 
     return (
-        <div className="h-full flex flex-col relative">
+        <div className="h-full flex flex-col relative" style={{ minHeight: '500px' }}>
             {/* Loading Overlay */}
             {isLoadingMapData && (
                 <div className="absolute inset-0 bg-white bg-opacity-75 z-[2000] flex flex-col items-center justify-center">
@@ -460,8 +463,8 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 </button>
             </div>
 
-            <div className="flex-grow relative z-0">
-                <div id="map" ref={mapRef} className="absolute inset-0 w-full h-full"></div>
+            <div className="flex-grow relative z-0 h-full w-full">
+                <div id="map" ref={mapRef} className="absolute inset-0 w-full h-full" style={{ minHeight: '500px' }}></div>
             </div>
         </div>
     );

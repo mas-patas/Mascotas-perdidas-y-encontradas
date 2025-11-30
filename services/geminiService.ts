@@ -5,7 +5,16 @@ import { petColors, dogBreeds, catBreeds } from "../data/breeds";
 import { supabase } from "./supabaseClient";
 import { PET_STATUS } from "../constants";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization helper
+// This prevents the app from crashing on startup if the API_KEY is missing.
+const getAiClient = () => {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.warn("Gemini API Key is missing. AI features will be disabled.");
+        return null;
+    }
+    return new GoogleGenAI({ apiKey });
+};
 
 // Helper to convert URL to Base64 for Gemini
 async function urlToBase64(url: string): Promise<string> {
@@ -31,6 +40,9 @@ export async function analyzePetImage(imageUrl: string): Promise<{
     description?: string;
 }> {
     try {
+        const ai = getAiClient();
+        if (!ai) throw new Error("API Key no configurada.");
+
         const base64Image = await urlToBase64(imageUrl);
         
         const response = await ai.models.generateContent({
@@ -87,6 +99,9 @@ export async function analyzePetImage(imageUrl: string): Promise<{
 
 export async function generatePetEmbedding(text: string): Promise<number[]> {
     try {
+        const ai = getAiClient();
+        if (!ai) return [];
+
         // Use 'contents' array to satisfy API requirements for this model/SDK version
         const result: any = await ai.models.embedContent({
             model: 'text-embedding-004',
@@ -196,16 +211,19 @@ export async function generatePetDescription(
     breed: string,
     color: string
 ): Promise<string> {
-    const prompt = `Genera una descripción breve y amigable para un anuncio de mascota perdida o encontrada. La descripción debe ser en español.
-    
-    Detalles de la mascota:
-    - Tipo: ${animalType}
-    - Raza: ${breed}
-    - Color: ${color}
-    
-    Incluye estas características de forma clara en la descripción. No incluyas información de contacto ni ubicación. Mantén la descripción por debajo de 50 palabras.`;
-
     try {
+        const ai = getAiClient();
+        if (!ai) return `${animalType} de raza ${breed} y color ${color}.`;
+
+        const prompt = `Genera una descripción breve y amigable para un anuncio de mascota perdida o encontrada. La descripción debe ser en español.
+        
+        Detalles de la mascota:
+        - Tipo: ${animalType}
+        - Raza: ${breed}
+        - Color: ${color}
+        
+        Incluye estas características de forma clara en la descripción. No incluyas información de contacto ni ubicación. Mantén la descripción por debajo de 50 palabras.`;
+
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],

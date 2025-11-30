@@ -1,12 +1,20 @@
-
 import { supabase } from '../services/supabaseClient';
 import { STORAGE_BUCKET } from '../config';
 
-// Helper to prevent indefinite hanging
-const timeoutPromise = (ms: number, errorMessage: string) => {
-    return new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(errorMessage)), ms);
-    });
+// Helper to convert Base64 to Blob directly (skipping fetch/network)
+const base64ToBlob = (base64: string, mimeType: string = 'image/jpeg'): Blob => {
+    // Strip the data URL prefix if present (e.g., "data:image/jpeg;base64,")
+    const base64Data = base64.replace(/^data:image\/\w+;base64,/, "");
+    
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    return new Blob([bytes], { type: mimeType });
 };
 
 export const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.7): Promise<string> => {
@@ -77,52 +85,41 @@ export const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, qua
     });
 };
 
-// --- SUPABASE STORAGE UPLOAD LOGIC ---
-const uploadToSupabase = async (base64: string, bucket: string): Promise<string> => {
-    // 1. Convert Base64 back to Blob for upload
-    const res = await fetch(base64);
-    const blob = await res.blob();
-
-    const fileExt = 'jpg';
-    // Create a clean file path: year/month/timestamp-random.jpg
-    const date = new Date();
-    const path = `${date.getFullYear()}/${date.getMonth() + 1}`;
-    const fileName = `${path}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-    
-    // 2. Upload to Supabase Bucket
-    const { error } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: false,
-            cacheControl: '31536000' // 1 year cache
-        });
-
-    if (error) {
-        console.error("Supabase Storage Upload Error:", error);
-        throw new Error("No se pudo subir la imagen a la nube. Verifica tu conexión.");
-    }
-
-    // 3. Get Public URL
-    const { data } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(fileName);
-
-    return data.publicUrl;
-};
-
-// --- MAIN UPLOAD FUNCTION ---
+// --- MAIN UPLOAD FUNCTION (Simplified) ---
 export const uploadImage = async (file: File): Promise<string> => {
     try {
         // 1. Always compress first (Standardize size and format to JPEG)
         const base64 = await compressImage(file);
         
-        // 2. Upload to Supabase with timeout
-        // Removed fallback: We want to force cloud storage to keep DB clean.
-        return await Promise.race([
-            uploadToSupabase(base64, STORAGE_BUCKET),
-            timeoutPromise(25000, "La subida a la nube tardó demasiado.") as any 
-        ]);
+        // 2. Convert Base64 to Blob using direct binary conversion
+        const blob = base64ToBlob(base64, 'image/jpeg');
+
+        const fileExt = 'jpg';
+        // Create a clean file path: year/month/timestamp-random.jpg
+        const date = new Date();
+        const path = `${date.getFullYear()}/${date.getMonth() + 1}`;
+        const fileName = `${path}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+        
+        // 3. Upload to Supabase Bucket (Direct Await)
+        const { error } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(fileName, blob, {
+                contentType: 'image/jpeg',
+                upsert: false,
+                cacheControl: '31536000'
+            });
+
+        if (error) {
+            console.error("Supabase Storage Upload Error:", error);
+            throw new Error("No se pudo subir la imagen a la nube.");
+        }
+
+        // 4. Get Public URL
+        const { data } = supabase.storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(fileName);
+
+        return data.publicUrl;
 
     } catch (error: any) {
         console.error('Error uploading image:', error);

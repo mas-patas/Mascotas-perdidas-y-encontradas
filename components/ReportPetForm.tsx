@@ -12,6 +12,7 @@ interface ReportPetFormProps {
     onSubmit: (pet: any, idToUpdate?: string) => void;
     initialStatus: PetStatus;
     petToEdit?: Pet | null;
+    isSubmitting?: boolean;
 }
 
 const normalizeLocationName = (name: string) => {
@@ -22,21 +23,16 @@ const normalizeLocationName = (name: string) => {
         .trim();
 };
 
-export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit }) => {
+export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit, isSubmitting }) => {
     const isEditMode = !!petToEdit;
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markerInstance = useRef<any>(null);
     const isUpdatingFromMapRef = useRef(false);
-    const isMounted = useRef(true);
     
     // AbortControllers for cancelling stale requests
     const reverseGeocodingAbortController = useRef<AbortController | null>(null);
     const forwardGeocodingAbortController = useRef<AbortController | null>(null);
-
-    useEffect(() => {
-        return () => { isMounted.current = false; };
-    }, []);
 
     // Form States
     const [status, setStatus] = useState<PetStatus>(initialStatus);
@@ -247,15 +243,13 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 if (!response.ok) throw new Error("Network response was not ok");
                 
                 const data = await response.json();
-                if (isMounted.current) {
-                    setSuggestions(data);
-                    setShowSuggestions(true);
-                }
+                setSuggestions(data);
+                setShowSuggestions(true);
             } catch (err: any) {
                 if (err.name === 'AbortError') return;
                 console.warn("Error fetching address suggestions (skipping):", err);
             } finally {
-                if (isMounted.current) setIsSearchingAddress(false);
+                setIsSearchingAddress(false);
             }
         }, 1000); // 1000ms debounce to prevent "Failed to fetch" (Rate Limit)
 
@@ -329,51 +323,54 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         setShowSuggestions(false);
 
         // Reset the flag after state updates settle
-        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 1000);
+        setTimeout(() => { isUpdatingFromMapRef.current = false; }, 1000);
     };
 
     // Map Logic
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!isMounted.current || !mapRef.current) return;
-            const L = (window as any).L;
-            if (!L) return;
+        if (!mapRef.current) return;
+        if (mapInstance.current) return; // Already initialized
 
-            const setupMap = () => {
+        let L: any;
+        const checkLeaflet = setInterval(() => {
+            if (typeof (window as any).L !== 'undefined') {
+                clearInterval(checkLeaflet);
+                L = (window as any).L;
+
                 const initialLat = lat || -12.046374;
                 const initialLng = lng || -77.042793;
 
-                if (!mapInstance.current) {
-                    mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap'
-                    }).addTo(mapInstance.current);
+                mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
 
-                    mapInstance.current.on('click', (e: any) => {
-                        const { lat, lng } = e.latlng;
-                        updateMarker(lat, lng);
-                        updateAddressFromCoords(lat, lng);
-                    });
-                } else {
-                    mapInstance.current.invalidateSize();
-                    if (lat && lng) mapInstance.current.setView([lat, lng], 15);
-                }
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                }).addTo(mapInstance.current);
+
+                mapInstance.current.on('click', (e: any) => {
+                    const { lat, lng } = e.latlng;
+                    updateMarker(lat, lng);
+                    updateAddressFromCoords(lat, lng);
+                });
+
+                // Invalidate size after a short delay to ensure the container is visible
+                setTimeout(() => {
+                    mapInstance.current?.invalidateSize();
+                }, 100);
 
                 if (lat && lng) {
                     updateMarker(lat, lng, false);
                 }
-            };
-            setupMap();
-        }, 500);
+            }
+        }, 100);
 
         return () => {
-            clearTimeout(timer);
+            clearInterval(checkLeaflet);
             if (mapInstance.current) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
             }
         };
-    }, []); 
+    }, []);
 
     const updateMarker = (latitude: number, longitude: number, updateState = true) => {
         const L = (window as any).L;
@@ -439,7 +436,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
             const data = await response.json();
             
-            if (data && data.address && isMounted.current) {
+            if (data && data.address) {
                 const addr = data.address;
                 const road = addr.road || '';
                 const number = addr.house_number || '';
@@ -484,7 +481,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 if (newDist) setDistrict(newDist);
                 if (newAddress) setAddress(newAddress);
 
-                setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 1000);
+                setTimeout(() => { isUpdatingFromMapRef.current = false; }, 1000);
             }
         } catch (err: any) {
             if (err.name === 'AbortError') return; // Ignore cancelled requests
@@ -520,11 +517,12 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     const url = await uploadImage(files[i]);
                     newImages.push(url);
                 }
-                if (isMounted.current) setImagePreviews(prev => [...prev, ...newImages]);
+                setImagePreviews(prev => [...prev, ...newImages]);
             } catch (err) {
-                setError('Error al subir imagen');
+                console.error(err);
+                setError('Error al subir imagen. Por favor intenta de nuevo.');
             } finally {
-                if (isMounted.current) setIsUploading(false);
+                setIsUploading(false);
             }
         }
     };
@@ -652,7 +650,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             </div>
                         </div>
 
-                        {/* COLORS SECTION - EXPLICITLY SEPARATED */}
+                        {/* COLORS SECTION */}
                         <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
                             <h4 className="font-bold text-blue-900 mb-3 text-sm uppercase tracking-wide">Colores (Identificación)</h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -753,9 +751,10 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             )}
                         </div>
                         
-                        <div className="h-56 w-full rounded-xl overflow-hidden border border-gray-300 relative z-0 shadow-inner">
-                            <div ref={mapRef} className="w-full h-full"></div>
-                            <div className="absolute bottom-2 left-2 bg-white/90 text-xs px-2 py-1 rounded shadow pointer-events-none text-gray-600">
+                        {/* Map Container - Explicit Height */}
+                        <div className="w-full rounded-xl overflow-hidden border border-gray-300 relative z-0 shadow-inner" style={{ height: '300px' }}>
+                            <div ref={mapRef} className="w-full h-full" style={{ height: '100%' }}></div>
+                            <div className="absolute bottom-2 left-2 bg-white/90 text-xs px-2 py-1 rounded shadow pointer-events-none text-gray-600 z-[1000]">
                                 Mueve el pin para ajustar la posición
                             </div>
                         </div>
@@ -833,8 +832,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
                 <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0">
                     <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
-                    <button type="button" onClick={handleSubmit} disabled={isUploading} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
-                        {isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
+                    <button type="button" onClick={handleSubmit} disabled={isUploading || isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
+                        {isSubmitting ? 'Publicando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
                     </button>
                 </div>
             </div>

@@ -17,6 +17,19 @@ self.addEventListener('install', (event) => {
 
 // Listen for requests
 self.addEventListener('fetch', (event) => {
+  // IMPORTANT: Ignore non-GET requests (like POST/PUT uploads)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  
+  // STRICT CHECK: Ignore requests that are not http or https (e.g., 'data:', 'chrome-extension:')
+  // This prevents the SW from trying to cache or fetch Base64 images or browser extensions
+  if (!url.protocol.startsWith('http')) {
+      return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
