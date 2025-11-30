@@ -147,7 +147,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 if (petError) {
                     const { data: fallbackData, error: fallbackError } = await supabase
                         .from('pets')
-                        .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, reward, currency')
+                        .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, reward, currency, expires_at')
                         .not('lat', 'is', null)
                         .not('lng', 'is', null);
 

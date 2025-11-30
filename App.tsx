@@ -107,6 +107,7 @@ const App: React.FC = () => {
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     // IP Ban State
     const [isIpBanned, setIsIpBanned] = useState(false);
@@ -235,6 +236,7 @@ const App: React.FC = () => {
 
     const finalizePetSubmission = async (petData: any) => {
         if (!currentUser) return;
+        setIsSubmitting(true);
         try {
             const newPetId = generateUUID();
             const now = new Date();
@@ -306,7 +308,11 @@ const App: React.FC = () => {
                 id: generateUUID(), user_id: currentUser.id, message: `Has publicado exitosamente el reporte de "${petData.name}".`, link: { type: 'pet', id: newPetId }, is_read: false, created_at: now.toISOString()
             });
             setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null);
-        } catch (err: any) { alert("Error al publicar: " + err.message); }
+        } catch (err: any) { 
+            alert("Error al publicar: " + err.message); 
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleRenewPet = async (pet: Pet) => {
@@ -603,7 +609,7 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
-            {isReportModalOpen && <ReportPetForm onClose={() => { setIsReportModalOpen(false); setSelectedPetForModal(null); }} onSubmit={handleSubmitPet} initialStatus={reportStatus} petToEdit={selectedPetForModal} />}
+            {isReportModalOpen && <ReportPetForm onClose={() => { setIsReportModalOpen(false); setSelectedPetForModal(null); }} onSubmit={handleSubmitPet} initialStatus={reportStatus} petToEdit={selectedPetForModal} isSubmitting={isSubmitting} />}
             {isAdoptionModalOpen && <ReportAdoptionForm onClose={() => setIsAdoptionModalOpen(false)} onSubmit={(pet) => finalizePetSubmission(pet)} />}
             {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
