@@ -31,6 +31,7 @@ import { StatusCheckModal } from './components/StatusCheckModal';
 import UserPublicProfileModal from './components/UserPublicProfileModal';
 import AboutPage from './components/AboutPage';
 import ReunitedPetsPage from './components/ReunitedPetsPage';
+import { TipsPage } from './components/TipsPage'; // Import TipsPage
 import { supabase } from './services/supabaseClient';
 import { generateUUID } from './utils/uuid';
 import { WarningIcon } from './components/icons';
@@ -158,7 +159,7 @@ const App: React.FC = () => {
 
     // Auto-close sidebar
     useEffect(() => {
-        if (location.pathname === '/mapa' || location.pathname === '/nosotros' || location.pathname === '/servicios' || location.pathname === '/reunidos') {
+        if (['/mapa', '/nosotros', '/servicios', '/reunidos', '/tips'].includes(location.pathname)) {
             setIsSidebarOpen(false);
         }
     }, [location.pathname]);
@@ -604,6 +605,7 @@ const App: React.FC = () => {
                     <Route path="servicios" element={<ServicesMapPage />} />
                     <Route path="nosotros" element={<AboutPage />} />
                     <Route path="reunidos" element={<ReunitedPetsPage />} />
+                    <Route path="tips" element={<TipsPage />} />
 
                     {/* Dynamic Routes LAST */}
                     <Route path="mascota/:id" element={<PetDetailPage pet={undefined} onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} users={users} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} />} />

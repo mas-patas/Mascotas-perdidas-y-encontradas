@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon } from './icons';
+import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 import { PetStatus, Notification, User } from '../types';
 import { PET_STATUS, USER_ROLES } from '../constants';
@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     // Updated Styling: Light gray background, dark gray text, Purple hover
     const navButtonClass = "flex items-center gap-2 px-2 sm:px-3 py-2 text-gray-600 hover:text-sidebar-dark hover:bg-purple-100 rounded-lg transition-all duration-200 relative font-medium";
-    const isMainView = ['/', '/campanas', '/mapa', '/servicios'].includes(location.pathname);
+    const isMainView = ['/', '/campanas', '/mapa', '/servicios', '/tips'].includes(location.pathname);
 
     return (
         <header className="bg-gray-100 text-gray-800 shadow-md px-3 py-2 sm:px-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-50 flex-shrink-0">
@@ -174,6 +174,12 @@ export const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
                     
+                    {/* Tips Link - Desktop Only (visible in sidebar on mobile) */}
+                    <button onClick={() => navigate('/tips')} className={`${navButtonClass} hidden xl:flex`} aria-label="Consejos">
+                        <LightbulbIcon className="h-5 w-5" />
+                        <span>Tips</span>
+                    </button>
+
                     {/* Nosotros Link - Always visible, text visible on tablet (md) and up */}
                     <button onClick={() => navigate('/nosotros')} className={navButtonClass} aria-label="Quiénes Somos">
                         <HeartIcon className="h-5 w-5" />
