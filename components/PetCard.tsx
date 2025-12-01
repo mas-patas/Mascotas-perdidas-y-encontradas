@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import type { Pet, User, UserRole } from '../types';
-import { PET_STATUS, ANIMAL_TYPES, USER_ROLES } from '../constants';
-import { CalendarIcon, LocationMarkerIcon, BookmarkIcon, PetIcon } from './icons';
+import type { Pet, User } from '../types';
+import { PET_STATUS, ANIMAL_TYPES } from '../constants';
+import { CalendarIcon, LocationMarkerIcon, BookmarkIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
+import { LazyImage } from './LazyImage';
 
 interface PetCardProps {
     pet: Pet;
@@ -15,8 +16,6 @@ interface PetCardProps {
 
 export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
     const { currentUser, savePet, unsavePet } = useAuth();
-    const [imageLoaded, setImageLoaded] = useState(false);
-    const [imageError, setImageError] = useState(false);
     const isSaved = !!currentUser?.savedPetIds?.includes(pet.id);
     
     // Theme logic: Returns subtle background and border colors based on status
@@ -83,8 +82,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
     }
     
     // Safe image access with fallback logic
-    const primaryImage = (pet.imageUrls && pet.imageUrls.length > 0) ? pet.imageUrls[0] : null;
-    const fallbackImage = 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen';
+    const primaryImage = (pet.imageUrls && pet.imageUrls.length > 0) ? pet.imageUrls[0] : '';
 
     return (
         <Link 
@@ -96,27 +94,13 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
                     <span className="text-lg font-bold text-gray-800 bg-gray-200 px-4 py-2 rounded-full shadow-sm border border-gray-300">REUNIDO</span>
                 </div>
             )}
-            <div className="relative h-48 w-full bg-gray-200 overflow-hidden">
-                {/* Fallback / Loading State */}
-                {(!imageLoaded || imageError || !primaryImage) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 z-0">
-                        <PetIcon className="h-12 w-12 text-gray-300" />
-                    </div>
-                )}
-
-                {primaryImage && !imageError && (
-                    <img 
-                        className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`} 
-                        src={primaryImage} 
-                        alt={`${pet.breed} ${pet.name}`} 
-                        loading="lazy"
-                        onLoad={() => setImageLoaded(true)}
-                        onError={() => {
-                            setImageError(true);
-                            setImageLoaded(true); // Stop loading spinner
-                        }}
-                    />
-                )}
+            
+            <div className="relative h-48 w-full">
+                <LazyImage 
+                    src={primaryImage} 
+                    alt={`${pet.breed} ${pet.name}`}
+                    className="h-full w-full"
+                />
 
                 <div className={`absolute top-2 left-2 px-3 py-1 text-xs font-bold rounded-full shadow-sm z-10 ${theme.badge}`}>
                     {pet.status}
@@ -124,7 +108,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
                 {pet.imageUrls && pet.imageUrls.length > 1 && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black bg-opacity-60 px-2 py-1 text-xs font-semibold text-white z-10 backdrop-blur-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 00-2-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                         </svg>
                         <span>{pet.imageUrls.length}</span>
                     </div>

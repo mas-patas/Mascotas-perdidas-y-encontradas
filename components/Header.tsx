@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon, DocumentIcon } from './icons';
+import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon, DocumentIcon, TrophyIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 import { PetStatus, Notification, User } from '../types';
 import { PET_STATUS, USER_ROLES } from '../constants';
 import NotificationDropdown from './NotificationDropdown';
+import { useGamification } from '../hooks/useGamification';
 
 interface HeaderProps {
     onReportPet: (status: PetStatus) => void;
@@ -19,6 +20,9 @@ interface HeaderProps {
 }
 
 const Avatar: React.FC<{ user: User | null, size?: 'sm' | 'md' | 'lg' }> = ({ user, size = 'md' }) => {
+    // Hook call inside component is safe
+    const { level } = useGamification(user?.id);
+    
     if (!user) return null;
     
     const sizeClasses = {
@@ -27,16 +31,23 @@ const Avatar: React.FC<{ user: User | null, size?: 'sm' | 'md' | 'lg' }> = ({ us
         lg: 'w-24 h-24 text-4xl',
     };
 
+    // Dynamic border color based on level
+    const borderClass = user.id ? `border-2 ${level.ring.replace('ring-', 'border-')}` : 'border-transparent';
+
     if (user.avatarUrl) {
         return (
-            <img src={user.avatarUrl} alt="Avatar" className={`${sizeClasses[size]} rounded-full object-cover`} />
+            <img 
+                src={user.avatarUrl} 
+                alt="Avatar" 
+                className={`${sizeClasses[size]} rounded-full object-cover ${borderClass}`} 
+            />
         );
     }
 
     const initial = user.firstName ? user.firstName.charAt(0).toUpperCase() : '?';
 
     return (
-        <div className={`${sizeClasses[size]} rounded-full bg-sidebar-dark text-white flex items-center justify-center font-bold`}>
+        <div className={`${sizeClasses[size]} rounded-full bg-sidebar-dark text-white flex items-center justify-center font-bold ${borderClass}`}>
             {initial}
         </div>
     );
@@ -54,6 +65,8 @@ export const Header: React.FC<HeaderProps> = ({
     onResetFilters
 }) => {
     const { currentUser, logout } = useAuth();
+    const { points, level, progress, nextLevel } = useGamification(currentUser?.id);
+    
     const navigate = useNavigate();
     const location = useLocation();
     const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
@@ -236,7 +249,19 @@ export const Header: React.FC<HeaderProps> = ({
                                 <ChevronDownIcon />
                             </button>
                             {isAccountDropdownOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5 animate-fade-in border border-gray-100">
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5 animate-fade-in border border-gray-100 overflow-hidden">
+                                    {/* Gamification Mini-Header */}
+                                    <div className={`px-4 py-3 bg-gradient-to-r ${level.gradient} text-white`}>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-bold uppercase tracking-wider">{level.title}</span>
+                                            <span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full">{points} pts</span>
+                                        </div>
+                                        <div className="w-full bg-black/20 h-1.5 rounded-full overflow-hidden">
+                                            <div className="bg-white h-full" style={{ width: `${progress}%` }}></div>
+                                        </div>
+                                        {nextLevel && <p className="text-[10px] mt-1 text-white/80 text-right">Próximo: {nextLevel.name}</p>}
+                                    </div>
+
                                     <div className="px-4 py-2 border-b border-gray-100 md:hidden">
                                         <p className="text-sm font-bold text-gray-800">{currentUser.firstName} {currentUser.lastName}</p>
                                         <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>

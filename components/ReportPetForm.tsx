@@ -110,7 +110,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     
     // Refs to control flow and prevent infinite loops
     const isUpdatingFromMapRef = useRef(false); 
-    const mapClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const mapClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const reverseGeocodingAbortController = useRef<AbortController | null>(null);
     const forwardGeocodingAbortController = useRef<AbortController | null>(null);

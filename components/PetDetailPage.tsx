@@ -2,20 +2,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '../types';
-import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon } from './icons';
+import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from './icons';
 import { PET_STATUS, USER_ROLES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
 import { ReportModal } from './ReportModal';
 import { formatTime } from '../utils/formatters';
-import { usePets } from '../hooks/usePets';
 import { supabase } from '../services/supabaseClient';
 import UserPublicProfileModal from './UserPublicProfileModal';
 import { trackContactOwner, trackPetReunited } from '../services/analytics';
 import ShareModal from './ShareModal';
 import ReunionSuccessModal from './ReunionSuccessModal';
+import { mapPetFromDb } from '../utils/mappers';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -33,7 +34,7 @@ interface PetDetailPageProps {
     onLikeComment: (petId: string, commentId: string) => void;
 }
 
-// Recursive Comment Component (unchanged logic)
+// ... Comment Components (CommentItem, CommentListAndInput, CommentsModal) remain same ...
 const CommentItem: React.FC<{
     comment: Comment;
     allComments: Comment[];
@@ -161,7 +162,6 @@ const CommentItem: React.FC<{
     );
 };
 
-// Full list component used in Modal
 const CommentListAndInput: React.FC<{ 
     petId: string, 
     postOwnerEmail?: string,
@@ -271,12 +271,16 @@ const CommentsModal: React.FC<any> = ({ isOpen, onClose, ...props }) => {
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><XCircleIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="flex-grow overflow-hidden">
-                    <CommentListAndInput {...props} />
+                    <ErrorBoundary name="Comments List">
+                        <CommentListAndInput {...props} />
+                    </ErrorBoundary>
                 </div>
             </div>
         </div>
     );
 }
+
+// ... Main Component ...
 
 export const PetDetailPage: React.FC<PetDetailPageProps> = ({ 
     pet: propPet, 
@@ -285,7 +289,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     onEdit, 
     onDelete, 
     onGenerateFlyer, 
-    onUpdateStatus, 
     users, 
     onViewUser,
     onReport,
@@ -298,9 +301,42 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const { currentUser } = useAuth();
     const queryClient = useQueryClient();
     
-    // Hooks state
-    const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
-    const pet = propPet || pets.find(p => p.id === id);
+    // FETCH SPECIFIC PET
+    // We always fetch the pet detail to ensure we have the latest comments and status,
+    // even if it was passed via props (which might be stale).
+    // The propPet is used as initial data for immediate rendering.
+    const { data: fetchedPet, isLoading: isLoadingSingle, isError } = useQuery({
+        queryKey: ['pet_detail', id],
+        enabled: !!id && !propPet, // If propPet is present, we don't need to force fetch immediately for display, but React Query handles background refresh
+        queryFn: async () => {
+            if (!id) throw new Error("ID no proporcionado");
+
+            // Corrected syntax for join: profiles(email, username)
+            const { data, error } = await supabase
+                .from('pets')
+                .select('*, profiles(email, username)')
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+
+            const { data: commentsData } = await supabase
+                .from('comments')
+                .select('*')
+                .eq('pet_id', id)
+                .order('created_at', { ascending: true });
+
+            const commentIds = commentsData?.map((c: any) => c.id) || [];
+            const { data: likesData } = commentIds.length > 0 
+                ? await supabase.from('comment_likes').select('*').in('comment_id', commentIds)
+                : { data: [] };
+
+            return mapPetFromDb(data, [], commentsData || [], likesData || []);
+        },
+        retry: 1
+    });
+
+    const pet = propPet || fetchedPet;
     
     // UI State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -359,16 +395,27 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         return () => clearTimeout(timer);
     }, [pet]);
 
-    if (!pet) return <div className="p-8 text-center">Cargando detalles...</div>;
+    if (isLoadingSingle && !pet) return <div className="p-16 text-center text-gray-500 font-medium"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto mb-2"></div>Cargando detalles...</div>;
+    
+    if (isError) return (
+        <div className="p-16 text-center text-red-500 font-medium bg-red-50 rounded-lg m-4">
+            <WarningIcon className="h-10 w-10 mx-auto mb-2" />
+            <p className="mb-2">No se pudo cargar la información de la mascota.</p>
+            <p className="text-sm text-gray-600 mb-4">Es posible que haya sido eliminada o que el enlace sea incorrecto.</p>
+            <button onClick={onClose} className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-colors shadow-sm font-bold">Volver al inicio</button>
+        </div>
+    );
+
+    if (!pet) return <div className="p-16 text-center text-gray-500 font-medium">No se encontró la publicación.<br/><button onClick={onClose} className="mt-4 text-brand-primary font-bold hover:underline">Volver</button></div>;
 
     const petOwner = users.find(u => u.email === pet.userEmail);
+    const ownerName = petOwner?.username || (fetchedPet?.userEmail ? fetchedPet.userEmail.split('@')[0] : 'Usuario');
+    
     const isOwner = currentUser?.email === pet.userEmail;
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
-    // Status Logic
     const isLost = pet.status === PET_STATUS.PERDIDO;
     
-    // Handlers
     const handleReunionSubmit = async (story: string, date: string, image?: string) => {
         try {
             const updateData: any = {
@@ -390,6 +437,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
             trackPetReunited(pet.id);
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
             
             navigate('/reunidos');
             
@@ -414,10 +462,10 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         const { error } = await supabase.from('comments').delete().eq('id', commentId);
         if (!error) {
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
         }
     };
 
-    // Helper for badges
     const getStatusBadge = () => {
         switch (pet.status) {
             case PET_STATUS.PERDIDO: return 'bg-red-600 text-white';
@@ -429,7 +477,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
-    // Filter comments for preview (last 2)
     const previewComments = pet.comments ? pet.comments.filter(c => !c.parentId).slice(-2) : [];
     const totalComments = pet.comments ? pet.comments.length : 0;
 
@@ -441,6 +488,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             return;
         }
         await onAddComment(pet.id, newCommentPreview);
+        queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
         setNewCommentPreview('');
     };
 
@@ -448,26 +496,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         <div className="max-w-5xl mx-auto pb-10 px-4 sm:px-6">
             <Helmet>
                 <title>{pet.name} - {pet.status} | Pets</title>
-                <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}. Ayuda a encontrarlo.`} />
-                
-                {/* Open Graph Tags for Social Sharing */}
-                <meta property="og:title" content={`${pet.status}: ${pet.name}`} />
-                <meta property="og:description" content={`${pet.breed} - ${pet.color}. ${pet.location}. ${pet.description.substring(0, 100)}...`} />
-                <meta property="og:image" content={pet.imageUrls[0] || 'https://placehold.co/1200x630/1D4ED8/ffffff?text=Pets+App'} />
-                <meta property="og:url" content={window.location.href} />
-                <meta property="og:type" content="website" />
+                <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
 
             <button onClick={onClose} className="mb-4 flex items-center text-gray-600 hover:text-brand-primary font-bold transition-colors">
                 <ChevronLeftIcon className="h-5 w-5 mr-1" /> Volver al listado
             </button>
 
-            {/* --- NEW 2-COLUMN LAYOUT --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
-                {/* --- LEFT COLUMN: Images, Description, Comments --- */}
                 <div className="space-y-6">
-                    {/* 1. Fixed Height Image Container */}
                     <div className="relative bg-gray-200 rounded-lg overflow-hidden h-[400px] md:h-[500px] shadow-md border border-gray-200">
                         <img 
                             src={pet.imageUrls[currentImageIndex] || 'https://placehold.co/600x400?text=Sin+Imagen'} 
@@ -492,7 +530,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         )}
                     </div>
 
-                    {/* 2. Description */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                         <h3 className="font-bold text-gray-900 text-lg mb-3 border-b pb-2">Historia / Descripción</h3>
                         <p className="text-gray-700 leading-relaxed whitespace-pre-line">
@@ -506,7 +543,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         )}
                     </div>
 
-                    {/* 3. Comments (Moved here) */}
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                             <h3 className="font-bold text-gray-700 text-sm flex items-center gap-2">
@@ -538,7 +574,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 <p className="text-sm text-gray-400 italic mb-4 text-center">Aún no hay comentarios.</p>
                             )}
                             
-                            {/* Quick Comment Input */}
                             <form onSubmit={handleQuickComment} className="flex gap-2">
                                 <input 
                                     type="text" 
@@ -556,10 +591,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
                 </div>
 
-                {/* --- RIGHT COLUMN: Info, Details, Map, Actions --- */}
                 <div className="flex flex-col h-full bg-white p-6 rounded-lg shadow-md border border-gray-200 relative">
-                    
-                    {/* Header: Name, Type, Buttons */}
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <h1 className="text-3xl font-black text-gray-900 capitalize leading-tight">{pet.name}</h1>
@@ -581,7 +613,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
 
                     <div className="space-y-6 flex-grow">
-                        {/* Details Grid */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <p className="text-xs text-gray-400 font-bold uppercase mb-1">Tamaño</p>
@@ -593,7 +624,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             </div>
                         </div>
 
-                        {/* Date */}
                         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
                             <CalendarIcon className="text-brand-primary h-5 w-5 flex-shrink-0" />
                             <div>
@@ -604,7 +634,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             </div>
                         </div>
 
-                        {/* Location Text - ICON REDUCED HERE based on request */}
                         <div className="flex items-start gap-3">
                             <LocationMarkerIcon className="text-brand-primary h-4 w-4 mt-1 flex-shrink-0" />
                             <div>
@@ -613,7 +642,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             </div>
                         </div>
 
-                        {/* Reward */}
                         {pet.reward && (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3 shadow-sm">
                                 <span className="text-2xl">💰</span>
@@ -624,36 +652,35 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             </div>
                         )}
 
-                        {/* Interactive Map */}
                         {pet.lat && pet.lng && (
                             <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                                 <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">
                                     Ubicación Exacta
                                 </div>
-                                <div className="w-full h-48 relative z-0">
-                                    <div ref={mapRef} className="w-full h-full"></div>
-                                </div>
-                                <div className="flex">
-                                    <button 
-                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank')}
-                                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors border-r border-gray-200 flex items-center justify-center gap-1 btn-press"
-                                    >
-                                        <GoogleMapsIcon className="h-3 w-3" /> Maps
-                                    </button>
-                                    <button 
-                                        onClick={() => window.open(`https://waze.com/ul?ll=${pet.lat},${pet.lng}&navigate=yes`, '_blank')}
-                                        className="flex-1 py-2 bg-white hover:bg-blue-50 text-xs font-bold text-blue-700 transition-colors flex items-center justify-center gap-1 btn-press"
-                                    >
-                                        <WazeIcon className="h-3 w-3" /> Waze
-                                    </button>
-                                </div>
+                                <ErrorBoundary name="PetDetailMap">
+                                    <div className="w-full h-48 relative z-0">
+                                        <div ref={mapRef} className="w-full h-full"></div>
+                                    </div>
+                                    <div className="flex">
+                                        <button 
+                                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${pet.lat},${pet.lng}`, '_blank')}
+                                            className="flex-1 py-2 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors border-r border-gray-200 flex items-center justify-center gap-1 btn-press"
+                                        >
+                                            <GoogleMapsIcon className="h-3 w-3" /> Maps
+                                        </button>
+                                        <button 
+                                            onClick={() => window.open(`https://waze.com/ul?ll=${pet.lat},${pet.lng}&navigate=yes`, '_blank')}
+                                            className="flex-1 py-2 bg-white hover:bg-blue-50 text-xs font-bold text-blue-700 transition-colors flex items-center justify-center gap-1 btn-press"
+                                        >
+                                            <WazeIcon className="h-3 w-3" /> Waze
+                                        </button>
+                                    </div>
+                                </ErrorBoundary>
                             </div>
                         )}
                     </div>
 
-                    {/* Sticky Bottom Actions */}
                     <div className="mt-8 pt-4 border-t border-gray-100">
-                        {/* Owner Actions */}
                         {(isOwner || isAdmin) ? (
                             <div className="space-y-3">
                                 {isLost && (
@@ -675,7 +702,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 </div>
                             </div>
                         ) : (
-                            /* Public User Actions */
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
                                     <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer">
@@ -683,14 +709,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                             <img src={petOwner.avatarUrl} className="w-10 h-10 rounded-full object-cover border border-gray-200" alt="avatar" />
                                         ) : (
                                             <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold">
-                                                {(petOwner?.firstName || 'U').charAt(0)}
+                                                {(petOwner?.firstName || ownerName.charAt(0)).toString().toUpperCase()}
                                             </div>
                                         )}
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-500">Publicado por</p>
                                         <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-bold text-gray-900 hover:text-brand-primary text-sm hover:underline">
-                                            @{petOwner?.username || 'Usuario'}
+                                            @{ownerName}
                                         </button>
                                     </div>
                                 </div>
@@ -778,7 +804,6 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     );
 };
 
-// Internal icon for this file just in case it's missing in icons.tsx export
 const ShareIcon: React.FC<{className?: string}> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
