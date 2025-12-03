@@ -1,9 +1,8 @@
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 import { WarningIcon } from './icons';
 
 interface Props {
-    children: ReactNode;
+    children?: ReactNode;
     fallback?: ReactNode;
     name?: string; // Para identificar dónde falló en los logs
 }
@@ -13,7 +12,7 @@ interface State {
     error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundary extends React.Component<Props, State> {
     public state: State = {
         hasError: false,
         error: null
@@ -29,6 +28,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
     private handleRetry = () => {
         this.setState({ hasError: false, error: null });
+        // Opcional: Recargar la página si es un error crítico
+        // window.location.reload();
     };
 
     public render() {
@@ -37,18 +38,24 @@ export class ErrorBoundary extends Component<Props, State> {
                 return this.props.fallback;
             }
 
+            const isTimeout = this.state.error?.message.includes('Tiempo de espera') || this.state.error?.message.includes('network');
+
             return (
-                <div className="p-6 bg-red-50 rounded-lg border border-red-100 flex flex-col items-center justify-center text-center min-h-[200px]">
-                    <div className="bg-red-100 p-3 rounded-full mb-3 text-red-600">
-                        <WarningIcon className="h-8 w-8" />
+                <div className="p-6 bg-red-50 rounded-lg border border-red-100 flex flex-col items-center justify-center text-center min-h-[250px]">
+                    <div className="bg-red-100 p-4 rounded-full mb-4 text-red-600 shadow-sm">
+                        <WarningIcon className="h-10 w-10" />
                     </div>
-                    <h3 className="text-lg font-bold text-red-800 mb-2">Algo salió mal</h3>
-                    <p className="text-sm text-red-600 mb-4 max-w-xs">
-                        No pudimos cargar esta sección correctamente.
+                    <h3 className="text-xl font-bold text-red-800 mb-2">
+                        {isTimeout ? 'Problema de conexión' : 'Algo salió mal'}
+                    </h3>
+                    <p className="text-sm text-red-600 mb-6 max-w-sm leading-relaxed">
+                        {isTimeout 
+                            ? 'La solicitud tardó demasiado. Por favor, verifica tu conexión a internet e inténtalo de nuevo.' 
+                            : 'No pudimos cargar esta sección correctamente debido a un error inesperado.'}
                     </p>
                     <button
                         onClick={this.handleRetry}
-                        className="px-4 py-2 bg-white border border-red-300 text-red-700 font-semibold rounded-lg hover:bg-red-50 transition-colors text-sm shadow-sm"
+                        className="px-6 py-3 bg-white border border-red-300 text-red-700 font-bold rounded-lg hover:bg-red-50 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                         Intentar de nuevo
                     </button>

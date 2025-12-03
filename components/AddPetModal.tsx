@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { OwnedPet } from '../types';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
 import { XCircleIcon, DogIcon, CatIcon } from './icons';
@@ -133,8 +134,8 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
     
     const inputClass = "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+    return createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex justify-center items-center p-4">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div className="p-6 relative">
                     <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
@@ -239,7 +240,8 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

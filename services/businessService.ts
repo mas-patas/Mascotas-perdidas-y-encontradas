@@ -99,15 +99,14 @@ export const businessService = {
                 .from('businesses')
                 .select('*')
                 .eq('owner_id', ownerId)
-                .single();
+                .maybeSingle(); // Changed from .single() to avoid 406 error on empty result
             
             if (error) {
-                // Ignore error if specifically "Row not found" (PGRST116), it just means user has no business
-                if (error.code !== 'PGRST116') {
-                    console.error('Error fetching business by owner:', error.message);
-                }
+                console.error('Error fetching business by owner:', error.message);
                 return null; 
             }
+
+            if (!data) return null;
 
             // Enrich with products
             const { data: products } = await supabase

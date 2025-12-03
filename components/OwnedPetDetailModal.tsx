@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { createPortal } from 'react-dom';
 import type { OwnedPet } from '../types';
 import { EditIcon, DogIcon } from './icons';
 
@@ -11,9 +13,9 @@ interface OwnedPetDetailModalProps {
 
 const OwnedPetDetailModal: React.FC<OwnedPetDetailModalProps> = ({ pet, onClose, onEdit, onReportLost }) => {
     
-    return (
+    return createPortal(
         <div 
-            className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4"
+            className="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex justify-center items-center p-4"
             onClick={onClose}
         >
             <div 
@@ -70,7 +72,8 @@ const OwnedPetDetailModal: React.FC<OwnedPetDetailModalProps> = ({ pet, onClose,
                 </div>
 
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

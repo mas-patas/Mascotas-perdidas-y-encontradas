@@ -1,5 +1,6 @@
 
 import React, { createContext, useState, useEffect, useContext, ReactNode, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, OwnedPet, UserRole, UserStatus } from '../types';
 import { USER_ROLES, USER_STATUS } from '../constants';
 import { supabase } from '../services/supabaseClient';
@@ -42,6 +43,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isGhosting, setIsGhosting] = useState<User | null>(null);
     
+    // Access QueryClient to manage cache
+    const queryClient = useQueryClient();
+    
     // Ref to track if component is mounted
     const mountedRef = useRef(true);
 
@@ -68,10 +72,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         const initAuth = async () => {
             try {
-                // Race condition protection
+                // Race condition protection - Increased to 15 seconds to handle cold starts
                 const sessionPromise = supabase.auth.getSession();
                 const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) => 
-                    setTimeout(() => reject(new Error('Auth timeout')), 8000)
+                    setTimeout(() => reject(new Error('Auth timeout')), 15000)
                 );
 
                 const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
@@ -85,8 +89,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         setLoading(false);
                     }
                 }
-            } catch (error) {
+            } catch (error: any) {
+                // Log the REAL error to console for debugging
+                console.error("Auth Init Error Details:", error); 
                 console.log("Auth init info: Defaulting to guest mode due to timeout or network.");
+                
                 if (mountedRef.current) {
                     setCurrentUser(null);
                     setLoading(false);
@@ -99,12 +106,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (mountedRef.current) {
                 if (session?.user) {
+                    // CRITICAL FIX: If we have a user session but local currentUser is outdated,
+                    // set loading to true IMMEDIATELY to prevent app from rendering with stale/null user
                     if (!currentUser || currentUser.id !== session.user.id) {
+                        setLoading(true); 
                         await fetchProfile(session.user);
                     }
                 } else if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
                     setLoading(false);
+                    // Cancel pending queries and remove data, but don't nuke the client completely
+                    // This allows public queries (PetList) to restart immediately
+                    queryClient.removeQueries();
                 } else {
                     if (!currentUser) setLoading(false);
                 }
@@ -245,10 +258,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = async () => {
+        // 1. Reset Context State
         setCurrentUser(null);
         setIsGhosting(null);
         localStorage.removeItem('ghostingAdmin');
         
+        // 2. Clear React Query Cache carefully
+        // Cancel in-flight queries to prevent errors from fetching with old token
+        await queryClient.cancelQueries();
+        // Remove all queries to ensure fresh public data is fetched next
+        queryClient.removeQueries();
+        // We do NOT use queryClient.clear() anymore as it causes a "stalled" state in some cases
+
+        // 3. Reset URL to clean state
         if (window.location.hash !== '#/' && window.location.hash !== '') {
             window.location.hash = '/';
         }

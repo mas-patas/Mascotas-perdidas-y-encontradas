@@ -68,13 +68,21 @@ export const getUserHistory = async (userId: string): Promise<ActivityLog[]> => 
 };
 
 export const getWeeklyLeaderboard = async (): Promise<LeaderboardEntry[]> => {
-    // Note: This RPC function also needs to be created in Supabase if it doesn't exist
-    const { data, error } = await supabase.rpc('get_weekly_leaderboard');
-    
-    if (error) {
-        console.warn('Error fetching leaderboard (RPC might be missing):', error.message);
+    try {
+        // RPC: Remote Procedure Call. Esto requiere que la función 'get_weekly_leaderboard'
+        // exista en la base de datos de Supabase.
+        const { data, error } = await supabase.rpc('get_weekly_leaderboard');
+        
+        if (error) {
+            // Si la función no existe, o hay un error de conexión, devolvemos array vacío
+            // para no romper la interfaz de usuario.
+            console.warn('Error fetching leaderboard (RPC missing or DB timeout):', error.message);
+            return [];
+        }
+        
+        return data || [];
+    } catch (e) {
+        console.error("Exception fetching leaderboard:", e);
         return [];
     }
-    
-    return data || [];
 };

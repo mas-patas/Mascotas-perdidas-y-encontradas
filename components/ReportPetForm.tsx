@@ -13,6 +13,7 @@ interface ReportPetFormProps {
     onSubmit: (pet: any, idToUpdate?: string) => void;
     initialStatus: PetStatus;
     petToEdit?: Pet | null;
+    dataToPrefill?: Partial<Pet> | null;
     isSubmitting?: boolean;
 }
 
@@ -55,7 +56,7 @@ const normalizeLocationName = (name: string) => {
         .trim();
 };
 
-export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit, isSubmitting }) => {
+export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit, initialStatus, petToEdit, dataToPrefill, isSubmitting }) => {
     const isEditMode = !!petToEdit;
     
     // RHF Setup
@@ -124,7 +125,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
 
-    // --- EFFECT: Initialize from Edit Mode ---
+    // --- EFFECT: Initialize from Edit Mode OR Prefill ---
     useEffect(() => {
         if (isEditMode && petToEdit) {
             // Colors
@@ -195,22 +196,45 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     setValue('address', petToEdit.location);
                 }
             }
+        } else if (dataToPrefill) {
+             // Prefill Logic for New Report (e.g. from Owned Pet)
+             setValue('name', dataToPrefill.name || '');
+             if (dataToPrefill.animalType) setValue('animalType', dataToPrefill.animalType);
+             
+             // Breed
+             const currentList = dataToPrefill.animalType === ANIMAL_TYPES.GATO ? catBreeds : dogBreeds;
+             if (dataToPrefill.breed && currentList.includes(dataToPrefill.breed)) {
+                 setValue('breed', dataToPrefill.breed);
+             } else if (dataToPrefill.breed) {
+                 setValue('breed', 'Otro');
+                 setValue('customBreed', dataToPrefill.breed);
+             }
+
+             // Colors (Assumes comma separated string in dataToPrefill.color)
+             const colors = dataToPrefill.color ? dataToPrefill.color.split(',').map(c => c.trim()) : [];
+             setValue('color1', colors[0] || '');
+             setValue('color2', colors[1] || '');
+             setValue('color3', colors[2] || '');
+
+             setValue('description', dataToPrefill.description || '');
+             setValue('imageUrls', dataToPrefill.imageUrls || []);
+             if (dataToPrefill.contact) setValue('contact', dataToPrefill.contact);
         }
-    }, [isEditMode, petToEdit, setValue]);
+    }, [isEditMode, petToEdit, dataToPrefill, setValue]);
 
     // --- EFFECT: Update Breeds List ---
     useEffect(() => {
         if (watchedAnimalType === ANIMAL_TYPES.PERRO) {
             setBreeds(dogBreeds);
-            if (!isEditMode) setValue('breed', dogBreeds[0]);
+            if (!isEditMode && !dataToPrefill) setValue('breed', dogBreeds[0]);
         } else if (watchedAnimalType === ANIMAL_TYPES.GATO) {
             setBreeds(catBreeds);
-            if (!isEditMode) setValue('breed', catBreeds[0]);
+            if (!isEditMode && !dataToPrefill) setValue('breed', catBreeds[0]);
         } else {
             setBreeds(['Otro']);
-            if (!isEditMode) setValue('breed', 'Otro');
+            if (!isEditMode && !dataToPrefill) setValue('breed', 'Otro');
         }
-    }, [watchedAnimalType, isEditMode, setValue]);
+    }, [watchedAnimalType, isEditMode, dataToPrefill, setValue]);
 
     // --- EFFECT: Update Location Lists (Normal User Selection) ---
     useEffect(() => {
@@ -218,19 +242,18 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         if (!isUpdatingFromMapRef.current && watchedDepartment) {
             setProvinces(getProvinces(watchedDepartment));
             // Reset children if manually changed
-            if (!isEditMode) { 
-                setValue('province', '');
-                setValue('district', '');
+            if (!isEditMode && !dataToPrefill?.location) { // Don't reset if filling from existing data (though location parsing is tricky)
+                // Actually location parsing above handles setting province/district, 
+                // but if user changes dept manually, we should reset.
+                // The check !isUpdatingFromMapRef handles map clicks.
+                // For initial load, the other useEffect handles setting the lists.
             }
         }
-    }, [watchedDepartment]); // Removed dependent props to avoid loops
+    }, [watchedDepartment]); 
 
     useEffect(() => {
         if (!isUpdatingFromMapRef.current && watchedDepartment && watchedProvince) {
             setDistricts(getDistricts(watchedDepartment, watchedProvince));
-            if (!isEditMode) {
-                setValue('district', '');
-            }
         }
     }, [watchedDepartment, watchedProvince]);
 

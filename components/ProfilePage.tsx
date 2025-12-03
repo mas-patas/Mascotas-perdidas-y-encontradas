@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { useAuth } from '../contexts/AuthContext';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from './icons';
 import AddPetModal from './AddPetModal';
 import OwnedPetDetailModal from './OwnedPetDetailModal';
 import ConfirmationModal from './ConfirmationModal';
@@ -55,6 +55,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const [petToDelete, setPetToDelete] = useState<OwnedPet | null>(null);
     const [reportPage, setReportPage] = useState(1);
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // Click outside to close filter dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setIsFilterDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     
     const [editableUser, setEditableUser] = useState({
         firstName: user.firstName || '',
@@ -316,8 +330,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
 
                 {/* HEADER PERFIL */}
                 <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <h2 className="text-3xl font-bold text-brand-dark">Mi Perfil</h2>
+                    <div className="flex flex-col md:flex-row justify-between items-center md:items-start mb-6 gap-4">
+                        <h2 className="text-3xl font-bold text-brand-dark text-center md:text-left">Mi Perfil</h2>
                         <div className="flex gap-2">
                             {myBusiness && (
                                 <button 
@@ -328,7 +342,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                 </button>
                             )}
                             {!isEditing && (
-                                <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 text-sm py-2 px-3 bg-blue-100 text-brand-primary rounded-lg hover:bg-blue-200 transition-colors">
+                                <button 
+                                    onClick={() => setIsEditing(true)} 
+                                    className="hidden md:flex items-center gap-2 text-sm py-2 px-3 bg-blue-100 text-brand-primary rounded-lg hover:bg-blue-200 transition-colors"
+                                >
                                     <EditIcon /> Editar Perfil
                                 </button>
                             )}
@@ -384,7 +401,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         </div>
                     ) : (
                         <div className="flex flex-col lg:flex-row gap-8">
-                            <div className="flex-1 flex flex-col md:flex-row md:items-start gap-6">
+                            <div className="flex-1 flex flex-col items-center md:flex-row md:items-start gap-6 w-full">
                                 <div className="relative">
                                     {user.avatarUrl ? (
                                         <div className="w-32 h-32 rounded-full overflow-hidden shadow-md">
@@ -396,12 +413,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                         </div>
                                     )}
                                 </div>
-                                <div className="text-center md:text-left space-y-2 text-gray-600">
-                                    <p><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
-                                    <p><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
-                                    <p><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
-                                    {user.phone && <p><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
-                                    {user.country && <p><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
+                                <div className="text-center md:text-left space-y-3 text-gray-600 w-full flex flex-col items-center md:items-start">
+                                    <p className="w-full"><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
+                                    <p className="w-full"><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
+                                    <p className="w-full"><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
+                                    {user.phone && <p className="w-full"><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                                    {user.country && <p className="w-full"><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
+                                    
+                                    {/* Mobile Edit Button */}
+                                    <button 
+                                        onClick={() => setIsEditing(true)} 
+                                        className="md:hidden mt-2 flex items-center justify-center gap-2 text-sm py-2.5 px-6 bg-blue-100 text-brand-primary rounded-xl hover:bg-blue-200 transition-colors font-bold w-full max-w-xs mx-auto"
+                                    >
+                                        <EditIcon /> Editar Perfil
+                                    </button>
                                 </div>
                             </div>
 
@@ -492,49 +517,45 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
 
                 {/* MY REPORTS (PAGINATED & FILTERABLE) */}
                 <div className="space-y-4">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-4">
-                        <div className="flex items-center gap-4">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100 pb-4 mb-4">
+                        <div className="flex items-center gap-4 relative">
                             <h3 className="text-2xl font-semibold text-gray-700 whitespace-nowrap">Mis reportes</h3>
                             
-                            {/* Desktop Filters (Hidden on Mobile) */}
-                            <div className="hidden md:flex gap-2">
-                                {filterOptions.map(option => (
-                                    <button
-                                        key={option.value}
-                                        onClick={() => setFilterStatus(option.value)}
-                                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                                            filterStatus === option.value
-                                                ? 'bg-brand-primary text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
+                            {/* Dropdown Filter */}
+                            <div className="relative" ref={filterRef}>
+                                <button
+                                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm border border-gray-200"
+                                >
+                                    <span>{filterOptions.find(o => o.value === filterStatus)?.label || 'Filtrar'}</span>
+                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isFilterDropdownOpen && (
+                                    <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-20 py-1 overflow-hidden animate-fade-in-up">
+                                        {filterOptions.map((option) => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => {
+                                                    setFilterStatus(option.value);
+                                                    setIsFilterDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
+                                                    filterStatus === option.value ? 'font-bold text-brand-primary bg-blue-50' : 'text-gray-600'
+                                                }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Desktop Pagination (Right Aligned) */}
+                        {/* Pagination */}
                         <div className="hidden md:block">
                             <Pagination />
                         </div>
-                    </div>
-
-                    {/* Mobile Filters (Scrollable Row) */}
-                    <div className="md:hidden flex overflow-x-auto no-scrollbar gap-2 pb-2">
-                        {filterOptions.map(option => (
-                            <button
-                                key={option.value}
-                                onClick={() => setFilterStatus(option.value)}
-                                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
-                                    filterStatus === option.value
-                                        ? 'bg-brand-primary text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-                                }`}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
                     </div>
 
                     {isLoadingReports ? (

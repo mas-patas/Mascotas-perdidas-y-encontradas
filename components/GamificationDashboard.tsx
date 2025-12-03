@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Pet, Mission, ActivityLog, LeaderboardEntry } from '../types';
 import { TargetIcon, HistoryIcon, CoinIcon, XCircleIcon, CheckIcon, PlusIcon, ChatBubbleIcon, HeartIcon, MegaphoneIcon, TrophyIcon, CrownIcon } from './icons';
@@ -100,9 +101,13 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
         }
     };
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 z-[3000] flex justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden relative">
+    // Use Portal to ensure centering works regardless of parent transforms (e.g. sidebar)
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex justify-center items-center p-4 animate-fade-in">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-sm" onClick={onClose}></div>
+
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden relative z-10">
                 
                 {/* Close Button */}
                 <button 
@@ -112,65 +117,65 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                     <XCircleIcon className="h-8 w-8" />
                 </button>
 
-                {/* Hero Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-8 text-white relative overflow-hidden shrink-0">
+                {/* Hero Header - Shrink-0 prevents it from collapsing */}
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-6 md:p-8 text-white relative overflow-hidden shrink-0">
                     <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                     
                     <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4 md:gap-6">
                             {/* Using white text color via sm/lg logic inside component for dark bg */}
-                            <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20">
+                            <div className="bg-white/10 p-3 md:p-4 rounded-2xl backdrop-blur-md border border-white/20">
                                 <GamificationBadge points={currentPoints} size="sm" />
                             </div>
                             <div>
-                                <h2 className="text-3xl font-black uppercase tracking-wide">Mi Progreso</h2>
-                                <p className="opacity-80 text-sm font-medium">Sigue completando misiones para subir de rango.</p>
+                                <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">Mi Progreso</h2>
+                                <p className="opacity-80 text-xs md:text-sm font-medium">Sigue completando misiones para subir de rango.</p>
                             </div>
                         </div>
 
                         <div className="bg-black/30 px-6 py-3 rounded-xl border border-white/10 flex items-center gap-4 min-w-[200px]">
                             <div className="bg-yellow-400 p-2 rounded-full shadow-lg text-yellow-900">
-                                <CoinIcon className="h-8 w-8" />
+                                <CoinIcon className="h-6 w-6 md:h-8 md:w-8" />
                             </div>
                             <div>
-                                <p className="text-xs uppercase font-bold tracking-wider text-yellow-400">Doggy Points</p>
-                                <p className="text-4xl font-black font-mono leading-none">{currentPoints}</p>
+                                <p className="text-[10px] md:text-xs uppercase font-bold tracking-wider text-yellow-400">Doggy Points</p>
+                                <p className="text-3xl md:text-4xl font-black font-mono leading-none">{currentPoints}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Navigation */}
-                <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+                {/* Navigation - Shrink-0 ensures tabs stay visible */}
+                <div className="flex border-b border-gray-200 bg-gray-50 shrink-0 overflow-x-auto no-scrollbar">
                     <button
                         onClick={() => setActiveTab('missions')}
-                        className={`flex-1 py-4 px-4 font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'missions' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                        className={`flex-1 py-3 px-1 sm:px-4 font-bold text-[10px] sm:text-xs md:text-sm uppercase tracking-tight sm:tracking-wider flex items-center justify-center gap-1 sm:gap-2 transition-all whitespace-nowrap ${activeTab === 'missions' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
                     >
-                        <TargetIcon className="h-5 w-5" /> Misiones
+                        <TargetIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Misiones
                     </button>
                     <button
                         onClick={() => setActiveTab('leaderboard')}
-                        className={`flex-1 py-4 px-4 font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'leaderboard' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                        className={`flex-1 py-3 px-1 sm:px-4 font-bold text-[10px] sm:text-xs md:text-sm uppercase tracking-tight sm:tracking-wider flex items-center justify-center gap-1 sm:gap-2 transition-all whitespace-nowrap ${activeTab === 'leaderboard' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
                     >
-                        <TrophyIcon className="h-5 w-5" /> Ranking Global
+                        <TrophyIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Ranking
                     </button>
                     <button
                         onClick={() => setActiveTab('history')}
-                        className={`flex-1 py-4 px-4 font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                        className={`flex-1 py-3 px-1 sm:px-4 font-bold text-[10px] sm:text-xs md:text-sm uppercase tracking-tight sm:tracking-wider flex items-center justify-center gap-1 sm:gap-2 transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-white border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
                     >
-                        <HistoryIcon className="h-5 w-5" /> Historial
+                        <HistoryIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Historial
                     </button>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex-grow overflow-y-auto bg-gray-100 p-6">
+                {/* Content Area - Flex Grow allows scrolling only here */}
+                <div className="flex-grow overflow-y-auto bg-gray-100 p-4 md:p-6">
                     
                     {/* MISSIONS TAB */}
                     {activeTab === 'missions' && (
                         <div className="max-w-2xl mx-auto space-y-4">
                             <div className="flex justify-between items-end mb-2">
-                                <h3 className="text-xl font-bold text-gray-800">Misiones de Hoy</h3>
-                                <span className="text-xs font-bold text-gray-500 uppercase bg-gray-200 px-2 py-1 rounded">Reinician en 24h</span>
+                                <h3 className="text-lg md:text-xl font-bold text-gray-800">Misiones de Hoy</h3>
+                                <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase bg-gray-200 px-2 py-1 rounded">Reinician en 24h</span>
                             </div>
                             
                             {missions.map(mission => (
@@ -181,15 +186,15 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                                 {mission.isCompleted ? <CheckIcon className="h-6 w-6" /> : <TargetIcon className="h-6 w-6" />}
                                             </div>
                                             <div>
-                                                <h4 className={`font-bold text-lg ${mission.isCompleted ? 'text-green-800 line-through decoration-2' : 'text-gray-800'}`}>{mission.title}</h4>
-                                                <p className="text-sm text-gray-500">{mission.description}</p>
+                                                <h4 className={`font-bold text-base md:text-lg ${mission.isCompleted ? 'text-green-800 line-through decoration-2' : 'text-gray-800'}`}>{mission.title}</h4>
+                                                <p className="text-xs md:text-sm text-gray-500">{mission.description}</p>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="font-black text-yellow-500 text-xl flex items-center gap-1">
+                                        <div className="flex flex-col items-end pl-2">
+                                            <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center gap-1 whitespace-nowrap">
                                                 +{mission.points} <CoinIcon className="h-4 w-4" />
                                             </span>
-                                            {mission.isCompleted && <span className="text-xs font-bold text-green-600 uppercase mt-1">Completado</span>}
+                                            {mission.isCompleted && <span className="text-[10px] font-bold text-green-600 uppercase mt-1">Completado</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -201,8 +206,8 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                     {activeTab === 'leaderboard' && (
                         <div className="max-w-3xl mx-auto">
                             <div className="text-center mb-8">
-                                <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight mb-2">Héroes de la Semana</h3>
-                                <p className="text-gray-500 text-sm">Los usuarios que más ayudan a la comunidad (últimos 7 días)</p>
+                                <h3 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tight mb-2">Héroes de la Semana</h3>
+                                <p className="text-gray-500 text-xs md:text-sm">Los usuarios que más ayudan a la comunidad (últimos 7 días)</p>
                             </div>
 
                             {loadingLeaderboard ? (
@@ -212,7 +217,7 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                             ) : leaderboard.length > 0 ? (
                                 <>
                                     {/* Podium Section */}
-                                    <div className="flex justify-center items-end gap-4 mb-10 px-4">
+                                    <div className="flex justify-center items-end gap-2 md:gap-4 mb-10 px-2">
                                         {/* 2nd Place */}
                                         {leaderboard[1] && (
                                             <div className="flex flex-col items-center w-1/3 max-w-[120px]">
@@ -222,8 +227,8 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                                     </div>
                                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gray-300 text-gray-800 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm border border-white">#2</div>
                                                 </div>
-                                                <p className="text-sm font-bold text-gray-800 truncate w-full text-center">@{leaderboard[1].username}</p>
-                                                <p className="text-xs text-indigo-600 font-bold">{leaderboard[1].total_points} pts</p>
+                                                <p className="text-xs md:text-sm font-bold text-gray-800 truncate w-full text-center">@{leaderboard[1].username}</p>
+                                                <p className="text-[10px] md:text-xs text-indigo-600 font-bold">{leaderboard[1].total_points} pts</p>
                                             </div>
                                         )}
 
@@ -231,16 +236,16 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                         {leaderboard[0] && (
                                             <div className="flex flex-col items-center w-1/3 max-w-[140px] -mb-4 z-10">
                                                 <div className="mb-1 text-yellow-500 animate-bounce-slow">
-                                                    <CrownIcon className="h-8 w-8" />
+                                                    <CrownIcon className="h-6 w-6 md:h-8 md:w-8" />
                                                 </div>
                                                 <div className="relative mb-3">
                                                     <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-yellow-400 overflow-hidden shadow-xl ring-4 ring-yellow-100">
                                                         {leaderboard[0].avatar_url ? <img src={leaderboard[0].avatar_url} alt="1st" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 text-2xl">{leaderboard[0].username.charAt(0)}</div>}
                                                     </div>
-                                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-sm font-black px-3 py-1 rounded-full shadow-md border-2 border-white">#1</div>
+                                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs md:text-sm font-black px-3 py-1 rounded-full shadow-md border-2 border-white">#1</div>
                                                 </div>
-                                                <p className="text-base font-bold text-gray-900 truncate w-full text-center">@{leaderboard[0].username}</p>
-                                                <p className="text-sm text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-lg mt-1">{leaderboard[0].total_points} pts</p>
+                                                <p className="text-sm md:text-base font-bold text-gray-900 truncate w-full text-center">@{leaderboard[0].username}</p>
+                                                <p className="text-xs md:text-sm text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-lg mt-1">{leaderboard[0].total_points} pts</p>
                                             </div>
                                         )}
 
@@ -253,8 +258,8 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                                     </div>
                                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm border border-white">#3</div>
                                                 </div>
-                                                <p className="text-sm font-bold text-gray-800 truncate w-full text-center">@{leaderboard[2].username}</p>
-                                                <p className="text-xs text-indigo-600 font-bold">{leaderboard[2].total_points} pts</p>
+                                                <p className="text-xs md:text-sm font-bold text-gray-800 truncate w-full text-center">@{leaderboard[2].username}</p>
+                                                <p className="text-[10px] md:text-xs text-indigo-600 font-bold">{leaderboard[2].total_points} pts</p>
                                             </div>
                                         )}
                                     </div>
@@ -266,26 +271,26 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                             return (
                                                 <div 
                                                     key={entry.user_id} 
-                                                    className={`flex items-center p-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors ${isMe ? 'bg-indigo-50 hover:bg-indigo-100' : ''}`}
+                                                    className={`flex items-center p-3 md:p-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors ${isMe ? 'bg-indigo-50 hover:bg-indigo-100' : ''}`}
                                                     onClick={() => handleUserClick(entry)}
                                                 >
-                                                    <span className="w-8 text-center font-bold text-gray-400 text-sm">#{index + 4}</span>
+                                                    <span className="w-8 text-center font-bold text-gray-400 text-xs md:text-sm">#{index + 4}</span>
                                                     <div className="flex items-center gap-3 flex-1 ml-2">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                                                             {entry.avatar_url ? <img src={entry.avatar_url} alt={entry.username} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-500">{entry.username.charAt(0)}</div>}
                                                         </div>
                                                         <div>
-                                                            <p className={`text-sm font-bold ${isMe ? 'text-indigo-700' : 'text-gray-800'}`}>
+                                                            <p className={`text-xs md:text-sm font-bold ${isMe ? 'text-indigo-700' : 'text-gray-800'}`}>
                                                                 @{entry.username} {isMe && '(Tú)'}
                                                             </p>
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1 scale-75 origin-left md:scale-100">
                                                                 <GamificationBadge points={entry.total_points} size="sm" /> 
                                                             </div>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="font-bold text-indigo-600">{entry.total_points}</span>
-                                                        <span className="text-xs text-gray-400 ml-1">pts</span>
+                                                        <span className="font-bold text-indigo-600 text-sm md:text-base">{entry.total_points}</span>
+                                                        <span className="text-[10px] md:text-xs text-gray-400 ml-1">pts</span>
                                                     </div>
                                                 </div>
                                             );
@@ -314,34 +319,46 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                                 {loadingHistory ? (
                                     <div className="p-8 text-center text-gray-500">Cargando historial...</div>
                                 ) : history.length > 0 ? (
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-xs">
-                                            <tr>
-                                                <th className="px-6 py-3 font-bold">Actividad</th>
-                                                <th className="px-6 py-3 font-bold">Fecha</th>
-                                                <th className="px-6 py-3 font-bold text-right">Puntos</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {history.map((log) => {
-                                                const config = getActionConfig(log.actionType);
-                                                return (
-                                                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 font-medium text-gray-800 flex items-center gap-3">
-                                                            <div className={`${config.colorClass} p-2 rounded-lg shadow-sm`}>
-                                                                {config.icon}
-                                                            </div>
-                                                            {config.label}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-gray-500 text-xs">
-                                                            {new Date(log.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right font-bold text-green-600">+{log.points}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                    <>
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-xs">
+                                                <tr>
+                                                    <th className="px-4 py-3 font-bold">Actividad</th>
+                                                    <th className="px-4 py-3 font-bold hidden sm:table-cell">Fecha</th>
+                                                    <th className="px-4 py-3 font-bold text-right">Puntos</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {history.slice(0, 5).map((log) => {
+                                                    const config = getActionConfig(log.actionType);
+                                                    return (
+                                                        <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 py-4 font-medium text-gray-800">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`${config.colorClass} p-2 rounded-lg shadow-sm flex-shrink-0`}>
+                                                                        {config.icon}
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span>{config.label}</span>
+                                                                        <span className="text-[10px] text-gray-400 sm:hidden">
+                                                                            {new Date(log.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-4 text-gray-500 text-xs hidden sm:table-cell">
+                                                                {new Date(log.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            </td>
+                                                            <td className="px-4 py-4 text-right font-bold text-green-600 whitespace-nowrap">+{log.points}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                        <div className="p-3 text-center bg-gray-50 border-t border-gray-200">
+                                            <p className="text-xs text-gray-500 italic">Se muestran los últimos 5 registros</p>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="p-12 text-center">
                                         <p className="text-gray-400 mb-2 text-lg">Aún no tienes historial de actividad.</p>
@@ -361,7 +378,8 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                     targetUser={viewingPublicProfile}
                 />
             )}
-        </div>
+        </div>,
+        document.body
     );
 };
 

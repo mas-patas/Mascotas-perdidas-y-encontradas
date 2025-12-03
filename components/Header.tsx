@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon, DocumentIcon, TrophyIcon } from './icons';
@@ -154,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <ChevronDownIcon />
                         </button>
                         {isReportDropdownOpen && (
-                            <div className="absolute left-auto right-0 sm:right-auto sm:left-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-30 ring-1 ring-black ring-opacity-5 border border-gray-100">
+                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5 border border-gray-100 origin-top-right">
                                 <button
                                     onClick={() => handleReportSelection(PET_STATUS.PERDIDO)}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-sidebar-dark"

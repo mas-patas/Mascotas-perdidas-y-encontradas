@@ -184,7 +184,6 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                         {/* User Info - Dark Text for Contrast */}
                         <div>
                             <h2 className="text-2xl font-black text-purple-900">@{targetUser.username || 'Usuario'}</h2>
-                            <p className="text-purple-700 text-sm font-medium">{targetUser.firstName} {targetUser.lastName}</p>
                         </div>
 
                         {/* Badge Section - In between Name and Score */}

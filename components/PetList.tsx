@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon, HeartIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon, HeartIcon, HistoryIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
@@ -102,7 +102,6 @@ const PetSection: React.FC<{
                 newGridClass = 'grid-cols-3';
             }
             
-            // Guard against unnecessary state updates (React 310/185 prevention)
             setGridClass(prev => prev !== newGridClass ? newGridClass : prev);
             setCardsPerPage(prev => prev !== newCardsPerPage ? newCardsPerPage : prev);
 
@@ -116,11 +115,7 @@ const PetSection: React.FC<{
         };
 
         window.addEventListener('resize', updateLayout);
-        
-        // FIX: Defer initial update to prevent "update inside render" error
-        const timer = setTimeout(() => {
-            updateLayout(); 
-        }, 0);
+        const timer = setTimeout(() => { updateLayout(); }, 0);
 
         return () => {
             window.removeEventListener('resize', updateLayout);
@@ -152,7 +147,6 @@ const PetSection: React.FC<{
 
     const visiblePets = showCarousel ? pets.slice(currentIndex, currentIndex + cardsPerPage) : pets;
 
-    // Touch Handlers
     const onTouchStart = (e: React.TouchEvent) => {
         setTouchEnd(null);
         setTouchStart(e.targetTouches[0].clientX);
@@ -224,7 +218,6 @@ const PetSection: React.FC<{
                             <ChevronRightIcon />
                         </button>
                         
-                        {/* Mobile Indicators (Dots) */}
                         <div className="flex md:hidden justify-center mt-4 gap-1.5">
                             {Array.from({ length: Math.ceil((pets.length - cardsPerPage) + 1) }).map((_, idx) => (
                                 <div 
@@ -244,6 +237,21 @@ const PetSection: React.FC<{
 export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading, isError, onRetry }) => {
     
     const sentinelRef = useRef<HTMLDivElement>(null);
+    const [showSlowLoading, setShowSlowLoading] = useState(false);
+
+    // Watch for slow loading state
+    useEffect(() => {
+        let timer: any;
+        if (isLoading) {
+            setShowSlowLoading(false);
+            timer = setTimeout(() => {
+                setShowSlowLoading(true);
+            }, 10000); // Increased to 10 seconds to allow smooth logout/login transitions
+        } else {
+            setShowSlowLoading(false);
+        }
+        return () => clearTimeout(timer);
+    }, [isLoading]);
 
     // Infinite Scroll Observer triggers server fetch via loadMore prop
     useEffect(() => {
@@ -310,8 +318,16 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                 </div>
 
                 {isLoading && pets.length === 0 ? (
-                     <div className="h-64 w-full flex justify-center items-center">
+                     <div className="h-64 w-full flex flex-col justify-center items-center gap-4">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div>
+                        {showSlowLoading && (
+                            <div className="text-center animate-fade-in">
+                                <p className="text-gray-500 text-sm mb-2">Esto está tardando más de lo normal...</p>
+                                <button onClick={onRetry} className="text-brand-primary font-bold hover:underline text-sm flex items-center gap-1 mx-auto">
+                                    <HistoryIcon className="h-4 w-4"/> Recargar ahora
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ) : pets.length > 0 ? (
                     <>
@@ -373,12 +389,24 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
 
     if (isLoading && pets.length === 0) {
         return (
-            <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">
-                <div className="animate-pulse flex flex-col items-center">
+            <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md min-h-[300px] flex flex-col justify-center items-center">
+                <div className="animate-pulse flex flex-col items-center w-full">
                     <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
                     <div className="h-4 bg-gray-200 rounded w-1/4"></div>
                 </div>
                 <p className="text-xl text-gray-500 mt-4">Cargando mascotas...</p>
+                
+                {showSlowLoading && (
+                    <div className="mt-6 animate-fade-in bg-yellow-50 p-4 rounded-lg border border-yellow-100 max-w-sm">
+                        <p className="text-yellow-700 text-sm mb-2 font-medium">La conexión parece lenta.</p>
+                        <button 
+                            onClick={onRetry} 
+                            className="bg-white border border-yellow-300 text-yellow-700 px-4 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-yellow-50 transition-colors"
+                        >
+                            Reintentar Conexión
+                        </button>
+                    </div>
+                )}
             </div>
         );
     }
