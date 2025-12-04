@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useEffect, useContext, ReactNode, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, OwnedPet, UserRole, UserStatus } from '../types';
@@ -12,8 +13,9 @@ interface AuthContextType {
     register: (email: string, pass: string) => Promise<void>;
     logout: () => Promise<void>;
     loginWithGoogle: () => Promise<void>;
-    loginWithApple: () => Promise<void>;
-    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl' | 'country'>>) => Promise<void>;
+    resetPassword: (email: string) => Promise<void>;
+    updateUserProfile: (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'birthDate' | 'avatarUrl' | 'country'>>) => Promise<void>;
+    updatePassword: (password: string) => Promise<void>;
     addOwnedPet: (petData: Omit<OwnedPet, 'id'>) => Promise<void>;
     updateOwnedPet: (petData: OwnedPet) => Promise<void>;
     deleteOwnedPet: (petId: string) => Promise<void>;
@@ -55,7 +57,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const pingSupabase = async () => {
             await supabase.auth.getSession();
         };
-        const intervalId = setInterval(pingSupabase, 60000);
+        const intervalId = setInterval(pingSupabase, 240000);
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 pingSupabase();
@@ -203,6 +205,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     lastName: data.last_name,
                     phone: data.phone,
                     dni: data.dni,
+                    birthDate: data.birth_date, // Map from DB
                     country: data.country || 'Perú',
                     avatarUrl: data.avatar_url,
                     ownedPets: data.owned_pets || [], 
@@ -231,9 +234,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const loginWithGoogle = async (): Promise<void> => {
-        // Robust implementation:
-        // 1. redirectTo: Ensures user comes back to the correct URL (handles subdomains/deploy previews).
-        // 2. prompt: 'consent' forces the Google account picker, ensuring the user can choose the correct account if they have multiple.
         const { error } = await supabase.auth.signInWithOAuth({ 
             provider: 'google',
             options: {
@@ -247,30 +247,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) throw new Error(error.message);
     };
 
-    const loginWithApple = async (): Promise<void> => {
-        const { error } = await supabase.auth.signInWithOAuth({ 
-            provider: 'apple',
-            options: {
-                redirectTo: `${window.location.origin}/`
-            }
+    const resetPassword = async (email: string): Promise<void> => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            // Redirect to setup profile allows them to immediately set a password if we treat it as a "fresh" login
+            // or simply to the home page.
+            redirectTo: `${window.location.origin}/setup-profile`, 
         });
         if (error) throw new Error(error.message);
     };
 
     const logout = async () => {
-        // 1. Reset Context State
         setCurrentUser(null);
         setIsGhosting(null);
         localStorage.removeItem('ghostingAdmin');
         
-        // 2. Clear React Query Cache carefully
-        // Cancel in-flight queries to prevent errors from fetching with old token
         await queryClient.cancelQueries();
-        // Remove all queries to ensure fresh public data is fetched next
         queryClient.removeQueries();
-        // We do NOT use queryClient.clear() anymore as it causes a "stalled" state in some cases
 
-        // 3. Reset URL to clean state
         if (window.location.hash !== '#/' && window.location.hash !== '') {
             window.location.hash = '/';
         }
@@ -282,7 +275,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'avatarUrl' | 'country'>>): Promise<void> => {
+    const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'birthDate' | 'avatarUrl' | 'country'>>): Promise<void> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('No auth session');
         
@@ -292,6 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             last_name: profileData.lastName,
             phone: profileData.phone,
             dni: profileData.dni,
+            birth_date: profileData.birthDate,
             country: profileData.country,
             avatar_url: profileData.avatarUrl,
             updated_at: new Date().toISOString(),
@@ -312,6 +306,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         setCurrentUser(prev => prev ? { ...prev, ...profileData } : null);
+    };
+
+    const updatePassword = async (password: string): Promise<void> => {
+        const { error } = await supabase.auth.updateUser({ password: password });
+        if (error) throw new Error(error.message);
     };
 
     const addOwnedPet = async (petData: Omit<OwnedPet, 'id'>) => {
@@ -416,8 +415,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         register,
         logout,
         loginWithGoogle,
-        loginWithApple,
+        resetPassword,
         updateUserProfile,
+        updatePassword,
         addOwnedPet,
         updateOwnedPet,
         deleteOwnedPet,

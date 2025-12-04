@@ -174,6 +174,7 @@ export interface User {
     lastName?: string;
     phone?: string;
     dni?: string;
+    birthDate?: string; // Nuevo campo Fecha de Nacimiento
     country?: string; // Nuevo campo Pais
     provider?: 'email' | 'google' | 'apple';
     ownedPets?: OwnedPet[];

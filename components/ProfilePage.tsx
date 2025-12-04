@@ -74,6 +74,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         phone: user.phone || '',
+        birthDate: user.birthDate || '',
         country: user.country || 'Perú',
         avatarUrl: user.avatarUrl || '',
     });
@@ -386,11 +387,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                             <input type="tel" name="phone" value={editableUser.phone} onChange={handleInputChange} className={inputClass} />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900">País</label>
-                                            <select name="country" value={editableUser.country} onChange={handleInputChange} className={inputClass}>
-                                                {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
+                                            <label className="block text-sm font-medium text-gray-900">Fecha de Nacimiento</label>
+                                            <input 
+                                                type="date" 
+                                                name="birthDate" 
+                                                value={editableUser.birthDate} 
+                                                onChange={handleInputChange} 
+                                                className={inputClass} 
+                                                max={new Date().toISOString().split('T')[0]}
+                                            />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900">País</label>
+                                        <select name="country" value={editableUser.country} onChange={handleInputChange} className={inputClass}>
+                                            {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -418,6 +430,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                     <p className="w-full"><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
                                     <p className="w-full"><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
                                     {user.phone && <p className="w-full"><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
+                                    {user.birthDate && <p className="w-full"><span className="font-semibold text-gray-800">Fecha de Nacimiento:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
                                     {user.country && <p className="w-full"><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
                                     
                                     {/* Mobile Edit Button */}

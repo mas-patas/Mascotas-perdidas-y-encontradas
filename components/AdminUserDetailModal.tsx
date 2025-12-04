@@ -150,6 +150,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                     <p><span className="font-semibold text-gray-800 w-28 inline-block">Email:</span> {user.email}</p>
                                     <p><span className="font-semibold text-gray-800 w-28 inline-block">DNI:</span> {user.dni || 'No registrado'}</p>
                                     <p><span className="font-semibold text-gray-800 w-28 inline-block">Teléfono:</span> {user.phone || 'No registrado'}</p>
+                                    {user.birthDate && <p><span className="font-semibold text-gray-800 w-28 inline-block">Cumpleaños:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
                                     <div className="flex items-center">
                                         <span className="font-semibold text-gray-800 w-28 inline-block">Rol:</span>
                                         {isEditing && canEditRole ? (
