@@ -14,9 +14,11 @@ interface OnboardingTourProps {
     steps: TourStep[];
     tourId: string; // Unique ID to save in localStorage (e.g., 'home_v1')
     onComplete?: () => void;
+    onOpenSidebar?: () => void;
+    onCloseSidebar?: () => void;
 }
 
-export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, onComplete }) => {
+export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, onComplete, onOpenSidebar, onCloseSidebar }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [isVisible, setIsVisible] = useState(false);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
@@ -52,6 +54,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
     const finishTour = () => {
         localStorage.setItem(`tour_completed_${tourId}`, 'true');
         setIsVisible(false);
+        // Ensure sidebar is closed when tour finishes if it was opened
+        if (onCloseSidebar) onCloseSidebar();
         if (onComplete) onComplete();
     };
 
@@ -104,13 +108,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
             let t = 0, l = 0;
             
             if (pos === 'top') {
-                t = rect.top - spacing; // Will subtract height via CSS transform translateY(-100%) later or adjust here
-                // Note: To position strictly above, we need actual height. 
-                // Alternatively, we use bottom-aligned positioning logic or CSS.
-                // Let's use standard top/left calculation assuming we can adjust via CSS or estimation.
-                // Better approach for React Portal without ref to tooltip dimensions yet: 
-                // Position at target's top, and CSS `transform: translateY(-100%)` handles the height.
-                t = rect.top - spacing;
+                t = rect.top - spacing; 
                 l = rect.left + (rect.width / 2) - (tooltipWidth / 2);
             } else if (pos === 'bottom') {
                 t = rect.bottom + spacing;
@@ -132,42 +130,61 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
 
             // Clamp Vertical (Harder without exact height, but we can clamp top)
             if (t < padding) t = padding;
-            // (Bottom clamping omitted to allow scrolling if needed, ensuring top is visible is prioritized)
-
-            setTooltipPos({ top: t, left: l });
             
-            // Set arrow direction based on final position
-            // e.g., if tooltip is on 'right', arrow points 'left'
+            setTooltipPos({ top: t, left: l });
             setArrowPos(pos);
-
         }
     }, [isVisible, currentStep]);
 
+    // Handle Sidebar and Positioning logic when step changes
     useEffect(() => {
-        updatePosition();
-        // Recalculate on resize and scroll to keep it attached
-        window.addEventListener('resize', updatePosition);
-        window.addEventListener('scroll', updatePosition, true); // true for capture to catch sub-scrollers
+        if (!isVisible || !currentStep) return;
+
+        // Identifiers for elements that live inside the sidebar
+        const sidebarTargets = [
+            '[data-tour="nav-map"]', 
+            '[data-tour="nav-campaigns"]', 
+            '[data-tour="nav-reunited"]', 
+            '[data-tour="sidebar-filters"]',
+            '[data-tour="sidebar-menu"]',
+            '[data-tour="sidebar-navigation"]'
+        ];
         
-        // Double check position after a small delay to allow UI transitions
-        const timer = setTimeout(updatePosition, 500);
+        const isSidebarStep = sidebarTargets.includes(currentStep.target);
+        let timer: ReturnType<typeof setTimeout>;
+
+        // Logic: Open sidebar if needed, close if not (to clear mobile backdrop), then calculate position
+        if (isSidebarStep && onOpenSidebar) {
+            onOpenSidebar();
+            // Wait for CSS transition (approx 300ms) before calculating position
+            timer = setTimeout(updatePosition, 350);
+        } else if (!isSidebarStep && onCloseSidebar) {
+            onCloseSidebar();
+            timer = setTimeout(updatePosition, 350);
+        } else {
+            // Immediate update if no UI state change is triggered
+            updatePosition();
+        }
+
+        // Recalculate on resize and scroll
+        const handleResizeOrScroll = () => updatePosition();
+        window.addEventListener('resize', handleResizeOrScroll);
+        window.addEventListener('scroll', handleResizeOrScroll, true); 
 
         return () => {
-            window.removeEventListener('resize', updatePosition);
-            window.removeEventListener('scroll', updatePosition, true);
             clearTimeout(timer);
+            window.removeEventListener('resize', handleResizeOrScroll);
+            window.removeEventListener('scroll', handleResizeOrScroll, true);
         };
-    }, [currentStepIndex, isVisible, updatePosition]);
+    }, [currentStepIndex, isVisible, currentStep, onOpenSidebar, onCloseSidebar, updatePosition]);
 
     if (!isVisible || !currentStep || !targetRect) return null;
 
     // Helper to determine arrow styles based on 'pos'
     const getArrowStyle = () => {
-        // arrowPos matches the tooltip position relative to target
-        // e.g. 'bottom' means tooltip is BELOW target, so arrow should be at TOP of tooltip pointing UP
         switch (arrowPos) {
             case 'bottom': return 'top-[-8px] left-1/2 -translate-x-1/2 border-b-white border-l-transparent border-r-transparent border-t-transparent border-[8px]';
-            case 'top': return 'bottom-[-8px] left-1/2 -translate-x-1/2 border-t-white border-l-transparent border-r-transparent border-b-transparent border-[8px]'; // Tooltip is top, arrow at bottom
+            case 'top': return 'bottom-[-8px] left-1/2 -translate-x-1/2 border-t-white border-l-transparent border-r-transparent border-b-transparent border-[8px]'; 
             case 'right': return 'left-[-8px] top-1/2 -translate-y-1/2 border-r-white border-t-transparent border-b-transparent border-l-transparent border-[8px]';
             case 'left': return 'right-[-8px] top-1/2 -translate-y-1/2 border-l-white border-t-transparent border-b-transparent border-r-transparent border-[8px]';
             default: return '';
@@ -176,9 +193,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
 
     // Calculate Transform based on position to center or offset correctly
     const getTransform = () => {
-        if (arrowPos === 'left' || arrowPos === 'right') return 'translateY(-50%)'; // Center vertically relative to t
-        if (arrowPos === 'top') return 'translateY(-100%)'; // Move up by its own height (positioned at target top)
-        return ''; // Bottom doesn't need transform if t = rect.bottom
+        if (arrowPos === 'left' || arrowPos === 'right') return 'translateY(-50%)'; 
+        if (arrowPos === 'top') return 'translateY(-100%)'; 
+        return ''; 
     };
 
     return createPortal(

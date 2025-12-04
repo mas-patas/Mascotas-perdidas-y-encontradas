@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const pingSupabase = async () => {
             await supabase.auth.getSession();
         };
-        const intervalId = setInterval(pingSupabase, 240000);
+        const intervalId = setInterval(pingSupabase, 60000);
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 pingSupabase();

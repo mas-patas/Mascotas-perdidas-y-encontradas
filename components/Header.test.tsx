@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom'; // Usar MemoryRouter para tests
 import { Header } from './Header';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,14 +11,13 @@ vi.mock('../contexts/AuthContext', () => ({
     useAuth: vi.fn(),
 }));
 
-// Mock de hooks de navegación ya que Header usa useNavigate/useLocation
+// Mock del hook de navegación, pero ya no del de location
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom');
     return {
         ...actual,
         useNavigate: () => mockNavigate,
-        useLocation: () => ({ pathname: '/' }),
     };
 });
 
@@ -34,49 +33,51 @@ describe('Header Component', () => {
         onResetFilters: vi.fn(),
     };
 
+    // Limpiar mocks después de cada test
+    afterEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('debe mostrar el botón de "Ingresar" cuando no hay usuario logueado', () => {
-        // Simulamos estado: No usuario
-        (useAuth as any).mockReturnValue({
-            currentUser: null,
-            logout: vi.fn(),
-        });
+        (useAuth as any).mockReturnValue({ currentUser: null });
 
         render(
-            <BrowserRouter>
+            <MemoryRouter initialEntries={['/']}>
                 <Header {...defaultProps} />
-            </BrowserRouter>
+            </MemoryRouter>
         );
 
-        // Verifica que aparezca el enlace/botón de Ingresar
-        expect(screen.getByText(/Ingresar/i)).toBeInTheDocument();
-        // Verifica que NO aparezca el perfil
-        expect(screen.queryByText(/Mi Cuenta/i)).not.toBeInTheDocument();
+        // FIX: Buscar por rol de link. getByText falla porque el texto está en un span que se oculta.
+        const loginLink = screen.getByRole('link', { name: /ingresar/i });
+        expect(loginLink).toBeInTheDocument();
+        
+        // FIX: Buscar el botón de cuenta por su aria-label, que es más fiable.
+        expect(screen.queryByLabelText(/Mi Cuenta/i)).not.toBeInTheDocument();
     });
 
     it('debe mostrar el usuario y opciones cuando está logueado', () => {
-        // Simulamos estado: Usuario logueado
         (useAuth as any).mockReturnValue({
             currentUser: { 
                 id: '1', 
                 email: 'test@test.com', 
                 username: 'TestUser', 
-                role: 'User' 
+                role: 'User',
+                firstName: 'Test',
             },
             logout: vi.fn(),
         });
 
         render(
-            <BrowserRouter>
+            <MemoryRouter initialEntries={['/']}>
                 <Header {...defaultProps} />
-            </BrowserRouter>
+            </MemoryRouter>
         );
 
-        // Verifica que aparezca el nombre del usuario
-        expect(screen.getByText('TestUser')).toBeInTheDocument();
+        // FIX: El nombre de usuario está en un span que se oculta.
+        // Se busca el botón que lo contiene y se verifica el contenido del texto.
+        const accountButton = screen.getByLabelText(/Mi Cuenta/i);
+        expect(accountButton).toHaveTextContent('TestUser');
         
-        // Verifica que aparezca el botón de mensajes
-        // Nota: El botón de mensajes tiene texto oculto en móvil, buscamos por aria-label o icono si es necesario,
-        // pero en desktop el texto "Mensajes" existe.
         const msgBtn = screen.getByLabelText('Mensajes');
         expect(msgBtn).toBeInTheDocument();
     });
@@ -85,12 +86,13 @@ describe('Header Component', () => {
         (useAuth as any).mockReturnValue({ currentUser: null });
 
         render(
-            <BrowserRouter>
+            // FIX: Usar MemoryRouter para asegurar que el path es '/' y el botón se renderiza.
+            <MemoryRouter initialEntries={['/']}>
                 <Header {...defaultProps} />
-            </BrowserRouter>
+            </MemoryRouter>
         );
 
-        // El botón de menú solo es visible en resoluciones móviles, pero existe en el DOM.
+        // El botón ahora se renderiza correctamente gracias a MemoryRouter.
         const menuBtn = screen.getByLabelText('Abrir menú de filtros');
         fireEvent.click(menuBtn);
 

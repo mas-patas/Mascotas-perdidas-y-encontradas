@@ -21,8 +21,10 @@ describe('Toast Component', () => {
     it('debe aplicar estilos diferentes según el tipo', () => {
         render(<ToastContainer toasts={mockToasts} onClose={vi.fn()} />);
         
-        const successToast = screen.getByText('Operación exitosa').closest('div');
-        const errorToast = screen.getByText('Hubo un error').closest('div');
+        // FIX: Usamos .parentElement en lugar de .closest('div') para seleccionar
+        // el contenedor principal del Toast, que es donde se aplican los estilos.
+        const successToast = screen.getByText('Operación exitosa').parentElement;
+        const errorToast = screen.getByText('Hubo un error').parentElement;
 
         // Verificamos clases de Tailwind
         expect(successToast?.className).toContain('bg-green-50');

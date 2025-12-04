@@ -501,7 +501,12 @@ const App: React.FC = () => {
     return (
         <ErrorBoundary name="Root">
             {currentUser && location.pathname === '/' && (
-                <OnboardingTour steps={homeTourSteps} tourId="home_v1" />
+                <OnboardingTour 
+                    steps={homeTourSteps} 
+                    tourId="home_v1" 
+                    onOpenSidebar={() => setIsSidebarOpen(true)}
+                    onCloseSidebar={() => setIsSidebarOpen(false)}
+                />
             )}
 
             <Routes>
@@ -531,7 +536,7 @@ const App: React.FC = () => {
                     <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.userEmail === currentUser?.email)} userReports={reports.filter(r => r.reporterEmail === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="campanas" element={<ErrorBoundary name="Campaigns"><CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
-                    <Route path="mapa" element={<ErrorBoundary name="Map"><MapPage pets={pets} onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
+                    <Route path="mapa" element={<ErrorBoundary name="Map"><MapPage onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="servicios" element={<ErrorBoundary name="Services"><ServicesMapPage /></ErrorBoundary>} />
                     <Route path="nosotros" element={<AboutPage />} />
                     <Route path="reunidos" element={<ErrorBoundary name="Reunited"><ReunitedPetsPage /></ErrorBoundary>} />

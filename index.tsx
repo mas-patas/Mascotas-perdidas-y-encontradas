@@ -14,18 +14,19 @@ if (!rootElement) {
 }
 
 // --- NUCLEAR OPTION: FORCE UNREGISTER ALL SERVICE WORKERS ---
-// This ensures that any old, buggy, or caching SW is completely removed.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
-      console.log('Force Unregistering SW:', registration);
-      registration.unregister();
-    }
-  }).catch(err => {
-    // Catch errors like "The document is in an invalid state" which can happen during reloads
-    console.warn('Service Worker unregistration skipped:', err);
-  });
-}
+// Modified to run only after load to prevent "The document is in an invalid state" error
+window.addEventListener('load', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        console.log('Force Unregistering SW:', registration);
+        registration.unregister().catch(err => console.warn('Unregister failed:', err));
+      }
+    }).catch(err => {
+      console.warn('Service Worker unregistration skipped:', err);
+    });
+  }
+});
 
 // Create a client with retry strategy for robust loading
 const queryClient = new QueryClient({
