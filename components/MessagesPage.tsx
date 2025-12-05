@@ -1,69 +1,46 @@
 
 import React from 'react';
-import type { Chat } from '../types';
+import type { Chat, Pet, User } from '../types';
 import { formatTime } from '../utils/formatters';
-import { useChats } from '../hooks/useCommunication';
-import { useUsers } from '../hooks/useResources';
-import { usePets } from '../hooks/usePets';
-import { useAuth } from '../contexts/AuthContext';
 
 interface MessagesPageProps {
+    chats: (Chat & { isUnread: boolean })[];
+    pets: Pet[];
+    users: User[];
+    currentUser: User;
     onSelectChat: (chatId: string) => void;
     onBack: () => void;
 }
 
-const MessagesPage: React.FC<MessagesPageProps> = ({ onSelectChat, onBack }) => {
-    const { currentUser } = useAuth();
-    const { data: chats = [], isLoading } = useChats();
-    const { data: users = [] } = useUsers();
-    // Reusing usePets to get pet details for chat header. 
-    // Optimization: In real world, we'd fetch specific pets by ID list, but existing cache is fine here.
-    const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
-
-    if (!currentUser) return <div>Inicia sesión para ver tus mensajes.</div>;
-    if (isLoading) return <div className="p-8 text-center">Cargando mensajes...</div>;
+const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, currentUser, onSelectChat, onBack }) => {
 
     const getChatDetails = (chat: Chat) => {
         const pet = chat.petId ? pets.find(p => p.id === chat.petId) : null;
         const otherUserEmail = chat.participantEmails.find(email => email !== currentUser.email);
         const otherUser = otherUserEmail ? users.find(u => u.email === otherUserEmail) : null;
         const lastMessage = chat.messages[chat.messages.length - 1];
-        
-        // Unread logic
-        const myLastRead = chat.lastReadTimestamps?.[currentUser.email];
-        const lastMsgTime = lastMessage ? new Date(lastMessage.timestamp).getTime() : 0;
-        const readTime = myLastRead ? new Date(myLastRead).getTime() : 0;
-        const isUnread = lastMessage && lastMessage.senderEmail !== currentUser.email && lastMsgTime > readTime;
-
-        return { pet, otherUser, lastMessage, isUnread };
+        return { pet, otherUser, lastMessage };
     };
-
-    // Sort by latest message
-    const sortedChats = [...chats].sort((a, b) => {
-        const timeA = a.messages[a.messages.length - 1]?.timestamp || a.id; // Fallback to ID/creation if no messages
-        const timeB = b.messages[b.messages.length - 1]?.timestamp || b.id;
-        return new Date(timeB).getTime() - new Date(timeA).getTime();
-    });
 
     return (
         <div className="space-y-8">
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-3xl font-bold text-brand-dark mb-4">Mis Mensajes</h2>
                 
-                {sortedChats.length > 0 ? (
+                {chats.length > 0 ? (
                     <div className="space-y-3">
-                        {sortedChats.map(chat => {
-                            const { pet, otherUser, lastMessage, isUnread } = getChatDetails(chat);
+                        {chats.map(chat => {
+                            const { pet, otherUser, lastMessage } = getChatDetails(chat);
                             if (!otherUser) return null;
 
                             return (
                                 <div 
                                     key={chat.id} 
-                                    className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors border ${isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50 border-gray-100'}`}
+                                    className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors border ${chat.isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50 border-gray-100'}`}
                                     onClick={() => onSelectChat(chat.id)}
                                 >
                                     <div className="w-4 flex-shrink-0 flex justify-center mr-2">
-                                        {isUnread && (
+                                        {chat.isUnread && (
                                             <span className="h-2.5 w-2.5 rounded-full bg-brand-primary"></span>
                                         )}
                                     </div>
@@ -77,7 +54,7 @@ const MessagesPage: React.FC<MessagesPageProps> = ({ onSelectChat, onBack }) => 
                                         </div>
                                         <p className="text-xs text-gray-500 mb-1 font-medium">@{otherUser.username || 'usuario'}</p>
                                         {lastMessage ? (
-                                            <p className={`text-sm truncate ${isUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
+                                            <p className={`text-sm truncate ${chat.isUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
                                                 <span className="font-normal text-gray-400">{lastMessage.senderEmail === currentUser.email ? 'Tú: ' : ''}</span>
                                                 {lastMessage.text}
                                             </p>
