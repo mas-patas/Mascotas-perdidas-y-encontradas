@@ -38,11 +38,25 @@
             'brand-secondary': '#FBBF24',
             'brand-light': '#EFF6FF',
             'brand-dark': '#1E3A8A',
-            'sidebar-dark': '#1E3A8A', // Using Brand Dark for monochromatic harmony
+            'sidebar-dark': '#1E3A8A',
+            // Specific Design System Colors
+            'card-surface': '#F7F9FC',
+            'card-border': '#E5EAF2',
+            'text-main': '#1E293B',
+            'text-sub': '#475569',
+            'icon-gray': '#64748B',
+            // Status Colors
+            'status-lost': '#FF4D4F',
+            'status-found': '#28C76F',
+            'status-sighted': '#1677FF',
+            'status-adoption': '#A855F7',
           },
           animation: {
             'bounce-slow': 'bounce 3s infinite',
             'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          },
+          boxShadow: {
+            'card': '0 2px 8px rgba(0, 0, 0, 0.06)',
           }
         }
       }
@@ -230,7 +244,7 @@
 
 </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-[#F2F4F7]">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
