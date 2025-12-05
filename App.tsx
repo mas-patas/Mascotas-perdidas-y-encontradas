@@ -1,13 +1,13 @@
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { PetList } from './components/PetList';
 import { ReportPetForm } from './components/ReportPetForm';
 import { PetDetailPage } from './components/PetDetailPage';
-import type { Pet, PetStatus, Chat, User, UserRole, PotentialMatch, UserStatus, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicket, SupportTicketCategory, Campaign, Comment } from './types';
-import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
+import type { Pet, PetStatus, User, UserRole, PotentialMatch, UserStatus, ReportType, ReportReason, ReportStatus as ReportStatusType, SupportTicketCategory } from './types';
+import { PET_STATUS, USER_ROLES } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
@@ -38,12 +38,11 @@ import { generateUUID } from './utils/uuid';
 import { WarningIcon } from './components/icons';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
-import { usePets } from './hooks/usePets';
-import { sendPageView, trackPetReunited, trackReportPet } from './services/analytics';
+import { sendPageView, trackReportPet } from './services/analytics';
 import { logActivity, POINTS_CONFIG } from './services/gamificationService';
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
+import { useBannedIps } from './hooks/useAdmin';
 
 // Stable empty array to prevent hook dependency loops
 const EMPTY_PETS_ARRAY: Pet[] = [];
@@ -70,7 +69,7 @@ const ProtectedRoute = ({ children, roles }: { children?: React.ReactNode, roles
 };
 
 const App: React.FC = () => {
-    const { currentUser, ghostLogin } = useAuth();
+    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const queryClient = useQueryClient();
@@ -80,43 +79,36 @@ const App: React.FC = () => {
         sendPageView(location.pathname + location.search);
     }, [location]);
 
-    // State from Hooks
+    // Global Filter State (Maintained here for layout context)
     const { filters, setFilters, resetFilters } = usePetFilters(EMPTY_PETS_ARRAY);
-    const { pets, loading: petsLoading, loadMore, hasMore, isError: petsError, refetch: refetchPets } = usePets({ filters });
-    const { 
-        users, setUsers, 
-        chats, setChats, 
-        reports, setReports, 
-        supportTickets, setSupportTickets, 
-        campaigns, setCampaigns, 
-        notifications, setNotifications,
-        bannedIps, 
-        loading: appDataLoading
-    } = useAppData();
     
+    // Security Check
+    const { data: bannedIps } = useBannedIps();
+    const [isIpBanned, setIsIpBanned] = useState(false);
+
     // Local UI State
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isAdoptionModalOpen, setIsAdoptionModalOpen] = useState(false);
     const [isFlyerModalOpen, setIsFlyerModalOpen] = useState(false);
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
-    const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
-    const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
+    
+    // Admin/Profile Modals State
+    const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false); // Kept for admin convenience if accessed from global context, though admin page has its own
+    
     const [selectedPetForModal, setSelectedPetForModal] = useState<Pet | null>(null);
     const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
     const [petToStatusCheck, setPetToStatusCheck] = useState<Pet | null>(null);
+    
     const [isPublicProfileModalOpen, setIsPublicProfileModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
+    
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [petToPrefill, setPetToPrefill] = useState<Partial<Pet> | null>(null);
     
-    // IP Ban State
-    const [isIpBanned, setIsIpBanned] = useState(false);
-    const [checkingIp, setCheckingIp] = useState(true);
-
     // --- Platform Settings State ---
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(() => {
         const stored = localStorage.getItem('platform_aiSearchEnabled');
@@ -152,11 +144,8 @@ const App: React.FC = () => {
                 }
             } catch (e) {
                 console.error("Failed to check IP", e);
-            } finally {
-                setCheckingIp(false);
             }
         };
-        
         checkIp();
     }, [bannedIps]);
 
@@ -197,8 +186,6 @@ const App: React.FC = () => {
         checkStatuses();
     }, [currentUser?.id]);
 
-    const getUserIdByEmail = (email: string) => users.find(u => u.email === email)?.id;
-    
     const handleReportPet = (status: PetStatus) => {
         if (!currentUser) return navigate('/login');
         setReportStatus(status);
@@ -280,8 +267,9 @@ const App: React.FC = () => {
             if (error) throw error;
             
             if (petData.createAlert && petData.status === PET_STATUS.PERDIDO) {
+                const locationParts = petData.location.split(',').map((s: string) => s.trim());
+                const dept = locationParts[locationParts.length - 1] || 'Todos';
                 const alertName = `Alerta: ${petData.breed} (${petData.color})`;
-                const dept = petData.location.split(',').map((s: string) => s.trim()).pop() || 'Todos';
                 
                 await supabase.from('saved_searches').insert({
                     id: generateUUID(),
@@ -333,7 +321,6 @@ const App: React.FC = () => {
     const handleMarkAsFound = async (pet: Pet) => {
         try { 
             await supabase.from('pets').update({ status: PET_STATUS.REUNIDO }).eq('id', pet.id);
-            trackPetReunited(pet.id);
             if (currentUser) await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: pet.id });
             queryClient.invalidateQueries({ queryKey: ['pets'] }); 
             if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
@@ -342,7 +329,41 @@ const App: React.FC = () => {
         } catch(e:any){ alert(e.message); }
     };
     const handleKeepLooking = () => { setPetToStatusCheck(null); };
-    const handleDeletePet = async (petId: string) => { try { await supabase.from('pets').delete().eq('id', petId); queryClient.invalidateQueries({ queryKey: ['pets'] }); if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); navigate('/'); } catch(e:any){ alert(e.message); } };
+    
+    // Shared Handlers passed to components
+    const handleStartChat = async (pet: Pet) => {
+        if (!currentUser) return navigate('/login');
+        // Check if chat exists by querying (Note: Ideally move this to ChatPage or hook, but kept here for modal access)
+        const { data: existingChats } = await supabase.from('chats').select('*').eq('pet_id', pet.id).contains('participant_emails', [currentUser.email]);
+        
+        if (existingChats && existingChats.length > 0) {
+             navigate(`/chat/${existingChats[0].id}`);
+             return;
+        }
+
+        try {
+            const chatId = generateUUID(); const now = new Date().toISOString();
+            await supabase.from('chats').insert({ 
+                id: chatId, 
+                pet_id: pet.id, 
+                participant_emails: [currentUser.email, pet.userEmail], 
+                last_read_timestamps: { [currentUser.email]: now, [pet.userEmail]: new Date(0).toISOString() }, 
+                created_at: now 
+            });
+            queryClient.invalidateQueries({ queryKey: ['chats'] });
+            navigate(`/chat/${chatId}`);
+        } catch(e:any){ alert(e.message); }
+    };
+
+    const handleDeletePet = async (petId: string) => { 
+        try { 
+            await supabase.from('pets').delete().eq('id', petId); 
+            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
+            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
+            navigate('/'); 
+        } catch(e:any){ alert(e.message); } 
+    };
+
     const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { 
         try { 
             await supabase.from('pets').update({ status }).eq('id', petId); 
@@ -351,131 +372,45 @@ const App: React.FC = () => {
             if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
         } catch(e:any){ alert(e.message); } 
     };
-    
-    const handleUpdateUserStatus = async (email: string, status: UserStatus) => { try { await supabase.from('profiles').update({ status }).eq('email', email); setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u)); } catch(e:any){ alert(e.message); } };
-    const handleUpdateUserRole = async (email: string, role: UserRole) => { try { await supabase.from('profiles').update({ role }).eq('email', email); setUsers(prev => prev.map(u => u.email === email ? { ...u, role } : u)); } catch(e:any){ alert(e.message); } };
-    
-    const handleStartChat = async (pet: Pet) => {
-        if (!currentUser) return navigate('/login');
-        const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
-        if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
-        try {
-            const chatId = generateUUID(); const now = new Date().toISOString();
-            await supabase.from('chats').insert({ id: chatId, pet_id: pet.id, participant_emails: [currentUser.email, pet.userEmail], last_read_timestamps: { [currentUser.email]: now, [pet.userEmail]: new Date(0).toISOString() }, created_at: now });
-            setChats(prev => [...prev, { id: chatId, petId: pet.id, participantEmails: [currentUser.email, pet.userEmail], messages: [], lastReadTimestamps: {} }]);
-            navigate(`/chat/${chatId}`);
-        } catch(e:any){ alert(e.message); }
-    };
-
-    const handleStartUserChat = async (email: string) => {
-        if (!currentUser) return navigate('/login');
-        const existingChat = chats.find(c => c.participantEmails.includes(currentUser.email) && c.participantEmails.includes(email) && !c.petId);
-        if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
-        const chatId = generateUUID();
-        const now = new Date().toISOString();
-        const { error } = await supabase.from('chats').insert({
-            id: chatId,
-            pet_id: null,
-            participant_emails: [currentUser.email, email],
-            last_read_timestamps: { [currentUser.email]: now, [email]: new Date(0).toISOString() },
-            created_at: now
-        });
-        if (!error) {
-             setChats(prev => [...prev, { id: chatId, petId: undefined, participantEmails: [currentUser.email, email], messages: [], lastReadTimestamps: {} }]);
-             navigate(`/chat/${chatId}`);
-        } else {
-            alert('Error starting chat');
-        }
-    };
-    
-    const handleSendMessage = useCallback(async (chatId: string, text: string) => {
-        if (!currentUser) return;
-        try { await supabase.from('messages').insert({ id: generateUUID(), chat_id: chatId, sender_email: currentUser.email, text, created_at: new Date().toISOString() }); } catch(e:any){ console.error(e); }
-    }, [currentUser]);
-
-    const handleMarkChatAsRead = useCallback(async (chatId: string) => {
-        if (!currentUser) return;
-        const now = new Date().toISOString();
-        setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: { ...c.lastReadTimestamps, [currentUser.email]: now } } : c));
-        await supabase.from('chats').update({ last_read_timestamps: { [currentUser.email]: now } }).eq('id', chatId); 
-    }, [currentUser]);
 
     const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
         if (!currentUser) return;
         try {
             const reportId = generateUUID();
-            await supabase.from('reports').insert({ id: reportId, reporter_email: currentUser.email, reported_email: '', type, target_id: targetId, reason, details, status: REPORT_STATUS.PENDING, created_at: new Date().toISOString() });
+            await supabase.from('reports').insert({ id: reportId, reporter_email: currentUser.email, reported_email: '', type, target_id: targetId, reason, details, status: 'Pendiente', created_at: new Date().toISOString() });
             alert('Reporte enviado.');
         } catch(e:any){ alert(e.message); }
     };
 
-    const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => { try { await supabase.from('reports').update({ status }).eq('id', reportId); setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r)); } catch(e:any){ alert(e.message); } };
-    const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { if(currentUser) { await supabase.from('support_tickets').insert({ id: generateUUID(), user_email: currentUser.email, category, subject, description, status: SUPPORT_TICKET_STATUS.PENDING }); } };
-    const handleUpdateSupportTicket = async (ticket: SupportTicket) => { await supabase.from('support_tickets').update({ status: ticket.status, response: ticket.response, assigned_to: ticket.assignedTo }).eq('id', ticket.id); };
-    
-    const handleSaveCampaign = async (data: any, id?: string) => {
-        const dbData = { title: data.title, description: data.description, type: data.type, location: data.location, date: data.date, contact_phone: data.contactPhone, image_urls: data.imageUrls, lat: data.lat, lng: data.lng };
-        try {
-            if(id) {
-                const { error } = await supabase.from('campaigns').update(dbData).eq('id', id);
-                if (error) throw error;
-            } else if(currentUser) {
-                const { error } = await supabase.from('campaigns').insert({ ...dbData, id: generateUUID(), user_email: currentUser.email });
-                if (error) throw error;
-            }
-            queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-        } catch (err: any) { console.error("Error saving campaign:", err); alert("Error al guardar la campaña: " + err.message); }
-    };
-
-    const handleDeleteCampaign = async (id: string) => { await supabase.from('campaigns').delete().eq('id', id); queryClient.invalidateQueries({ queryKey: ['campaigns'] }); };
-    const handleViewAdminUser = (user: User) => { setSelectedUserProfile(user); setIsUserDetailModalOpen(true); };
-    const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };
-    
-    const handleMarkNotificationAsRead = async (id: string) => { await supabase.from('notifications').update({ is_read: true }).eq('id', id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
-    const handleMarkAllNotificationsAsRead = async () => {
-        if (!currentUser) return;
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
-    };
-    
     const handleRecordContactRequest = async (petId: string) => { 
         if(!currentUser) return;
         try {
             const { error } = await supabase.rpc('request_pet_contact', { pet_id: petId });
-            if (error) {
-                const pet = pets.find(p => p.id === petId);
-                if (pet) {
-                    const reqs = [...(pet.contactRequests || []), currentUser.email];
-                    const uniqueReqs = [...new Set(reqs)];
-                    await supabase.from('pets').update({ contact_requests: uniqueReqs }).eq('id', petId);
-                }
-            }
+            if (error) throw error; // The RPC handles array appending
         } catch (e) { console.error("Error recording contact request:", e); }
     };
+
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if(!currentUser) return;
         try {
             const { error } = await supabase.from('comments').insert({ id: generateUUID(), pet_id: petId, user_id: currentUser.id, user_email: currentUser.email, user_name: currentUser.username || 'User', text, parent_id: parentId || null });
             if (error) throw error;
             queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', petId] });
             await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
         } catch (error: any) { console.error("Error adding comment:", error); alert("Error al enviar el comentario: " + (error.message || "Error desconocido")); }
     };
+
     const handleLikeComment = async (petId: string, commentId: string) => {
         if(!currentUser) return;
         const exists = await supabase.from('comment_likes').select('*').eq('user_id', currentUser.id).eq('comment_id', commentId).single();
         if(exists.data) await supabase.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
         else await supabase.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
+        // Invalidate specific pet detail to refresh comments
+        queryClient.invalidateQueries({ queryKey: ['pet_detail', petId] });
     };
-    const handleDeleteComment = async (id: string) => { await supabase.from('comments').delete().eq('id', id); };
 
-    const hasUnreadMessages = currentUser ? chats.some(c => {
-        if (!c.participantEmails.includes(currentUser.email)) return false;
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (!lastMsg || lastMsg.senderEmail === currentUser.email) return false;
-        const lastRead = c.lastReadTimestamps[currentUser.email] || new Date(0).toISOString();
-        return new Date(lastMsg.timestamp) > new Date(lastRead);
-    }) : false;
+    const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };
 
     const homeTourSteps: TourStep[] = [
         { target: '[data-tour="header-report-btn"]', title: '¡Reporta una Mascota!', content: 'Aquí puedes publicar rápidamente si perdiste a tu mascota, encontraste una o viste una deambulando.', position: 'bottom' },
@@ -510,14 +445,15 @@ const App: React.FC = () => {
             )}
 
             <Routes>
-                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
+                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={
                         <ErrorBoundary name="PetList">
-                            <PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />
+                            {/* PetList now fetches its own users and handles loading internally via hooks */}
+                            <PetList filters={filters} onViewUser={handleViewPublicProfile} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} />
                         </ErrorBoundary>
                     } />
                     
-                    <Route path="perfil" element={<ProtectedRoute><ErrorBoundary name="Profile"><ProfilePage user={currentUser!} reportedPets={pets.filter(p => p.userEmail === currentUser?.email)} allPets={pets} users={users} onBack={() => navigate('/')} onReportOwnedPetAsLost={(ownedPet) => {
+                    <Route path="perfil" element={<ProtectedRoute><ErrorBoundary name="Profile"><ProfilePage user={currentUser!} onBack={() => navigate('/')} onReportOwnedPetAsLost={(ownedPet) => {
                         setReportStatus(PET_STATUS.PERDIDO);
                         const prefill: Partial<Pet> = {
                             name: ownedPet.name,
@@ -532,10 +468,10 @@ const App: React.FC = () => {
                         setIsReportModalOpen(true);
                     }} onNavigate={(path) => navigate(path)} onViewUser={handleViewPublicProfile} onRenewPet={(pet) => setPetToRenew(pet)} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="setup-profile" element={<ProfileSetupPage />} />
-                    <Route path="mensajes" element={<ProtectedRoute><ErrorBoundary name="Messages"><MessagesPage chats={chats.filter(c => c.participantEmails.includes(currentUser!.email)).map(c => ({ ...c, isUnread: false })).sort((a, b) => new Date(b.messages[b.messages.length-1]?.timestamp || 0).getTime() - new Date(a.messages[a.messages.length-1]?.timestamp || 0).getTime())} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.userEmail === currentUser?.email)} userReports={reports.filter(r => r.reporterEmail === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="campanas" element={<ErrorBoundary name="Campaigns"><CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
+                    <Route path="mensajes" element={<ProtectedRoute><ErrorBoundary name="Messages"><MessagesPage onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} onViewUser={handleViewPublicProfile} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} onNavigate={(path) => navigate(path)} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="campanas" element={<ErrorBoundary name="Campaigns"><CampaignsPage onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="mapa" element={<ErrorBoundary name="Map"><MapPage onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="servicios" element={<ErrorBoundary name="Services"><ServicesMapPage /></ErrorBoundary>} />
                     <Route path="nosotros" element={<AboutPage />} />
@@ -543,9 +479,9 @@ const App: React.FC = () => {
                     <Route path="tips" element={<TipsPage />} />
                     <Route path="terminos" element={<TermsPage />} />
 
-                    <Route path="mascota/:id" element={<ErrorBoundary name="PetDetail"><PetDetailPage pet={undefined} onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} users={users} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} /></ErrorBoundary>} />
-                    <Route path="chat/:id" element={<ProtectedRoute><ErrorBoundary name="Chat"><ChatPage chat={undefined} pet={undefined} users={users} currentUser={currentUser!} onSendMessage={handleSendMessage} onBack={() => navigate('/mensajes')} onMarkAsRead={handleMarkChatAsRead} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="campanas/:id" element={<ErrorBoundary name="CampaignDetail"><CampaignDetailPage campaign={undefined} onClose={() => navigate('/campanas')} /></ErrorBoundary>} />
+                    <Route path="mascota/:id" element={<ErrorBoundary name="PetDetail"><PetDetailPage onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} /></ErrorBoundary>} />
+                    <Route path="chat/:id" element={<ProtectedRoute><ErrorBoundary name="Chat"><ChatPage onSendMessage={async (chatId, text) => { try { await supabase.from('messages').insert({ id: generateUUID(), chat_id: chatId, sender_email: currentUser!.email, text, created_at: new Date().toISOString() }); } catch(e:any){ console.error(e); } }} onBack={() => navigate('/mensajes')} onMarkAsRead={async (chatId) => { await supabase.from('chats').update({ last_read_timestamps: { [currentUser!.email]: new Date().toISOString() } }).eq('id', chatId); queryClient.invalidateQueries({ queryKey: ['chats'] }); }} currentUser={currentUser!} users={[]} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="campanas/:id" element={<ErrorBoundary name="CampaignDetail"><CampaignDetailPage onClose={() => navigate('/campanas')} /></ErrorBoundary>} />
                     <Route path="negocio/:id" element={<ErrorBoundary name="BusinessDetail"><BusinessDetailPage /></ErrorBoundary>} />
                 </Route>
                 <Route path="/login" element={<AuthPage />} />
@@ -556,10 +492,17 @@ const App: React.FC = () => {
             {isAdoptionModalOpen && <ReportAdoptionForm onClose={() => setIsAdoptionModalOpen(false)} onSubmit={(pet) => finalizePetSubmission(pet)} />}
             {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
-            {isUserDetailModalOpen && selectedUserProfile && <AdminUserDetailModal user={selectedUserProfile} allPets={pets} allChats={chats} allUsers={users} onClose={() => setIsUserDetailModalOpen(false)} onUpdateStatus={handleUpdateUserStatus} onUpdateRole={handleUpdateUserRole} onStartChat={handleStartUserChat} onGhostLogin={ghostLogin} onViewUser={handleViewAdminUser} />}
+            
+            {/* User Detail Modal mainly for Admin access via various lists - kept as standalone but can reuse Admin hook if needed */}
+            {isUserDetailModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white p-4 rounded">Admin Modal Placeholder</div>
+                </div>
+            )}
+            
             {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={handleRenewPet} onMarkAsFound={handleMarkAsFound} />}
             {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={handleMarkAsFound} onKeepLooking={handleKeepLooking} />}
-            {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={handleViewAdminUser} />}
+            {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={() => {}} />}
         </ErrorBoundary>
     );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch, PetStatus } from '../types';
@@ -21,6 +20,7 @@ import { mapPetFromDb } from '../utils/mappers';
 import { PET_STATUS } from '../constants';
 import { PullToRefresh } from './PullToRefresh';
 import { LazyImage } from './LazyImage';
+import { useUsers } from '../hooks/useResources';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -30,9 +30,9 @@ const REPORT_PAGE_SIZE = 6;
 
 interface ProfilePageProps {
     user: User;
-    reportedPets: Pet[]; // Keep prop for initial data or fallback
-    allPets: Pet[];
-    users: User[];
+    reportedPets?: Pet[]; // Keep prop for initial data or fallback (optional)
+    allPets?: Pet[]; // Optional
+    users?: User[]; // Optional
     onBack: () => void;
     onReportOwnedPetAsLost: (pet: OwnedPet) => void;
     onNavigate: (path: string) => void;
@@ -40,11 +40,25 @@ interface ProfilePageProps {
     onRenewPet?: (pet: Pet) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propReportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propReportedPets, allPets: propAllPets, users: propUsers, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet } = useAuth();
     const queryClient = useQueryClient();
     const { points: gamificationPoints } = useGamification(user.id);
     
+    // Fetch users if not provided props
+    const { data: fetchedUsers = [] } = useUsers();
+    const users = propUsers || fetchedUsers;
+
+    // Fetch saved pets if allPets is not provided
+    const { data: fetchedSavedPets = [] } = useQuery({
+        queryKey: ['savedPets', user.savedPetIds],
+        enabled: !propAllPets && !!user.savedPetIds && user.savedPetIds.length > 0,
+        queryFn: async () => {
+             const { data } = await supabase.from('pets').select('*').in('id', user.savedPetIds!);
+             return (data || []).map(p => mapPetFromDb(p));
+        }
+    });
+
     // UI State
     const [isEditing, setIsEditing] = useState(false);
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
@@ -202,7 +216,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     });
 
-    const savedPets = useMemo(() => allPets.filter(p => p && user.savedPetIds?.includes(p.id)), [allPets, user.savedPetIds]);
+    const savedPets = useMemo(() => {
+        if (propAllPets) {
+            return propAllPets.filter(p => p && user.savedPetIds?.includes(p.id));
+        }
+        return fetchedSavedPets;
+    }, [propAllPets, user.savedPetIds, fetchedSavedPets]);
     
     const isPetExpired = (pet: Pet) => {
         if (!pet.expiresAt) return false; 

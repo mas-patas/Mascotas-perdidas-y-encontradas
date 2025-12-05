@@ -55,9 +55,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         mountedRef.current = true;
         const pingSupabase = async () => {
-            await supabase.auth.getSession();
+            // Querying the database is a more robust way to keep the connection alive,
+            // as it keeps the connection pooler from dropping the connection.
+            const { error } = await supabase.from('profiles').select('id').limit(1);
+            if (error) {
+                console.error('Keep-alive ping failed:', error);
+            }
         };
-        const intervalId = setInterval(pingSupabase, 240000);
+        const intervalId = setInterval(pingSupabase,60000);
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 pingSupabase();

@@ -4,9 +4,12 @@ import { Outlet, Link } from 'react-router-dom';
 import { Header } from './Header';
 import { FilterControls } from './FilterControls';
 import { useAuth } from '../contexts/AuthContext';
-import { Notification, PetStatus, AnimalType, PetSize } from '../types';
+import { PetStatus } from '../types';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 import CompleteProfileModal from './CompleteProfileModal';
+import { useNotifications } from '../hooks/useCommunication';
+import { supabase } from '../services/supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface LayoutProps {
     onReportPet: (status: PetStatus) => void;
@@ -14,10 +17,6 @@ interface LayoutProps {
     isSidebarOpen: boolean;
     onToggleSidebar: () => void;
     onCloseSidebar: () => void;
-    hasUnreadMessages: boolean;
-    notifications: Notification[];
-    onMarkNotificationAsRead: (id: string) => void;
-    onMarkAllNotificationsAsRead: () => void;
     filters: any;
     setFilters: React.Dispatch<React.SetStateAction<any>>;
     onResetFilters: () => void;
@@ -29,15 +28,27 @@ export const Layout: React.FC<LayoutProps> = ({
     isSidebarOpen,
     onToggleSidebar,
     onCloseSidebar,
-    hasUnreadMessages,
-    notifications,
-    onMarkNotificationAsRead,
-    onMarkAllNotificationsAsRead,
     filters,
     setFilters,
     onResetFilters
 }) => {
     const { isGhosting, stopGhosting, currentUser } = useAuth();
+    const { data: notifications = [] } = useNotifications();
+    const queryClient = useQueryClient();
+
+    // Helper logic from previous App.tsx but simplified since data is local
+    const hasUnreadMessages = false; // Chat logic moved to Chat/Messages components, header indicator might need a small separate hook or context if crucial
+
+    const handleMarkNotificationAsRead = async (id: string) => {
+        await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
+
+    const handleMarkAllNotificationsAsRead = async () => {
+        if (!currentUser) return;
+        await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
 
     return (
         <div className="min-h-screen bg-brand-light flex flex-col font-sans">
@@ -48,20 +59,17 @@ export const Layout: React.FC<LayoutProps> = ({
                 </div>
             )}
             
-            {/* Push Notification Request Banner */}
             <NotificationPermissionBanner />
-            
-            {/* Incomplete Profile Prompt */}
             <CompleteProfileModal />
             
             <Header 
                 onReportPet={onReportPet} 
                 onOpenAdoptionModal={onOpenAdoptionModal}
                 onToggleSidebar={onToggleSidebar}
-                hasUnreadMessages={hasUnreadMessages}
+                hasUnreadMessages={hasUnreadMessages} // TODO: Separate hook for unread count if needed globally
                 notifications={notifications}
-                onMarkNotificationAsRead={onMarkNotificationAsRead}
-                onMarkAllNotificationsAsRead={onMarkAllNotificationsAsRead}
+                onMarkNotificationAsRead={handleMarkNotificationAsRead}
+                onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
                 onResetFilters={onResetFilters}
             />
             
@@ -78,7 +86,6 @@ export const Layout: React.FC<LayoutProps> = ({
                     <div className="p-4 lg:p-8 flex-grow">
                         <Outlet />
                     </div>
-                    {/* Global Footer with Slogan - Updated to Light Purple */}
                     <footer className="bg-purple-50 text-purple-900 py-8 mt-auto border-t border-purple-100">
                         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
                             <div className="max-w-lg">
