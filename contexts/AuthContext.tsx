@@ -55,20 +55,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         mountedRef.current = true;
         const pingSupabase = async () => {
-            // Querying the database is a more robust way to keep the connection alive,
-            // as it keeps the connection pooler from dropping the connection.
-            const { error } = await supabase.from('profiles').select('id').limit(1);
-            if (error) {
-                console.error('Keep-alive ping failed:', error);
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+            if (sessionError) {
+                console.error('Error refreshing session in keep-alive:', sessionError);
+                return; 
+            }
+            if (!session) {
+                return;
+            }
+
+            const { error: dbError } = await supabase.from('profiles').select('id').limit(1);
+
+            if (dbError) {
+                console.error('Keep-alive database ping failed:', dbError);
             }
         };
-        const intervalId = setInterval(pingSupabase,60000);
+        const intervalId = setInterval(pingSupabase, 60000);
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 pingSupabase();
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Combined cleanup
         return () => {
             mountedRef.current = false;
             clearInterval(intervalId);
@@ -76,20 +87,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
+    // Effect for initial session check
     useEffect(() => {
         const initAuth = async () => {
             try {
-                // Race condition protection - Increased to 15 seconds to handle cold starts
                 const sessionPromise = supabase.auth.getSession();
-                const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) => 
+                const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) =>
                     setTimeout(() => reject(new Error('Auth timeout')), 15000)
                 );
 
                 const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-                
+
                 if (mountedRef.current) {
                     if (session?.user) {
-                        // Pass the full user object to extract metadata if needed
                         await fetchProfile(session.user);
                     } else {
                         setCurrentUser(null);
@@ -97,10 +107,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
                 }
             } catch (error: any) {
-                // Log the REAL error to console for debugging
-                console.error("Auth Init Error Details:", error); 
+                console.error("Auth Init Error Details:", error);
                 console.log("Auth init info: Defaulting to guest mode due to timeout or network.");
-                
+
                 if (mountedRef.current) {
                     setCurrentUser(null);
                     setLoading(false);
@@ -109,32 +118,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         initAuth();
+    }, []);
 
+    // Effect for handling auth state changes
+    useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (mountedRef.current) {
-                if (session?.user) {
-                    // CRITICAL FIX: If we have a user session but local currentUser is outdated,
-                    // set loading to true IMMEDIATELY to prevent app from rendering with stale/null user
-                    if (!currentUser || currentUser.id !== session.user.id) {
-                        setLoading(true); 
-                        await fetchProfile(session.user);
-                    }
-                } else if (event === 'SIGNED_OUT') {
-                    setCurrentUser(null);
-                    setLoading(false);
-                    // Cancel pending queries and remove data, but don't nuke the client completely
-                    // This allows public queries (PetList) to restart immediately
+            if (!mountedRef.current) return;
+
+            if (session?.user) {
+                // A user is logged in. This could be a new login or a token refresh.
+                // We only act if the user in state is not the same.
+                if (!currentUser || currentUser.id !== session.user.id) {
+                    // It's a new user, clear old data and fetch their profile.
                     queryClient.removeQueries();
-                } else {
-                    if (!currentUser) setLoading(false);
+                    setLoading(true);
+                    await fetchProfile(session.user);
                 }
+            } else if (event === 'SIGNED_OUT') {
+                // The user has logged out.
+                setCurrentUser(null);
+                setLoading(false);
+                // Clearing the query client is handled by the logout function, 
+                // but we do it here as a safeguard for other sign-out scenarios.
+                queryClient.removeQueries();
             }
         });
 
         return () => {
             subscription.unsubscribe();
         };
-    }, []);
+    }, [currentUser, queryClient]); // Depend on currentUser to avoid stale closure
 
     const fetchProfile = async (authUser: any, retryCount = 0) => {
         // Stop retrying after 3 attempts
@@ -262,22 +275,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = async () => {
-        setCurrentUser(null);
-        setIsGhosting(null);
-        localStorage.removeItem('ghostingAdmin');
-        
-        await queryClient.cancelQueries();
-        queryClient.removeQueries();
-
-        if (window.location.hash !== '#/' && window.location.hash !== '') {
-            window.location.hash = '/';
-        }
-        
+        // Primero, cerramos la sesión en Supabase para invalidarla inmediatamente.
         try {
             await supabase.auth.signOut();
         } catch (error) {
             console.error("Error during sign out:", error);
         }
+
+        // Limpiamos el almacenamiento local de estados especiales como el modo fantasma.
+        localStorage.removeItem('ghostingAdmin');
+        
+        // Usamos queryClient.clear() para resetear completamente la caché.
+        // Esto es más robusto que removeQueries() y asegura que no queden datos
+        // de la sesión autenticada que puedan causar conflictos.
+        queryClient.clear();
+
+        // Finalmente, realizamos una navegación forzada a la página de inicio.
+        // Esto recarga toda la aplicación, garantizando un estado completamente limpio
+        // y evitando las condiciones de carrera con el enrutador de React.
+        window.location.href = '/';
     };
 
     const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'birthDate' | 'avatarUrl' | 'country'>>): Promise<void> => {
@@ -435,7 +451,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {!loading && children}
         </AuthContext.Provider>
     );
 };
