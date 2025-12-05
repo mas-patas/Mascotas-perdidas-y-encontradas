@@ -19,9 +19,17 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
     // Max visual pull distance
     const MAX_PULL = 120;
 
+    const getScrollTop = () => {
+        // Check for the main scrollable container in the new layout
+        const main = document.querySelector('main');
+        if (main) return main.scrollTop;
+        return window.scrollY || document.documentElement.scrollTop;
+    };
+
     const handleTouchStart = (e: React.TouchEvent) => {
+        const scrollTop = getScrollTop();
         // Only enable if we are at the top of the scroll container
-        if (window.scrollY <= 10 && !refreshing) {
+        if (scrollTop <= 5 && !refreshing) {
             setStartY(e.touches[0].clientY);
             setPulling(true);
         }
@@ -30,11 +38,17 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
     const handleTouchMove = (e: React.TouchEvent) => {
         if (!pulling || refreshing) return;
         
+        const scrollTop = getScrollTop();
+        if (scrollTop > 5) {
+            setPulling(false); // Cancel if scrolled down during move
+            return;
+        }
+
         const y = e.touches[0].clientY;
         const diff = y - startY;
 
         // Only allow pulling down if content is at top
-        if (diff > 0 && window.scrollY <= 0) {
+        if (diff > 0) {
             // Add resistance to the pull
             const newY = Math.min(diff * 0.5, MAX_PULL);
             setCurrentY(newY);
@@ -72,7 +86,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
     return (
         <div 
             ref={contentRef}
-            className="min-h-screen relative"
+            className="min-h-full relative"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}

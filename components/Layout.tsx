@@ -40,16 +40,18 @@ export const Layout: React.FC<LayoutProps> = ({
     const { isGhosting, stopGhosting, currentUser } = useAuth();
 
     return (
-        <div className="min-h-screen bg-brand-light flex flex-col font-sans">
+        <div className="h-screen overflow-hidden bg-brand-light flex flex-col font-sans">
             {isGhosting && (
-                 <div className="bg-yellow-400 text-yellow-900 text-center py-1 px-4 text-sm font-bold flex justify-between items-center">
+                 <div className="bg-yellow-400 text-yellow-900 text-center py-1 px-4 text-sm font-bold flex justify-between items-center flex-shrink-0">
                     <span>Modo Fantasma: Actuando como {currentUser?.email}</span>
                     <button onClick={stopGhosting} className="bg-white bg-opacity-50 hover:bg-opacity-75 rounded px-2 py-0.5 text-xs">Salir</button>
                 </div>
             )}
             
             {/* Push Notification Request Banner */}
-            <NotificationPermissionBanner />
+            <div className="flex-shrink-0">
+                <NotificationPermissionBanner />
+            </div>
             
             {/* Incomplete Profile Prompt */}
             <CompleteProfileModal />
@@ -79,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({
                         <Outlet />
                     </div>
                     {/* Global Footer with Slogan - Updated to Light Purple */}
-                    <footer className="bg-purple-50 text-purple-900 py-8 mt-auto border-t border-purple-100">
+                    <footer className="bg-purple-50 text-purple-900 py-8 mt-auto border-t border-purple-100 flex-shrink-0">
                         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
                             <div className="max-w-lg">
                                 <p className="font-serif italic text-purple-800 text-xs md:text-sm leading-relaxed opacity-80">
