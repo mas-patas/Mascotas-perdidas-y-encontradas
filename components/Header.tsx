@@ -148,6 +148,12 @@ export const Header: React.FC<HeaderProps> = ({
             
             <div className="flex items-center gap-1 sm:gap-2">
                 <nav className="flex items-center gap-1 sm:gap-2">
+                    {/* Inicio */}
+                    <button onClick={handleHomeClick} className={navButtonClass} aria-label="Inicio">
+                        <HomeIcon className="h-5 w-5" />
+                        <span className="hidden lg:inline">Inicio</span>
+                    </button>
+
                     {/* Reportar */}
                     <div className="relative" ref={reportDropdownRef} data-tour="header-report-btn">
                         <button
