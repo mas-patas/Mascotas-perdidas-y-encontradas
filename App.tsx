@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,7 +5,7 @@ import { Layout } from './components/Layout';
 import { PetList } from './components/PetList';
 import { ReportPetForm } from './components/ReportPetForm';
 import { PetDetailPage } from './components/PetDetailPage';
-import type { Pet, PetStatus, User, UserRole, PotentialMatch, UserStatus, ReportType, ReportReason, ReportStatus as ReportStatusType, SupportTicketCategory } from './types';
+import type { Pet, PetStatus, User, UserRole, PotentialMatch } from './types';
 import { PET_STATUS, USER_ROLES } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import ProfilePage from './components/ProfilePage';
@@ -15,11 +14,10 @@ import ProfileSetupPage from './components/ProfileSetupPage';
 import MessagesPage from './components/MessagesPage';
 import { ChatPage } from './components/ChatPage';
 import AdminDashboard from './components/AdminDashboard';
-import { findMatchingPets, generatePetEmbedding } from './services/geminiService';
+import { findMatchingPets } from './services/geminiService';
 import { PotentialMatchesModal } from './components/PotentialMatchesModal';
 import { FlyerModal } from './components/FlyerModal';
 import { ReportAdoptionForm } from './components/ReportAdoptionForm';
-import AdminUserDetailModal from './components/AdminUserDetailModal';
 import SupportPage from './components/SupportPage';
 import CampaignsPage from './components/CampaignsPage';
 import CampaignDetailPage from './components/CampaignDetailPage';
@@ -39,10 +37,10 @@ import { WarningIcon } from './components/icons';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { usePetFilters } from './hooks/usePetFilters';
-import { sendPageView, trackReportPet } from './services/analytics';
-import { logActivity, POINTS_CONFIG } from './services/gamificationService';
+import { sendPageView } from './services/analytics';
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
 import { useBannedIps } from './hooks/useAdmin';
+import { usePetMutations } from './hooks/usePetMutations';
 
 // Stable empty array to prevent hook dependency loops
 const EMPTY_PETS_ARRAY: Pet[] = [];
@@ -74,6 +72,9 @@ const App: React.FC = () => {
     const location = useLocation();
     const queryClient = useQueryClient();
     
+    // Mutations Hooks
+    const { createPet, updatePet, updatePetStatus, deletePet, renewPet } = usePetMutations();
+
     // Analytics: Track Page Views
     useEffect(() => {
         sendPageView(location.pathname + location.search);
@@ -93,9 +94,6 @@ const App: React.FC = () => {
     const [isFlyerModalOpen, setIsFlyerModalOpen] = useState(false);
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
     
-    // Admin/Profile Modals State
-    const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false); // Kept for admin convenience if accessed from global context, though admin page has its own
-    
     const [selectedPetForModal, setSelectedPetForModal] = useState<Pet | null>(null);
     const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
     const [petToStatusCheck, setPetToStatusCheck] = useState<Pet | null>(null);
@@ -106,7 +104,6 @@ const App: React.FC = () => {
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [petToPrefill, setPetToPrefill] = useState<Partial<Pet> | null>(null);
     
     // --- Platform Settings State ---
@@ -194,15 +191,9 @@ const App: React.FC = () => {
 
     const handleSubmitPet = async (petData: any, idToUpdate?: string) => {
         if (idToUpdate) {
-             try {
-                const { error } = await supabase.from('pets').update({
-                    status: petData.status, name: petData.name, animal_type: petData.animalType, breed: petData.breed, color: petData.color, size: petData.size, location: petData.location, date: petData.date, contact: petData.contact, description: petData.description, image_urls: petData.imageUrls, adoption_requirements: petData.adoptionRequirements, share_contact_info: petData.shareContactInfo, reward: petData.reward, currency: petData.currency, lat: petData.lat, lng: petData.lng
-                }).eq('id', idToUpdate);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['pets'] });
-                if (currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
-                setIsReportModalOpen(false);
-             } catch (err: any) { alert('Error al actualizar: ' + err.message); }
+             updatePet.mutate({ id: idToUpdate, updates: petData }, {
+                 onSuccess: () => setIsReportModalOpen(false)
+             });
             return;
         }
         
@@ -222,118 +213,22 @@ const App: React.FC = () => {
              }
         }
         
-        finalizePetSubmission(petData);
-    };
-
-    const finalizePetSubmission = async (petData: any) => {
-        if (!currentUser) return;
-        setIsSubmitting(true);
-        try {
-            const newPetId = generateUUID();
-            const now = new Date();
-            const expirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-            
-            let embedding = null;
-            if (isAiSearchEnabled) {
-                const contentToEmbed = `${petData.animalType} ${petData.breed} ${petData.color} ${petData.description}`;
-                embedding = await generatePetEmbedding(contentToEmbed);
-            }
-
-            const { error } = await supabase.from('pets').insert({
-                id: newPetId, 
-                user_id: currentUser.id, 
-                status: petData.status, 
-                name: petData.name, 
-                animal_type: petData.animalType, 
-                breed: petData.breed, 
-                color: petData.color, 
-                size: petData.size, 
-                location: petData.location, 
-                date: petData.date, 
-                contact: petData.contact, 
-                description: petData.description, 
-                image_urls: petData.imageUrls, 
-                adoption_requirements: petData.adoptionRequirements, 
-                share_contact_info: petData.shareContactInfo, 
-                reward: petData.reward, 
-                currency: petData.currency, 
-                contact_requests: [], 
-                lat: petData.lat, 
-                lng: petData.lng, 
-                created_at: now.toISOString(), 
-                expires_at: expirationDate.toISOString(),
-                embedding: embedding 
+        // Finalize (Create)
+        if (currentUser) {
+            createPet.mutate({ ...petData, userId: currentUser.id, isAiSearchEnabled }, {
+                onSuccess: () => {
+                    setIsReportModalOpen(false); 
+                    setIsAdoptionModalOpen(false); 
+                    setIsMatchModalOpen(false);
+                    setPendingPetToSubmit(null);
+                    setPetToPrefill(null);
+                }
             });
-            if (error) throw error;
-            
-            if (petData.createAlert && petData.status === PET_STATUS.PERDIDO) {
-                const locationParts = petData.location.split(',').map((s: string) => s.trim());
-                const dept = locationParts[locationParts.length - 1] || 'Todos';
-                const alertName = `Alerta: ${petData.breed} (${petData.color})`;
-                
-                await supabase.from('saved_searches').insert({
-                    id: generateUUID(),
-                    user_id: currentUser.id,
-                    name: alertName,
-                    filters: {
-                        status: 'Todos', 
-                        type: petData.animalType,
-                        breed: petData.breed,
-                        department: dept
-                    },
-                    created_at: now.toISOString()
-                });
-            }
-
-            const locationParts = petData.location.split(',').map((s: string) => s.trim());
-            const dept = locationParts[locationParts.length - 1] || 'Unknown';
-            trackReportPet(petData.status, petData.animalType, dept);
-            
-            await logActivity(currentUser.id, 'report_pet', POINTS_CONFIG.REPORT_PET, { petId: newPetId, status: petData.status });
-
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
-            
-            await supabase.from('notifications').insert({
-                id: generateUUID(), user_id: currentUser.id, message: `Has publicado exitosamente el reporte de "${petData.name}".`, link: { type: 'pet', id: newPetId }, is_read: false, created_at: now.toISOString()
-            });
-            setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null); setPetToPrefill(null);
-        } catch (err: any) { 
-            alert("Error al publicar: " + err.message); 
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
-    const handleRenewPet = async (pet: Pet) => {
-        if (!currentUser) return;
-        try {
-            const now = new Date();
-            const newExpirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-            await supabase.from('pets').update({ expires_at: newExpirationDate.toISOString(), created_at: now.toISOString() }).eq('id', pet.id);
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
-            setPetToRenew(null);
-            alert(`Publicación renovada.`);
-        } catch (err: any) { alert("Error al renovar: " + err.message); }
-    };
-
-    const handleMarkAsFound = async (pet: Pet) => {
-        try { 
-            await supabase.from('pets').update({ status: PET_STATUS.REUNIDO }).eq('id', pet.id);
-            if (currentUser) await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: pet.id });
-            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
-            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
-            setPetToRenew(null); setPetToStatusCheck(null); 
-            alert("¡Felicidades!"); 
-        } catch(e:any){ alert(e.message); }
-    };
-    const handleKeepLooking = () => { setPetToStatusCheck(null); };
-    
-    // Shared Handlers passed to components
     const handleStartChat = async (pet: Pet) => {
         if (!currentUser) return navigate('/login');
-        // Check if chat exists by querying (Note: Ideally move this to ChatPage or hook, but kept here for modal access)
         const { data: existingChats } = await supabase.from('chats').select('*').eq('pet_id', pet.id).contains('participant_emails', [currentUser.email]);
         
         if (existingChats && existingChats.length > 0) {
@@ -353,61 +248,6 @@ const App: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['chats'] });
             navigate(`/chat/${chatId}`);
         } catch(e:any){ alert(e.message); }
-    };
-
-    const handleDeletePet = async (petId: string) => { 
-        try { 
-            await supabase.from('pets').delete().eq('id', petId); 
-            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
-            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
-            navigate('/'); 
-        } catch(e:any){ alert(e.message); } 
-    };
-
-    const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { 
-        try { 
-            await supabase.from('pets').update({ status }).eq('id', petId); 
-            if (status === PET_STATUS.REUNIDO && currentUser) await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: petId });
-            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
-            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
-        } catch(e:any){ alert(e.message); } 
-    };
-
-    const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
-        if (!currentUser) return;
-        try {
-            const reportId = generateUUID();
-            await supabase.from('reports').insert({ id: reportId, reporter_email: currentUser.email, reported_email: '', type, target_id: targetId, reason, details, status: 'Pendiente', created_at: new Date().toISOString() });
-            alert('Reporte enviado.');
-        } catch(e:any){ alert(e.message); }
-    };
-
-    const handleRecordContactRequest = async (petId: string) => { 
-        if(!currentUser) return;
-        try {
-            const { error } = await supabase.rpc('request_pet_contact', { pet_id: petId });
-            if (error) throw error; // The RPC handles array appending
-        } catch (e) { console.error("Error recording contact request:", e); }
-    };
-
-    const handleAddComment = async (petId: string, text: string, parentId?: string) => {
-        if(!currentUser) return;
-        try {
-            const { error } = await supabase.from('comments').insert({ id: generateUUID(), pet_id: petId, user_id: currentUser.id, user_email: currentUser.email, user_name: currentUser.username || 'User', text, parent_id: parentId || null });
-            if (error) throw error;
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['pet_detail', petId] });
-            await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
-        } catch (error: any) { console.error("Error adding comment:", error); alert("Error al enviar el comentario: " + (error.message || "Error desconocido")); }
-    };
-
-    const handleLikeComment = async (petId: string, commentId: string) => {
-        if(!currentUser) return;
-        const exists = await supabase.from('comment_likes').select('*').eq('user_id', currentUser.id).eq('comment_id', commentId).single();
-        if(exists.data) await supabase.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
-        else await supabase.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
-        // Invalidate specific pet detail to refresh comments
-        queryClient.invalidateQueries({ queryKey: ['pet_detail', petId] });
     };
 
     const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };
@@ -448,7 +288,6 @@ const App: React.FC = () => {
                 <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={
                         <ErrorBoundary name="PetList">
-                            {/* PetList now fetches its own users and handles loading internally via hooks */}
                             <PetList filters={filters} onViewUser={handleViewPublicProfile} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} />
                         </ErrorBoundary>
                     } />
@@ -479,7 +318,17 @@ const App: React.FC = () => {
                     <Route path="tips" element={<TipsPage />} />
                     <Route path="terminos" element={<TermsPage />} />
 
-                    <Route path="mascota/:id" element={<ErrorBoundary name="PetDetail"><PetDetailPage onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} /></ErrorBoundary>} />
+                    <Route path="mascota/:id" element={
+                        <ErrorBoundary name="PetDetail">
+                            <PetDetailPage 
+                                onClose={() => navigate('/')} 
+                                onStartChat={handleStartChat} 
+                                onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} 
+                                onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} 
+                                onViewUser={handleViewPublicProfile} 
+                            />
+                        </ErrorBoundary>
+                    } />
                     <Route path="chat/:id" element={<ProtectedRoute><ErrorBoundary name="Chat"><ChatPage onSendMessage={async (chatId, text) => { try { await supabase.from('messages').insert({ id: generateUUID(), chat_id: chatId, sender_email: currentUser!.email, text, created_at: new Date().toISOString() }); } catch(e:any){ console.error(e); } }} onBack={() => navigate('/mensajes')} onMarkAsRead={async (chatId) => { await supabase.from('chats').update({ last_read_timestamps: { [currentUser!.email]: new Date().toISOString() } }).eq('id', chatId); queryClient.invalidateQueries({ queryKey: ['chats'] }); }} currentUser={currentUser!} users={[]} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="campanas/:id" element={<ErrorBoundary name="CampaignDetail"><CampaignDetailPage onClose={() => navigate('/campanas')} /></ErrorBoundary>} />
                     <Route path="negocio/:id" element={<ErrorBoundary name="BusinessDetail"><BusinessDetailPage /></ErrorBoundary>} />
@@ -488,20 +337,13 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
-            {isReportModalOpen && <ReportPetForm onClose={() => { setIsReportModalOpen(false); setSelectedPetForModal(null); setPetToPrefill(null); }} onSubmit={handleSubmitPet} initialStatus={reportStatus} petToEdit={selectedPetForModal} dataToPrefill={petToPrefill} isSubmitting={isSubmitting} />}
-            {isAdoptionModalOpen && <ReportAdoptionForm onClose={() => setIsAdoptionModalOpen(false)} onSubmit={(pet) => finalizePetSubmission(pet)} />}
-            {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
+            {isReportModalOpen && <ReportPetForm onClose={() => { setIsReportModalOpen(false); setSelectedPetForModal(null); setPetToPrefill(null); }} onSubmit={handleSubmitPet} initialStatus={reportStatus} petToEdit={selectedPetForModal} dataToPrefill={petToPrefill} isSubmitting={createPet.isPending || updatePet.isPending} />}
+            {isAdoptionModalOpen && <ReportAdoptionForm onClose={() => setIsAdoptionModalOpen(false)} onSubmit={(pet) => { if(currentUser) createPet.mutate({ ...pet, userId: currentUser.id, isAiSearchEnabled }, { onSuccess: () => setIsAdoptionModalOpen(false) }) }} />}
+            {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => { if(currentUser && pendingPetToSubmit) createPet.mutate({ ...pendingPetToSubmit, userId: currentUser.id, isAiSearchEnabled }, { onSuccess: () => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); } }) }} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
             
-            {/* User Detail Modal mainly for Admin access via various lists - kept as standalone but can reuse Admin hook if needed */}
-            {isUserDetailModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white p-4 rounded">Admin Modal Placeholder</div>
-                </div>
-            )}
-            
-            {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={handleRenewPet} onMarkAsFound={handleMarkAsFound} />}
-            {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={handleMarkAsFound} onKeepLooking={handleKeepLooking} />}
+            {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={(p) => renewPet.mutate(p.id, { onSuccess: () => setPetToRenew(null) })} onMarkAsFound={(p) => { updatePetStatus.mutate({ id: p.id, status: PET_STATUS.REUNIDO, userId: currentUser?.id }, { onSuccess: () => setPetToRenew(null) }); }} />}
+            {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={(p) => { updatePetStatus.mutate({ id: p.id, status: PET_STATUS.REUNIDO, userId: currentUser?.id }, { onSuccess: () => setPetToStatusCheck(null) }); }} onKeepLooking={() => setPetToStatusCheck(null)} />}
             {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={() => {}} />}
         </ErrorBoundary>
     );
