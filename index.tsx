@@ -45,13 +45,13 @@ root.render(
   <React.StrictMode>
     <HelmetProvider>
         <QueryClientProvider client={queryClient}>
+          <HashRouter>
           <AuthProvider>
             <ToastProvider>
-              <HashRouter>
                   <App />
-              </HashRouter>
             </ToastProvider>
           </AuthProvider>
+        </HashRouter>
         </QueryClientProvider>
     </HelmetProvider>
   </React.StrictMode>

@@ -95,6 +95,12 @@ export const Header: React.FC<HeaderProps> = ({
     useOutsideAlerter(accountDropdownRef, () => setIsAccountDropdownOpen(false));
     useOutsideAlerter(notificationsRef, () => setIsNotificationsOpen(false));
     
+    const handleLogout = () => {
+        setIsAccountDropdownOpen(false);
+        navigate('/');
+        logout();
+    };
+
     const handleReportSelection = (status: PetStatus) => {
         onReportPet(status);
         setIsReportDropdownOpen(false);
@@ -303,7 +309,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     </button>
 
                                     <button
-                                        onClick={() => { logout(); setIsAccountDropdownOpen(false); }}
+                                        onClick={handleLogout}
                                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
                                     >
                                         <LogoutIcon />

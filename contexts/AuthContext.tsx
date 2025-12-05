@@ -275,25 +275,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const logout = async () => {
-        // Primero, cerramos la sesión en Supabase para invalidarla inmediatamente.
         try {
             await supabase.auth.signOut();
+            // Al hacer signOut, el onAuthStateChange se disparará,
+            // lo que pondrá a currentUser en null y limpiará la caché.
+            // No es necesario hacerlo manualmente aquí para evitar condiciones de carrera.
         } catch (error) {
             console.error("Error during sign out:", error);
+            // Incluso si signOut falla, intentamos limpiar el estado local
+            setCurrentUser(null);
+            queryClient.clear();
         }
-
-        // Limpiamos el almacenamiento local de estados especiales como el modo fantasma.
         localStorage.removeItem('ghostingAdmin');
-        
-        // Usamos queryClient.clear() para resetear completamente la caché.
-        // Esto es más robusto que removeQueries() y asegura que no queden datos
-        // de la sesión autenticada que puedan causar conflictos.
-        queryClient.clear();
-
-        // Finalmente, realizamos una navegación forzada a la página de inicio.
-        // Esto recarga toda la aplicación, garantizando un estado completamente limpio
-        // y evitando las condiciones de carrera con el enrutador de React.
-        window.location.href = '/';
     };
 
     const updateUserProfile = async (profileData: Partial<Pick<User, 'username' | 'firstName' | 'lastName' | 'phone' | 'dni' | 'birthDate' | 'avatarUrl' | 'country'>>): Promise<void> => {
