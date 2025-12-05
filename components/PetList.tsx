@@ -413,9 +413,9 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
 
     return (
         <div className="space-y-10 animate-fade-in">
-            {/* Banner Promocional para Reunidos */}
+            {/* Banner Promocional para Reunidos - Sky Blue Gradient */}
             <div 
-                className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-2xl p-6 md:p-10 text-white shadow-xl relative overflow-hidden group cursor-pointer transition-transform transform hover:-translate-y-1" 
+                className="bg-gradient-to-r from-sky-400 to-blue-600 rounded-2xl p-6 md:p-10 text-white shadow-xl relative overflow-hidden group cursor-pointer transition-transform transform hover:-translate-y-1" 
                 onClick={() => onNavigate('/reunidos')}
             >
                 {/* Elementos decorativos */}
@@ -426,16 +426,16 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                     <div className="text-center md:text-left">
                         <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                             <span className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm"><HeartIcon className="h-5 w-5 text-white" filled /></span>
-                            <span className="font-bold text-purple-100 uppercase tracking-wider text-xs">Finales Felices</span>
+                            <span className="font-bold text-blue-100 uppercase tracking-wider text-xs">Finales Felices</span>
                         </div>
                         <h2 className="text-3xl md:text-4xl font-black mb-3 leading-tight drop-shadow-md">
                             Mascotas que regresaron a casa
                         </h2>
-                        <p className="text-purple-50 max-w-lg text-sm md:text-base font-medium opacity-90">
+                        <p className="text-blue-50 max-w-lg text-sm md:text-base font-medium opacity-90">
                             Descubre historias conmovedoras de reencuentros posibles gracias a esta comunidad. ¡La esperanza es lo último que se pierde!
                         </p>
                     </div>
-                    <button className="bg-white text-purple-700 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-purple-50 hover:text-purple-900 transition-all transform hover:scale-105 flex items-center gap-2 whitespace-nowrap">
+                    <button className="bg-white text-blue-700 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-blue-50 hover:text-blue-900 transition-all transform hover:scale-105 flex items-center gap-2 whitespace-nowrap">
                         Ver Historias <ChevronRightIcon />
                     </button>
                 </div>

@@ -11,10 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 type Filters = {
     status: PetStatus | 'Todos',
     type: AnimalType | 'Todos',
-    breed: string,
-    color1: string,
-    color2: string,
-    size: PetSize | 'Todos',
+    breed: string;
+    color1: string;
+    color2: string;
+    size: PetSize | 'Todos';
     department: string
 };
 
@@ -113,7 +113,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
             
             <aside 
                 className={`
-                    bg-sidebar-dark text-white flex flex-col shadow-2xl 
+                    bg-gradient-to-b from-slate-900 to-blue-800 text-white flex flex-col shadow-2xl 
                     transition-transform duration-300 ease-in-out
                     fixed inset-y-0 left-0 w-64 z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
                     pt-20 lg:pt-0
