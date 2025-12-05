@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { PetStatus, AnimalType, PetSize } from '../types';
-import { PET_STATUS, ANIMAL_TYPES, SIZES } from '../constants';
+import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '../constants';
 import { dogBreeds, catBreeds, petColors } from '../data/breeds';
 import { departments } from '../data/locations';
 import { HomeIcon, MegaphoneIcon, MapIcon, TrashIcon, StoreIcon, HeartIcon, LightbulbIcon } from './icons';
@@ -130,7 +130,11 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 </div>
 
                 <nav className="px-6 mb-6 space-y-2" data-tour="sidebar-navigation">
-                     <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
+                    <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
+                        <HeartIcon />
+                        <span>Mascotas Reunidas</span>
+                    </button>
+                    <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
                         <MapIcon />
                         <span>Mapa de Mascotas</span>
                     </button>
@@ -138,18 +142,16 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                         <MegaphoneIcon />
                         <span>Campañas</span>
                     </button>
-                    <button onClick={() => navigate('/servicios')} className={navLinkClass(isServices)}>
-                        <StoreIcon />
-                        <span>Servicios</span>
-                    </button>
-                    <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
-                        <HeartIcon />
-                        <span>Mascotas Reunidas</span>
-                    </button>
                     <button onClick={() => navigate('/tips')} className={navLinkClass(location.pathname === '/tips')}>
                         <LightbulbIcon />
                         <span>Tips y Consejos</span>
                     </button>
+                    {currentUser?.role === USER_ROLES.SUPERADMIN && (
+                        <button onClick={() => navigate('/servicios')} className={navLinkClass(isServices)}>
+                            <StoreIcon />
+                            <span>Servicios</span>
+                        </button>
+                    )}
                 </nav>
 
 
