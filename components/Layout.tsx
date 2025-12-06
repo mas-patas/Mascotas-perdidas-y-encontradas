@@ -77,7 +77,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 />
 
                 <main className="flex-1 overflow-y-auto flex flex-col scroll-smooth">
-                    <div className="p-4 lg:p-8 flex-grow">
+                    <div className="p-4 pt-2 lg:p-8 lg:pt-4 flex-grow">
                         <Outlet />
                     </div>
                     {/* Global Footer with Slogan - Updated to Light Purple */}
