@@ -513,7 +513,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={
                         <ErrorBoundary name="PetList">
-                            <PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />
+                            <PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} setFilters={setFilters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />
                         </ErrorBoundary>
                     } />
                     

@@ -1,17 +1,15 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon, WarningIcon, PlusIcon, HeartIcon, HistoryIcon } from './icons';
+import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
 
 interface PetListProps {
     pets: Pet[];
     users: User[];
     onViewUser: (user: User) => void;
-    filters: {
-        status: PetStatus | 'Todos';
-    };
+    filters: any;
+    setFilters: React.Dispatch<React.SetStateAction<any>>;
     onNavigate: (path: string) => void;
     onSelectStatus: (status: PetStatus) => void;
     onReset: () => void;
@@ -22,488 +20,340 @@ interface PetListProps {
     onRetry?: () => void;
 }
 
-// Wrapper for Lazy Loading & Animation
-const LazyLoadSection: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [isVisible, setIsVisible] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
+// Internal Component for Horizontal Rows
+const PetSection: React.FC<{ 
+    title: string; 
+    pets: Pet[]; 
+    users: User[]; 
+    onViewUser: (user: User) => void; 
+    onNavigate: (path: string) => void;
+    accentColor: string;
+    icon: React.ReactNode;
+    onViewAll: () => void;
+}> = ({ title, pets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setIsVisible(true);
-                    observer.disconnect(); // Stop observing once loaded
-                }
-            },
-            {
-                rootMargin: '100px', // Load 100px before it comes into view
-                threshold: 0.1
-            }
-        );
-
-        if (ref.current) {
-            observer.observe(ref.current);
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const { current } = scrollRef;
+            const scrollAmount = 600; 
+            current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
         }
+    };
 
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
+    if (pets.length === 0) return null;
 
     return (
-        <div 
-            ref={ref} 
-            className={`transition-all duration-1000 ease-out transform ${
-                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-            } min-h-[240px]`}
-        >
-            {isVisible ? children : (
-                // Skeleton loading state
-                <div className="w-full space-y-4">
-                    <div className="h-6 bg-gray-100 rounded w-1/4 animate-pulse"></div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {[1, 2, 3, 4, 5, 6].map(i => (
-                            <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse"></div>
-                        ))}
+        <div className="mb-8 border-b border-gray-100 pb-6 last:border-0 w-full overflow-hidden">
+            <div className="flex justify-between items-center mb-4 px-1">
+                <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-full bg-${accentColor}-100 text-${accentColor}-600`}>
+                        {icon}
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={onViewAll}
+                        className="text-xs font-bold text-brand-primary hover:text-brand-dark hover:underline uppercase tracking-wide transition-colors"
+                    >
+                        Ver todos
+                    </button>
+                    
+                    <div className="w-px h-4 bg-gray-300"></div>
+
+                    <div className="flex gap-1">
+                        <button 
+                            onClick={() => scroll('left')}
+                            className="p-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                        >
+                            <ChevronLeftIcon className="h-4 w-4" />
+                        </button>
+                        <button 
+                            onClick={() => scroll('right')}
+                            className="p-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                        >
+                            <ChevronRightIcon className="h-4 w-4" />
+                        </button>
                     </div>
                 </div>
-            )}
+            </div>
+
+            <div 
+                ref={scrollRef}
+                className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar scroll-smooth snap-x snap-mandatory w-full"
+            >
+                {pets.map(pet => {
+                    const petOwner = users.find(u => u.email === pet.userEmail);
+                    return (
+                        <div key={pet.id} className="min-w-[200px] w-[200px] snap-start flex-shrink-0">
+                            <PetCard pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
 
-const PetSection: React.FC<{
-    title: string;
-    pets: Pet[];
-    users: User[];
-    onViewUser: (user: User) => void;
-    onNavigate: (path: string) => void;
-    onSeeMore: () => void;
-}> = ({ title, pets, users, onViewUser, onNavigate, onSeeMore }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [cardsPerPage, setCardsPerPage] = useState(6);
-    const [gridClass, setGridClass] = useState('grid-cols-6');
-    
-    // Touch state for swipe detection
-    const [touchStart, setTouchStart] = useState<number | null>(null);
-    const [touchEnd, setTouchEnd] = useState<number | null>(null);
-    const minSwipeDistance = 50;
-
-    useEffect(() => {
-        const updateLayout = () => {
-            const width = window.innerWidth;
-            let newCardsPerPage = 6;
-            let newGridClass = 'grid-cols-6';
-            
-            if (width < 640) { // Mobile
-                newCardsPerPage = 2;
-                newGridClass = 'grid-cols-2';
-            } else if (width < 768) { // Small Tablet
-                newCardsPerPage = 3;
-                newGridClass = 'grid-cols-3';
-            } else if (width < 1024) { // Tablet
-                newCardsPerPage = 4;
-                newGridClass = 'grid-cols-4';
-            } else if (width < 1280) { // Small Desktop
-                newCardsPerPage = 5;
-                newGridClass = 'grid-cols-5';
-            }
-            
-            setGridClass(prev => prev !== newGridClass ? newGridClass : prev);
-            setCardsPerPage(prev => prev !== newCardsPerPage ? newCardsPerPage : prev);
-
-            setCurrentIndex(prevIndex => {
-                if (pets.length <= newCardsPerPage) {
-                    return 0;
-                }
-                const maxIndex = Math.max(0, pets.length - newCardsPerPage);
-                return Math.min(prevIndex, maxIndex);
-            });
-        };
-
-        window.addEventListener('resize', updateLayout);
-        const timer = setTimeout(() => { updateLayout(); }, 0);
-
-        return () => {
-            window.removeEventListener('resize', updateLayout);
-            clearTimeout(timer);
-        };
-    }, [pets.length]);
-
-
-    const showCarousel = pets.length > cardsPerPage;
-
-    if (pets.length === 0) {
-        return null;
-    }
-
-    const handleNext = () => {
-        if (currentIndex + cardsPerPage < pets.length) {
-            setCurrentIndex(prev => prev + 1);
-        }
-    };
-
-    const handlePrev = () => {
-        if (currentIndex > 0) {
-            setCurrentIndex(prev => prev - 1);
-        }
-    };
-
-    const canGoPrev = currentIndex > 0;
-    const canGoNext = currentIndex + cardsPerPage < pets.length;
-
-    const visiblePets = showCarousel ? pets.slice(currentIndex, currentIndex + cardsPerPage) : pets;
-
-    const onTouchStart = (e: React.TouchEvent) => {
-        setTouchEnd(null);
-        setTouchStart(e.targetTouches[0].clientX);
-    };
-
-    const onTouchMove = (e: React.TouchEvent) => {
-        setTouchEnd(e.targetTouches[0].clientX);
-    };
-
-    const onTouchEnd = () => {
-        if (!touchStart || !touchEnd) return;
-        
-        const distance = touchStart - touchEnd;
-        const isLeftSwipe = distance > minSwipeDistance;
-        const isRightSwipe = distance < -minSwipeDistance;
-
-        if (isLeftSwipe && canGoNext) {
-            handleNext();
-        }
-        if (isRightSwipe && canGoPrev) {
-            handlePrev();
-        }
-    };
-
-    return (
-        <section>
-            <div className="flex justify-between items-center mb-4 pb-2">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-800 relative pl-3 before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-5 before:bg-brand-primary before:rounded-full">
-                    {title}
-                </h2>
-                <button 
-                    onClick={onSeeMore}
-                    className="text-brand-primary hover:text-brand-dark font-bold text-sm flex items-center gap-1 group"
-                >
-                    <span>Ver todos</span>
-                    <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
-                </button>
-            </div>
-            
-            <div 
-                className="relative group/carousel select-none"
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
-            >
-                <div className={`grid ${gridClass} gap-4 transition-all duration-500`}>
-                    {visiblePets.filter(p => p).map(pet => {
-                        const petOwner = users.find(u => u.email === pet.userEmail);
-                        return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
-                    })}
-                </div>
-
-                {showCarousel && (
-                    <>
-                        <button 
-                            onClick={handlePrev} 
-                            disabled={!canGoPrev} 
-                            className="absolute top-1/2 -translate-y-1/2 -left-2 md:-left-4 z-20 p-2 rounded-full bg-white text-gray-700 shadow-xl border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100"
-                            aria-label="Anterior"
-                        >
-                            <ChevronLeftIcon />
-                        </button>
-                        <button 
-                            onClick={handleNext} 
-                            disabled={!canGoNext} 
-                            className="absolute top-1/2 -translate-y-1/2 -right-2 md:-right-4 z-20 p-2 rounded-full bg-white text-gray-700 shadow-xl border border-gray-100 hover:bg-gray-50 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100"
-                            aria-label="Siguiente"
-                        >
-                            <ChevronRightIcon />
-                        </button>
-                        
-                        <div className="flex md:hidden justify-center mt-4 gap-1.5">
-                            {Array.from({ length: Math.ceil((pets.length - cardsPerPage) + 1) }).map((_, idx) => (
-                                <div 
-                                    key={idx} 
-                                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-4 bg-brand-primary' : 'w-1.5 bg-gray-300'}`}
-                                />
-                            )).slice(0, 5)}
-                        </div>
-                    </>
-                )}
-            </div>
-        </section>
-    );
-};
-
-
-export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading, isError, onRetry }) => {
+export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, setFilters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading, isError, onRetry }) => {
     
     const sentinelRef = useRef<HTMLDivElement>(null);
-    const [showSlowLoading, setShowSlowLoading] = useState(false);
+    
+    // DIRECT STATE DERIVATION: No more local state syncing issues
+    // If filters.status is 'Todos', we are in 'ALL' (Dashboard) mode.
+    const activeTab = filters.status === 'Todos' ? 'ALL' : filters.status;
 
-    useEffect(() => {
-        let timer: any;
-        if (isLoading) {
-            setShowSlowLoading(false);
-            timer = setTimeout(() => {
-                setShowSlowLoading(true);
-            }, 10000); 
+    const handleTabChange = (status: string) => {
+        if (status === 'ALL') {
+            setFilters((prev: any) => ({ ...prev, status: 'Todos' }));
         } else {
-            setShowSlowLoading(false);
+            setFilters((prev: any) => ({ ...prev, status: status }));
         }
-        return () => clearTimeout(timer);
-    }, [isLoading]);
+    };
 
-    useEffect(() => {
-        if (filters.status === 'Todos' || !hasMore || !loadMore || isLoading || isError) return;
+    const removeFilter = (key: string) => {
+        setFilters((prev: any) => ({ ...prev, [key]: 'Todos' }));
+    };
 
+    // Active Filters Logic
+    const activeFilters = Object.entries(filters).filter(([key, value]) => 
+        key !== 'status' && value !== 'Todos' && value !== ''
+    );
+
+    // Grouping for Dashboard View - Only done when needed
+    // We filter prop 'pets' which should contain dashboard data when activeTab is ALL
+    const dashboardGroups = activeTab === 'ALL' ? {
+        lost: pets.filter(p => p.status === PET_STATUS.PERDIDO),
+        sighted: pets.filter(p => p.status === PET_STATUS.AVISTADO),
+        found: pets.filter(p => p.status === PET_STATUS.ENCONTRADO),
+        adoption: pets.filter(p => p.status === PET_STATUS.EN_ADOPCION)
+    } : null;
+
+    // Intersection Observer for Infinite Scroll (Only for Grid Mode)
+    React.useEffect(() => {
+        if (!hasMore || !loadMore || isLoading || isError || activeTab === 'ALL') return;
+        
         const observer = new IntersectionObserver((entries) => {
-            const target = entries[0];
-            if (target.isIntersecting) {
-                loadMore();
-            }
-        }, {
-            root: null,
-            rootMargin: '200px',
-            threshold: 0.1
-        });
-
-        if (sentinelRef.current) {
-            observer.observe(sentinelRef.current);
-        }
-
-        return () => {
-            if (sentinelRef.current) observer.unobserve(sentinelRef.current);
-        };
-    }, [hasMore, loadMore, filters.status, isLoading, isError]);
+            if (entries[0].isIntersecting) loadMore();
+        }, { rootMargin: '400px' });
+        
+        if (sentinelRef.current) observer.observe(sentinelRef.current);
+        return () => { if (sentinelRef.current) observer.unobserve(sentinelRef.current); };
+    }, [hasMore, loadMore, isLoading, isError, activeTab]);
 
     if (isError) {
         return (
-            <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md border border-red-100">
-                <div className="text-red-500 mb-4 flex justify-center">
-                    <WarningIcon />
-                </div>
-                <p className="text-xl text-gray-800 font-semibold">Hubo un problema al cargar las mascotas.</p>
-                <p className="text-gray-500 mt-2 mb-6">Por favor, revisa tu conexión o intenta nuevamente.</p>
-                <button 
-                    onClick={onRetry} 
-                    className="bg-brand-primary text-white px-6 py-2 rounded-full font-bold hover:bg-brand-dark transition-colors shadow-md"
-                >
-                    Reintentar
-                </button>
+            <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md border border-red-100 mt-8">
+                <div className="text-red-500 mb-4 flex justify-center"><WarningIcon /></div>
+                <p className="text-xl text-gray-800 font-semibold">Hubo un problema al cargar.</p>
+                <button onClick={onRetry} className="mt-4 bg-brand-primary text-white px-6 py-2 rounded-full font-bold hover:bg-brand-dark transition-colors">Reintentar</button>
             </div>
         );
     }
-
-    // View 1: Specific Category Selected (Infinite Scroll Grid with Fluid Layout)
-    if (filters.status !== 'Todos') {
-        return (
-             <div className="space-y-6 animate-fade-in">
-                <div>
-                    <button 
-                        onClick={onReset} 
-                        className="text-gray-500 hover:text-gray-900 font-bold py-2 rounded-lg transition-colors flex items-center gap-1 text-sm mb-4"
-                    >
-                        <ChevronLeftIcon />
-                        Volver al inicio
-                    </button>
-                    <div className="flex justify-between items-end border-b border-gray-200 pb-4">
-                        <h2 className="text-2xl md:text-3xl font-black text-gray-800">
-                            {filters.status === PET_STATUS.EN_ADOPCION ? 'Mascotas en Adopción' : `Mascotas ${filters.status}s`}
-                        </h2>
-                        <span className="text-gray-500 text-sm font-medium bg-white border border-gray-200 px-3 py-1 rounded-full">
-                            {pets.length} resultados
-                        </span>
-                    </div>
-                </div>
-
-                {isLoading && pets.length === 0 ? (
-                     <div className="h-64 w-full flex flex-col justify-center items-center gap-4">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-brand-primary"></div>
-                        {showSlowLoading && (
-                            <div className="text-center animate-fade-in">
-                                <p className="text-gray-500 text-sm mb-2">Esto está tardando más de lo normal...</p>
-                                <button onClick={onRetry} className="text-brand-primary font-bold hover:underline text-sm flex items-center gap-1 mx-auto">
-                                    <HistoryIcon className="h-4 w-4"/> Recargar ahora
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ) : pets.length > 0 ? (
-                    <>
-                        {/* Fluid Grid Layout - Airbnb Style */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 md:gap-5">
-                            {pets.filter(p => p).map(pet => {
-                                const petOwner = users.find(u => u.email === pet.userEmail);
-                                return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
-                            })}
-                        </div>
-                        
-                        {/* Infinite Scroll Logic + Manual Button */}
-                        <div className="flex flex-col items-center justify-center py-10 gap-4">
-                            {hasMore && (
-                                <>
-                                    <div ref={sentinelRef} className="h-1 w-full opacity-0"></div>
-                                    <button 
-                                        onClick={() => loadMore && loadMore()}
-                                        disabled={isLoading}
-                                        className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-bold py-2.5 px-6 rounded-full shadow-sm transition-all text-sm"
-                                    >
-                                        {isLoading ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
-                                                <span>Cargando...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <PlusIcon />
-                                                <span>Cargar más resultados</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </>
-                            )}
-                            
-                            {!hasMore && pets.length > 10 && (
-                                <div className="text-center mt-4">
-                                    <p className="text-gray-400 text-sm">Has llegado al final de la lista.</p>
-                                    <button onClick={onReset} className="text-brand-primary text-sm font-bold mt-2 hover:underline">Ver otras categorías</button>
-                                </div>
-                            )}
-                        </div>
-                    </>
-                ) : (
-                    <div className="text-center py-20 px-6 bg-white rounded-xl shadow-sm border border-gray-100 max-w-lg mx-auto mt-10">
-                        <div className="bg-gray-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                            <WarningIcon className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <p className="text-xl text-gray-800 font-bold">No se encontraron resultados.</p>
-                        <p className="text-gray-500 mt-2 text-sm">Intenta ajustar tu búsqueda o limpiar los filtros.</p>
-                        <button onClick={onReset} className="mt-6 px-6 py-2 bg-brand-primary text-white rounded-full font-bold text-sm shadow-md hover:bg-brand-dark transition-colors">
-                            Limpiar Filtros
-                        </button>
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    // View 2: Dashboard / Overview (Carousels per category)
-    const lostPets = pets.filter(p => p && p.status === PET_STATUS.PERDIDO);
-    const foundPets = pets.filter(p => p && p.status === PET_STATUS.ENCONTRADO);
-    const sightedPets = pets.filter(p => p && p.status === PET_STATUS.AVISTADO);
-    const adoptionPets = pets.filter(p => p && p.status === PET_STATUS.EN_ADOPCION);
-
-    if (isLoading && pets.length === 0) {
-        return (
-            <div className="text-center py-24 px-6">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary mx-auto mb-4"></div>
-                <p className="text-lg text-gray-500 font-medium">Buscando mascotas cercanas...</p>
-                
-                {showSlowLoading && (
-                    <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-100 max-w-sm mx-auto inline-block">
-                        <p className="text-yellow-700 text-sm mb-2 font-medium">La conexión parece lenta.</p>
-                        <button 
-                            onClick={onRetry} 
-                            className="bg-white border border-yellow-300 text-yellow-700 px-4 py-1.5 rounded-full text-xs font-bold shadow-sm hover:bg-yellow-50 transition-colors"
-                        >
-                            Reintentar
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
+    
+    const tabs = [
+        { id: 'ALL', label: 'Explorar Todos' },
+        { id: PET_STATUS.PERDIDO, label: 'Perdidos' },
+        { id: PET_STATUS.AVISTADO, label: 'Avistados' },
+        { id: PET_STATUS.ENCONTRADO, label: 'Encontrados' },
+        { id: PET_STATUS.EN_ADOPCION, label: 'Adopción' },
+        { id: PET_STATUS.REUNIDO, label: 'Reunidos' },
+    ];
 
     return (
-        <div className="space-y-12 animate-fade-in pb-10">
-            {/* Banner Promocional para Reunidos */}
-            <div 
-                className="bg-gradient-to-r from-sky-400 to-blue-600 rounded-2xl p-6 md:p-10 text-white shadow-lg relative overflow-hidden group cursor-pointer transition-transform transform hover:-translate-y-1" 
-                onClick={() => onNavigate('/reunidos')}
-            >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700"></div>
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-yellow-300 opacity-20 rounded-full translate-y-1/2 -translate-x-1/3 blur-xl"></div>
-                
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                            <span className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm"><HeartIcon className="h-4 w-4 text-white" filled /></span>
-                            <span className="font-bold text-blue-100 uppercase tracking-wider text-[10px]">Finales Felices</span>
+        <div className="space-y-6 pb-20">
+            {/* Style Injection for Hide Scrollbar */}
+            <style>{`
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .hide-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
+
+            {/* 1. Banner */}
+            {activeTab === 'ALL' && (
+                <div 
+                    className="relative rounded-2xl overflow-hidden shadow-md h-[150px] md:h-[180px] flex items-center bg-gray-900 group cursor-pointer animate-fade-in"
+                    onClick={() => onNavigate('/reunidos')}
+                >
+                    <img 
+                        src="https://images.unsplash.com/photo-1544568100-847a948585b9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" 
+                        alt="Happy dog" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/80 to-purple-500/40"></div>
+                    
+                    <div className="relative z-10 p-6 md:px-10 text-white max-w-2xl">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Historias Reales</span>
                         </div>
-                        <h2 className="text-2xl md:text-4xl font-black mb-2 leading-tight drop-shadow-sm">
-                            Mascotas que regresaron a casa
+                        <h2 className="text-xl md:text-3xl font-black mb-2 leading-tight drop-shadow-md">
+                            Cuando la esperanza <br/> vuelve a casa.
                         </h2>
-                        <p className="text-blue-50 max-w-lg text-sm font-medium opacity-90 leading-relaxed">
-                            Descubre historias conmovedoras de reencuentros posibles gracias a esta comunidad.
-                        </p>
+                        <button className="bg-white text-indigo-600 text-xs font-bold py-2 px-4 rounded-full shadow hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                            <HeartIcon className="h-3 w-3 fill-current text-red-500" /> Ver Reencuentros
+                        </button>
                     </div>
-                    <button className="bg-white text-blue-700 font-bold py-2.5 px-6 rounded-full shadow-lg hover:bg-blue-50 hover:text-blue-900 transition-all transform hover:scale-105 flex items-center gap-2 whitespace-nowrap text-sm">
-                        Ver Historias <ChevronRightIcon />
-                    </button>
                 </div>
+            )}
+
+            {/* Sticky Navigation Bar */}
+            <div className="sticky top-0 bg-[#F5F7FA] pt-2 pb-4 z-20 backdrop-blur-sm bg-opacity-95">
+                <div className="flex flex-col gap-3">
+                    {/* Tab Strip */}
+                    <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-1">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabChange(tab.id)}
+                                className={`
+                                    relative px-1 py-2 text-sm font-bold whitespace-nowrap transition-colors duration-200
+                                    ${activeTab === tab.id 
+                                        ? 'text-gray-900' 
+                                        : 'text-gray-500 hover:text-gray-800'}
+                                `}
+                            >
+                                {tab.label}
+                                {activeTab === tab.id && (
+                                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gray-900 rounded-full animate-scale-x"></span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Active Filters & Map Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-2 items-center min-h-[30px]">
+                            {activeFilters.length > 0 ? (
+                                <>
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1"><FilterIcon className="inline h-3 w-3 mb-0.5"/> Filtros:</span>
+                                    {activeFilters.map(([key, value]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => removeFilter(key)}
+                                            className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 text-gray-700 text-xs font-bold rounded-full hover:bg-gray-50 transition-colors shadow-sm"
+                                        >
+                                            {value as string} <XCircleIcon className="h-3 w-3 text-gray-400" />
+                                        </button>
+                                    ))}
+                                    <button onClick={onReset} className="text-xs text-gray-500 hover:text-red-500 font-bold underline ml-1">Borrar</button>
+                                </>
+                            ) : (
+                                <p className="text-xs text-gray-400 font-medium italic">Mostrando resultados más recientes</p>
+                            )}
+                        </div>
+                        
+                        <button 
+                            onClick={() => onNavigate('/mapa')}
+                            className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-900 text-white font-bold rounded-full hover:bg-black transition-colors shadow-sm text-xs"
+                        >
+                            <MapIcon className="h-4 w-4" />
+                            Ver en Mapa
+                        </button>
+                    </div>
+                </div>
+                <div className="h-px w-full bg-gray-200 mt-2"></div>
             </div>
 
-            {pets.length > 0 ? (
+            {/* CONTENT AREA */}
+            {isLoading && pets.length === 0 ? (
+                // Loading Skeleton
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                    {[...Array(12)].map((_, i) => (
+                        <div key={i} className="aspect-[3/2] bg-gray-200 rounded-xl animate-pulse"></div>
+                    ))}
+                </div>
+            ) : pets.length > 0 ? (
                 <>
-                    {lostPets.length > 0 && (
-                        <LazyLoadSection>
+                    {/* 2. DASHBOARD VIEW (Rows) - Only when viewing 'ALL' */}
+                    {activeTab === 'ALL' && dashboardGroups ? (
+                        <div className="space-y-2 animate-fade-in w-full">
                             <PetSection 
-                                title="Mascotas Perdidas"
-                                pets={lostPets}
-                                users={users}
-                                onViewUser={onViewUser}
+                                title="Mascotas Perdidas" 
+                                pets={dashboardGroups.lost} 
+                                users={users} 
+                                onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
-                                onSeeMore={() => onSelectStatus(PET_STATUS.PERDIDO)}
+                                accentColor="red"
+                                icon={<WarningIcon className="h-5 w-5 text-red-500" />}
+                                onViewAll={() => handleTabChange(PET_STATUS.PERDIDO)}
                             />
-                        </LazyLoadSection>
-                    )}
-                    {foundPets.length > 0 && (
-                         <LazyLoadSection>
+                            
                             <PetSection 
-                                title="Mascotas Encontradas"
-                                pets={foundPets}
-                                users={users}
-                                onViewUser={onViewUser}
+                                title="Mascotas Avistadas" 
+                                pets={dashboardGroups.sighted} 
+                                users={users} 
+                                onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
-                                onSeeMore={() => onSelectStatus(PET_STATUS.ENCONTRADO)}
+                                accentColor="blue"
+                                icon={<MapIcon className="h-5 w-5 text-blue-500" />}
+                                onViewAll={() => handleTabChange(PET_STATUS.AVISTADO)}
                             />
-                        </LazyLoadSection>
-                    )}
-                    {adoptionPets.length > 0 && (
-                        <LazyLoadSection>
+
                             <PetSection 
-                                title="En Adopción"
-                                pets={adoptionPets}
-                                users={users}
-                                onViewUser={onViewUser}
+                                title="Mascotas Encontradas" 
+                                pets={dashboardGroups.found} 
+                                users={users} 
+                                onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
-                                onSeeMore={() => onSelectStatus(PET_STATUS.EN_ADOPCION)}
+                                accentColor="green"
+                                icon={<HeartIcon className="h-5 w-5 text-green-500" />}
+                                onViewAll={() => handleTabChange(PET_STATUS.ENCONTRADO)}
                             />
-                        </LazyLoadSection>
-                    )}
-                    {sightedPets.length > 0 && (
-                         <LazyLoadSection>
+
                             <PetSection 
-                                title="Mascotas Avistadas"
-                                pets={sightedPets}
-                                users={users}
-                                onViewUser={onViewUser}
+                                title="En Adopción" 
+                                pets={dashboardGroups.adoption} 
+                                users={users} 
+                                onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
-                                onSeeMore={() => onSelectStatus(PET_STATUS.AVISTADO)}
+                                accentColor="purple"
+                                icon={<HeartIcon className="h-5 w-5 text-purple-500" filled />}
+                                onViewAll={() => handleTabChange(PET_STATUS.EN_ADOPCION)}
                             />
-                        </LazyLoadSection>
+                        </div>
+                    ) : (
+                        /* GRID VIEW (For specific tabs) */
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-4 gap-y-8 animate-fade-in-up w-full">
+                                {pets.map(pet => {
+                                    const petOwner = users.find(u => u.email === pet.userEmail);
+                                    return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
+                                })}
+                            </div>
+                            
+                            {/* Infinite Scroll Trigger */}
+                            <div ref={sentinelRef} className="h-20 flex justify-center items-center mt-8">
+                                {isLoading && hasMore && <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>}
+                            </div>
+                            
+                            {!hasMore && pets.length > 10 && (
+                                <div className="text-center py-10 w-full">
+                                    <p className="text-gray-400 text-sm font-medium">Has visto todas las publicaciones de esta categoría.</p>
+                                    <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="mt-2 text-brand-primary text-xs font-bold hover:underline">Volver arriba</button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </>
             ) : (
-                <div className="text-center py-20 bg-white rounded-xl border border-gray-100 max-w-md mx-auto">
-                    <p className="text-xl text-gray-500 font-bold">No hay publicaciones recientes.</p>
-                    <p className="text-gray-400 mt-2 text-sm">¡Sé el primero en reportar una mascota!</p>
+                <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm mx-auto max-w-md mt-10">
+                    <div className="bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                        <WarningIcon className="h-10 w-10 text-gray-300" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Sin resultados</h3>
+                    <p className="text-gray-500 text-sm mb-6">No encontramos mascotas con estos filtros en esta categoría.</p>
+                    <button onClick={onReset} className="px-8 py-3 bg-gray-900 text-white rounded-full font-bold shadow-lg hover:bg-black transition-all">
+                        Limpiar filtros
+                    </button>
                 </div>
             )}
         </div>

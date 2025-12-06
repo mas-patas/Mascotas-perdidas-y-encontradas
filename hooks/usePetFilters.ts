@@ -9,6 +9,7 @@ export const usePetFilters = (pets: Pet[]) => {
         breed: string;
         color1: string;
         color2: string;
+        color3: string;
         size: PetSize | 'Todos';
         department: string;
     }>({
@@ -17,6 +18,7 @@ export const usePetFilters = (pets: Pet[]) => {
         breed: 'Todos',
         color1: 'Todos',
         color2: 'Todos',
+        color3: 'Todos',
         size: 'Todos',
         department: 'Todos'
     });
@@ -27,8 +29,14 @@ export const usePetFilters = (pets: Pet[]) => {
             if (filters.type !== 'Todos' && pet.animalType !== filters.type) return false;
             if (filters.breed !== 'Todos' && pet.breed !== filters.breed) return false;
             if (filters.size !== 'Todos' && pet.size !== filters.size) return false;
-            if (filters.color1 !== 'Todos' && !pet.color.includes(filters.color1)) return false;
-            if (filters.color2 !== 'Todos' && !pet.color.includes(filters.color2)) return false;
+            
+            // Loose color matching: if filter is set, pet colors string must include it.
+            // AND logic: If user selects Black AND White, pet must have both.
+            const petColorsLower = pet.color.toLowerCase();
+            if (filters.color1 !== 'Todos' && !petColorsLower.includes(filters.color1.toLowerCase())) return false;
+            if (filters.color2 !== 'Todos' && !petColorsLower.includes(filters.color2.toLowerCase())) return false;
+            if (filters.color3 !== 'Todos' && !petColorsLower.includes(filters.color3.toLowerCase())) return false;
+
             // Simple string check for location as it is stored as "Address, District, Province, Department"
             if (filters.department !== 'Todos' && !pet.location.includes(filters.department)) return false;
             return true;
@@ -42,6 +50,7 @@ export const usePetFilters = (pets: Pet[]) => {
             breed: 'Todos',
             color1: 'Todos',
             color2: 'Todos',
+            color3: 'Todos',
             size: 'Todos',
             department: 'Todos'
         });
