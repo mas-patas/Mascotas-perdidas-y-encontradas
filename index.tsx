@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { HashRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
@@ -45,13 +45,13 @@ root.render(
   <React.StrictMode>
     <HelmetProvider>
         <QueryClientProvider client={queryClient}>
-          <HashRouter>
+          <BrowserRouter>
           <AuthProvider>
             <ToastProvider>
                   <App />
             </ToastProvider>
           </AuthProvider>
-        </HashRouter>
+        </BrowserRouter>
         </QueryClientProvider>
     </HelmetProvider>
   </React.StrictMode>
