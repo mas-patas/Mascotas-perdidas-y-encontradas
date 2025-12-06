@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
@@ -162,7 +163,6 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         { id: PET_STATUS.AVISTADO, label: 'Avistados' },
         { id: PET_STATUS.ENCONTRADO, label: 'Encontrados' },
         { id: PET_STATUS.EN_ADOPCION, label: 'Adopción' },
-        { id: PET_STATUS.REUNIDO, label: 'Reunidos' },
     ];
 
     return (
@@ -189,7 +189,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                         alt="Happy dog" 
                         className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/80 to-purple-500/40"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-sky-500/80 to-blue-600/40"></div>
                     
                     <div className="relative z-10 p-6 md:px-10 text-white max-w-2xl">
                         <div className="flex items-center gap-2 mb-2">
@@ -208,14 +208,14 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
             {/* Sticky Navigation Bar */}
             <div className="sticky top-0 bg-[#F5F7FA] pt-2 pb-4 z-20 backdrop-blur-sm bg-opacity-95">
                 <div className="flex flex-col gap-3">
-                    {/* Tab Strip */}
-                    <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-1">
+                    {/* Tab Strip - Modified to wrap on mobile instead of scroll */}
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 pb-1">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id)}
                                 className={`
-                                    relative px-1 py-2 text-sm font-bold whitespace-nowrap transition-colors duration-200
+                                    relative px-2 sm:px-1 py-2 text-sm font-bold whitespace-nowrap transition-colors duration-200
                                     ${activeTab === tab.id 
                                         ? 'text-gray-900' 
                                         : 'text-gray-500 hover:text-gray-800'}
@@ -253,7 +253,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                         
                         <button 
                             onClick={() => onNavigate('/mapa')}
-                            className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-900 text-white font-bold rounded-full hover:bg-black transition-colors shadow-sm text-xs"
+                            className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-400 to-blue-900 text-white font-bold rounded-full hover:opacity-90 transition-all shadow-sm text-xs"
                         >
                             <MapIcon className="h-4 w-4" />
                             Ver en Mapa
