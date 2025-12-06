@@ -1,9 +1,11 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import type { Pet, User, PetStatus } from '../types';
 import { PetCard } from './PetCard';
 import { PET_STATUS } from '../constants';
 import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { supabase } from '../services/supabaseClient';
+import { mapPetFromDb } from '../utils/mappers';
 
 interface PetListProps {
     pets: Pet[];
@@ -21,23 +23,87 @@ interface PetListProps {
     onRetry?: () => void;
 }
 
-// Internal Component for Horizontal Rows
+// Internal Component for Horizontal Rows with Infinite Scroll
 const PetSection: React.FC<{ 
     title: string; 
-    pets: Pet[]; 
+    status: string; // Needed for fetching more
+    initialPets: Pet[]; 
     users: User[]; 
     onViewUser: (user: User) => void; 
     onNavigate: (path: string) => void;
     accentColor: string;
     icon: React.ReactNode;
     onViewAll: () => void;
-}> = ({ title, pets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
+}> = ({ title, status, initialPets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [additionalPets, setAdditionalPets] = useState<Pet[]>([]);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [hasMoreHorizontal, setHasMoreHorizontal] = useState(true);
+
+    // Combine initial props with fetched data
+    const allPets = [...initialPets, ...additionalPets];
+
+    // Reset when initialPets changes (e.g. refresh)
+    useEffect(() => {
+        setAdditionalPets([]);
+        setHasMoreHorizontal(true);
+    }, [initialPets]);
+
+    const fetchMoreHorizontal = async () => {
+        if (isLoadingMore || !hasMoreHorizontal) return;
+        
+        setIsLoadingMore(true);
+        try {
+            // Calculate offset based on what we currently have
+            const currentCount = allPets.length;
+            const BATCH_SIZE = 7;
+            
+            // Basic query similar to usePets but specific for this row
+            const { data, error } = await supabase
+                .from('pets')
+                .select('id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date')
+                .eq('status', status)
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false })
+                .range(currentCount, currentCount + BATCH_SIZE - 1);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                // We need to map these raw DB pets to our Pet type
+                // Note: We might miss some deep user profile data here for optimization, 
+                // but PetCard handles missing owner gracefully or we could do a join if strictly needed.
+                const mappedNewPets = data.map(p => mapPetFromDb(p));
+                
+                setAdditionalPets(prev => [...prev, ...mappedNewPets]);
+                
+                if (data.length < BATCH_SIZE) {
+                    setHasMoreHorizontal(false);
+                }
+            } else {
+                setHasMoreHorizontal(false);
+            }
+        } catch (err) {
+            console.error("Error fetching more horizontal pets", err);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
             const { current } = scrollRef;
             const scrollAmount = 600; 
+            
+            // Check if we need to load more when scrolling right
+            if (direction === 'right' && hasMoreHorizontal) {
+                const maxScrollLeft = current.scrollWidth - current.clientWidth;
+                // If we are within 2 scroll distances of the end, start loading
+                if (current.scrollLeft + scrollAmount >= maxScrollLeft - 100) {
+                    fetchMoreHorizontal();
+                }
+            }
+
             current.scrollBy({
                 left: direction === 'left' ? -scrollAmount : scrollAmount,
                 behavior: 'smooth'
@@ -45,7 +111,7 @@ const PetSection: React.FC<{
         }
     };
 
-    if (pets.length === 0) return null;
+    if (allPets.length === 0) return null;
 
     return (
         <div className="mb-8 border-b border-gray-100 pb-6 last:border-0 w-full overflow-hidden">
@@ -88,7 +154,7 @@ const PetSection: React.FC<{
                 ref={scrollRef}
                 className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar scroll-smooth snap-x snap-mandatory w-full"
             >
-                {pets.map(pet => {
+                {allPets.map(pet => {
                     const petOwner = users.find(u => u.email === pet.userEmail);
                     return (
                         <div key={pet.id} className="min-w-[200px] w-[200px] snap-start flex-shrink-0">
@@ -96,6 +162,17 @@ const PetSection: React.FC<{
                         </div>
                     );
                 })}
+                
+                {/* Loader Skeleton at the end while fetching more */}
+                {isLoadingMore && (
+                    <div className="min-w-[200px] w-[200px] snap-start flex-shrink-0">
+                        <div className="h-full w-full bg-gray-100 rounded-xl animate-pulse flex flex-col p-4 space-y-2">
+                            <div className="h-32 bg-gray-200 rounded-lg"></div>
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -136,7 +213,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     } : null;
 
     // Intersection Observer for Infinite Scroll (Only for Grid Mode)
-    React.useEffect(() => {
+    useEffect(() => {
         if (!hasMore || !loadMore || isLoading || isError || activeTab === 'ALL') return;
         
         const observer = new IntersectionObserver((entries) => {
@@ -218,7 +295,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                     relative px-2 sm:px-1 py-2 text-sm font-bold whitespace-nowrap transition-colors duration-200
                                     ${activeTab === tab.id 
                                         ? 'text-gray-900' 
-                                        : 'text-gray-500 hover:text-gray-800'}
+                                        : 'text-gray-500 hover:text-brand-primary'}
                                 `}
                             >
                                 {tab.label}
@@ -247,7 +324,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                     <button onClick={onReset} className="text-xs text-gray-500 hover:text-red-500 font-bold underline ml-1">Borrar</button>
                                 </>
                             ) : (
-                                <p className="text-xs text-gray-400 font-medium italic">Mostrando resultados más recientes</p>
+                                <p className="text-xs text-gray-600 font-bold italic">Mostrando resultados más recientes</p>
                             )}
                         </div>
                         
@@ -278,7 +355,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                         <div className="space-y-2 animate-fade-in w-full">
                             <PetSection 
                                 title="Mascotas Perdidas" 
-                                pets={dashboardGroups.lost} 
+                                status={PET_STATUS.PERDIDO}
+                                initialPets={dashboardGroups.lost} 
                                 users={users} 
                                 onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
@@ -289,7 +367,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                             
                             <PetSection 
                                 title="Mascotas Avistadas" 
-                                pets={dashboardGroups.sighted} 
+                                status={PET_STATUS.AVISTADO}
+                                initialPets={dashboardGroups.sighted} 
                                 users={users} 
                                 onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
@@ -300,7 +379,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
 
                             <PetSection 
                                 title="Mascotas Encontradas" 
-                                pets={dashboardGroups.found} 
+                                status={PET_STATUS.ENCONTRADO}
+                                initialPets={dashboardGroups.found} 
                                 users={users} 
                                 onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
@@ -311,7 +391,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
 
                             <PetSection 
                                 title="En Adopción" 
-                                pets={dashboardGroups.adoption} 
+                                status={PET_STATUS.EN_ADOPCION}
+                                initialPets={dashboardGroups.adoption} 
                                 users={users} 
                                 onViewUser={onViewUser} 
                                 onNavigate={onNavigate}
