@@ -9,10 +9,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    // Aseguramos que el build busque el index.html en la raíz
-    root: '.',
+    // Use `src` as the project root so Vite serves files from `src/index.html`
+    root: 'src',
     build: {
-      outDir: 'dist',
+      // Keep the output `dist` at the repository root (one level up from src)
+      outDir: '../dist',
       assetsDir: 'assets',
       sourcemap: false,
     },

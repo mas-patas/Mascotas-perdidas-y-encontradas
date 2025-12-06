@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mascotas Perdidas y Encontradas</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1D4ED8" />
+    
+    <!-- Google Analytics 4 -->
+    <!-- REPLACE 'G-XXXXXXXXXX' WITH YOUR ACTUAL MEASUREMENT ID -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-XXXXXXXXXX', {
+        send_page_view: false // We will handle this manually in React
+      });
+    </script>
+
+    <!-- Google Fonts: Nunito (Rounded Sans) for approachable UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Nunito', 'sans-serif'], // Set Nunito as default
+          },
+          colors: {
+            'brand-primary': '#1D4ED8',
+            'brand-secondary': '#FBBF24',
+            'brand-light': '#EFF6FF',
+            'brand-dark': '#1E3A8A',
+            'sidebar-dark': '#1E3A8A',
+            // Specific Design System Colors - Updated for Airbnb 2024 style
+            'card-surface': '#FFFFFF', 
+            'card-border': '#E5EAF2',
+            'text-main': '#222222',
+            'text-sub': '#555555',
+            'icon-gray': '#64748B',
+            // Status Colors
+            'status-lost': '#FF4F4F', // Rojo suave
+            'status-found': '#28C76F',
+            'status-sighted': '#1677FF',
+            'status-adoption': '#A855F7',
+            'status-reward': '#4CAF50', // Verde suave
+          },
+          animation: {
+            'bounce-slow': 'bounce 3s infinite',
+            'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          },
+          boxShadow: {
+            'card': '0 2px 8px rgba(0, 0, 0, 0.06)',
+            'card-hover': '0 4px 12px rgba(0, 0, 0, 0.08)',
+          }
+        }
+      }
+    }
+    </script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+     
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+     <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+     
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <!-- html2canvas for image generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai",
+    "react": "https://esm.sh/react@18.3.1",
+    "react/": "https://esm.sh/react@18.3.1/",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?external=react,react-dom",
+    "react-helmet-async": "https://esm.sh/react-helmet-async@2.0.4?external=react,react-dom",
+    "react-hook-form": "https://esm.sh/react-hook-form@7.51.0?external=react,react-dom",
+    "@remix-run/router": "https://esm.sh/@remix-run/router@1.15.3",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@5.28.4?external=react,react-dom",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "@testing-library/jest-dom": "https://aistudiocdn.com/@testing-library/jest-dom@^6.9.1",
+    "@testing-library/react": "https://aistudiocdn.com/@testing-library/react@^16.3.0",
+    "vitest": "https://aistudiocdn.com/vitest@^4.0.14",
+    "vitest/": "https://aistudiocdn.com/vitest@^4.0.14/",
+    "@playwright/test": "https://aistudiocdn.com/@playwright/test@^1.57.0"
+  }
+}
+</script>
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #admin-dashboard, #admin-dashboard * {
+            visibility: visible;
+        }
+        #admin-dashboard {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        /* Add flyer print styles */
+        #flyer-modal, #flyer-modal * {
+            visibility: visible;
+        }
+        #flyer-modal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden !important;
+            box-shadow: none;
+            border: none;
+            transform: none !important; /* Reset scale for print */
+        }
+        header, aside, .no-print {
+            display: none !important;
+        }
+        main {
+            padding: 0 !important;
+        }
+    }
+
+    /* Custom styles for date inputs to improve calendar icon visibility */
+    input[type="date"] {
+        appearance: none;
+        -webkit-appearance: none;
+        min-height: 42px;
+    }
+    
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        width: 24px;
+        height: 24px;
+        padding: 2px;
+        margin-right: 4px;
+        /* Custom SVG Icon in Brand Primary Color (#1D4ED8) */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231D4ED8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' /%3E%3C/svg%3E");
+        opacity: 0.8;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+        transform: scale(1.15);
+        background-color: rgba(29, 78, 216, 0.1);
+        border-radius: 4px;
+    }
+
+    /* Leaflet Custom Marker Styles */
+    .custom-div-icon {
+        background: transparent;
+        border: none;
+    }
+    .marker-pin {
+        width: 30px;
+        height: 30px;
+        border-radius: 50% 50% 50% 0;
+        background: #3073FA;
+        position: absolute;
+        transform: rotate(-45deg);
+        left: 50%;
+        top: 50%;
+        margin: -15px 0 0 -15px;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
+    }
+    .marker-pin::after {
+        content: '';
+        width: 14px;
+        height: 14px;
+        margin: 8px 0 0 8px;
+        background: #fff;
+        position: absolute;
+        border-radius: 50%;
+    }
+    
+  .marker-pin.lost { background: #EF4444; }
+  .marker-pin.found { background: #10B981; }
+  .marker-pin.sighted { background: #3B82F6; }
+  .marker-pin.adoption { background: #8B5CF6; }
+
+  .marker-icon-svg {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 5px;
+    top: 2px; 
+    z-index: 10;
+    color: white;
+  }
+
+  /* Micro-interactions */
+  .btn-press {
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s;
+  }
+  .btn-press:active {
+    transform: scale(0.95);
+  }
+    
+  /* Subtle Ripple effect via pure CSS for hover states */
+  .hover-ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  .hover-ripple::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease-out, height 0.3s ease-out;
+  }
+  .hover-ripple:hover::after {
+    width: 200%;
+    height: 200%;
+  }
+
+</style>
+</head>
+<body class="bg-[#F5F7FA]">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
