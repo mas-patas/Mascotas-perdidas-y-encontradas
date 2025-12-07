@@ -1,11 +1,19 @@
 import { supabase } from '../../services/supabaseClient';
-import type { Chat, Message } from '../../types';
+import type { ChatRow, MessageRow } from '../../types';
 import type { CreateChatData } from './chats.types';
 
 /**
- * Fetch all chats for a user
+ * Extended chat type with messages
  */
-export const getChats = async (userEmail: string): Promise<Chat[]> => {
+export type ChatWithMessages = ChatRow & {
+  messages?: MessageRow[];
+};
+
+/**
+ * Fetch all chats for a user
+ * Returns database rows with snake_case column names
+ */
+export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> => {
   const { data: rawChats, error } = await supabase
     .from('chats')
     .select('*')
@@ -14,8 +22,8 @@ export const getChats = async (userEmail: string): Promise<Chat[]> => {
   if (error) throw error;
   if (!rawChats) return [];
 
-  const chatIds = rawChats.map((c: any) => c.id);
-  let rawMessages: any[] = [];
+  const chatIds = rawChats.map((c) => c.id);
+  let rawMessages: MessageRow[] = [];
   
   if (chatIds.length > 0) {
     const { data: msgs, error: msgError } = await supabase
@@ -28,30 +36,21 @@ export const getChats = async (userEmail: string): Promise<Chat[]> => {
     rawMessages = msgs || [];
   }
 
-  return rawChats.map((c: any) => {
-    const chatMessages = rawMessages
-      .filter((m: any) => m.chat_id === c.id)
-      .map((m: any) => ({
-        senderEmail: m.sender_email,
-        text: m.text,
-        timestamp: m.created_at,
-        isUnread: false, // Will be calculated by the query hook
-      }));
+  return rawChats.map((c) => {
+    const chatMessages = rawMessages.filter((m) => m.chat_id === c.id);
     
     return {
-      id: c.id,
-      petId: c.pet_id,
-      participantEmails: c.participant_emails,
+      ...c,
       messages: chatMessages,
-      lastReadTimestamps: c.last_read_timestamps || {},
     };
   });
 };
 
 /**
  * Fetch a single chat by ID
+ * Returns database row with snake_case column names
  */
-export const getChatById = async (chatId: string): Promise<Chat | null> => {
+export const getChatById = async (chatId: string): Promise<ChatWithMessages | null> => {
   const { data: chatData, error: chatError } = await supabase
     .from('chats')
     .select('*')
@@ -70,23 +69,16 @@ export const getChatById = async (chatId: string): Promise<Chat | null> => {
   if (msgError) throw msgError;
 
   return {
-    id: chatData.id,
-    petId: chatData.pet_id,
-    participantEmails: chatData.participant_emails,
-    messages: (messages || []).map((m: any) => ({
-      senderEmail: m.sender_email,
-      text: m.text,
-      timestamp: m.created_at,
-      isUnread: false,
-    })),
-    lastReadTimestamps: chatData.last_read_timestamps || {},
+    ...chatData,
+    messages: messages || [],
   };
 };
 
 /**
  * Fetch messages for a chat
+ * Returns database rows with snake_case column names
  */
-export const getMessages = async (chatId: string): Promise<Message[]> => {
+export const getMessages = async (chatId: string): Promise<MessageRow[]> => {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
@@ -96,12 +88,7 @@ export const getMessages = async (chatId: string): Promise<Message[]> => {
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((m: any) => ({
-    senderEmail: m.sender_email,
-    text: m.text,
-    timestamp: m.created_at,
-    isUnread: false,
-  }));
+  return data;
 };
 
 /**

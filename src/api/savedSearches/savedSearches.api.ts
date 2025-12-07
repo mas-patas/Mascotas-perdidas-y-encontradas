@@ -1,11 +1,12 @@
 import { supabase } from '../../services/supabaseClient';
-import type { SavedSearch } from '../../types';
+import type { SavedSearchRow } from '../../types';
 import type { CreateSavedSearchData } from './savedSearches.types';
 
 /**
  * Fetch saved searches for a user
+ * Returns database rows with snake_case column names
  */
-export const getSavedSearches = async (userId: string): Promise<SavedSearch[]> => {
+export const getSavedSearches = async (userId: string): Promise<SavedSearchRow[]> => {
   const { data, error } = await supabase
     .from('saved_searches')
     .select('*')
@@ -15,19 +16,14 @@ export const getSavedSearches = async (userId: string): Promise<SavedSearch[]> =
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((s: any) => ({
-    id: s.id,
-    userId: s.user_id,
-    name: s.name,
-    filters: s.filters,
-    createdAt: s.created_at,
-  }));
+  return data;
 };
 
 /**
  * Fetch a single saved search by ID
+ * Returns database row with snake_case column names
  */
-export const getSavedSearchById = async (id: string): Promise<SavedSearch | null> => {
+export const getSavedSearchById = async (id: string): Promise<SavedSearchRow | null> => {
   const { data, error } = await supabase
     .from('saved_searches')
     .select('*')
@@ -37,13 +33,7 @@ export const getSavedSearchById = async (id: string): Promise<SavedSearch | null
   if (error) throw error;
   if (!data) return null;
   
-  return {
-    id: data.id,
-    userId: data.user_id,
-    name: data.name,
-    filters: data.filters,
-    createdAt: data.created_at,
-  };
+  return data;
 };
 
 /**

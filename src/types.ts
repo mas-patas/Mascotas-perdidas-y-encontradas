@@ -74,144 +74,29 @@ export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeo
 export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
 export type BusinessType = typeof BUSINESS_TYPES[keyof typeof BUSINESS_TYPES];
 
-export interface SavedSearch {
-    id: string;
-    userId: string;
-    name: string;
-    filters: {
-        status: PetStatus | 'Todos';
-        type: AnimalType | 'Todos';
-        breed: string;
-        department: string;
-        // Simplified filters for saving
-    };
-    createdAt: string;
-}
+// Type aliases for backward compatibility (deprecated - use Row types directly)
+// These will be removed in a future version
+/** @deprecated Use SavedSearchRow instead */
+export type SavedSearch = SavedSearchRow;
+/** @deprecated Use BusinessProductRow instead */
+export type BusinessProduct = BusinessProductRow;
+/** @deprecated Use BusinessRow instead */
+export type Business = BusinessRow;
+/** @deprecated Use CampaignRow instead */
+export type Campaign = CampaignRow;
+/** @deprecated Use NotificationRow instead */
+export type Notification = NotificationRow;
+/** @deprecated Use SupportTicketRow instead */
+export type SupportTicket = SupportTicketRow;
+/** @deprecated Use CommentRow instead */
+export type Comment = CommentRow;
+/** @deprecated Use PetRow instead */
+export type Pet = PetRow;
+/** @deprecated Use ReportRow instead */
+export type Report = ReportRow;
 
-export interface BusinessProduct {
-    id: string;
-    businessId: string;
-    name: string;
-    description?: string;
-    price: number;
-    imageUrl?: string; // Deprecated, kept for compatibility
-    imageUrls?: string[]; // New array
-}
-
-export interface Business {
-    id: string;
-    ownerId: string; // Links to a User.id
-    name: string;
-    type: BusinessType;
-    description: string;
-    address: string;
-    phone: string;
-    whatsapp?: string;
-    website?: string;
-    facebook?: string;
-    instagram?: string;
-    logoUrl?: string;
-    coverUrl?: string; // Hero image
-    bannerUrl?: string; // Secondary promotional banner
-    services: string[]; // Array of strings e.g., ["Rayos X", "Baños", "Urgencias"]
-    products?: BusinessProduct[];
-    lat?: number;
-    lng?: number;
-    isVerified?: boolean;
-    createdAt?: string;
-}
-
-export interface Campaign {
-    id: string;
-    userEmail: string; // Admin who created it
-    type: CampaignType;
-    title: string;
-    description: string;
-    location: string;
-    date: string; // ISO String
-    imageUrls: string[];
-    contactPhone?: string;
-    lat?: number;
-    lng?: number;
-}
-
-export interface Notification {
-    id: string;
-    userId: string;
-    message: string;
-    link: 'support' | 'messages' | { type: 'campaign'; id: string } | { type: 'pet'; id: string } | { type: 'pet-renew'; id: string };
-    timestamp: string;
-    isRead: boolean;
-}
-
-export interface SupportTicket {
-    id: string;
-    userEmail: string;
-    category: SupportTicketCategory;
-    subject: string;
-    description: string;
-    timestamp: string;
-    status: SupportTicketStatus;
-    assignedTo?: string; // Admin email
-    assignmentHistory?: { adminEmail: string; timestamp: string }[];
-    response?: string;
-    relatedReportId?: string; // Link to a specific report
-}
-
-export interface Comment {
-    id: string;
-    userId?: string; // Added optional userId for DB linking
-    userEmail: string;
-    userName: string;
-    text: string;
-    timestamp: string;
-    parentId?: string | null;
-    likes?: string[];
-}
-
-export interface Pet {
-    id: string;
-    userEmail: string;
-    status: PetStatus;
-    name: string;
-    animalType: AnimalType;
-    breed: string;
-    color: string;
-    size?: PetSize;
-    location: string;
-    date: string;
-    contact: string;
-    description: string;
-    imageUrls: string[];
-    adoptionRequirements?: string;
-    shareContactInfo?: boolean;
-    contactRequests?: string[];
-    reward?: number; // Changed to number (integer in DB)
-    currency?: string; // New field for 'S/' or '$'
-    lat?: number; // Coordenada Latitud
-    lng?: number; // Coordenada Longitud
-    comments?: Comment[];
-    expiresAt?: string; // ISO String for 60-day expiration
-    createdAt?: string; // ISO String creation date
-    embedding?: number[]; // Vector embedding for AI search
-    reunionStory?: string; // Historia del reencuentro
-    reunionDate?: string; // Fecha del reencuentro
-}
-
-export type ReportPostSnapshot = Pet | { text: string }; // Can be a Pet or a Comment text object
-
-export interface Report {
-    id: string;
-    reporterEmail: string;
-    reportedEmail: string;
-    type: ReportType;
-    targetId: string;
-    reason: ReportReason;
-    details: string;
-    timestamp: string;
-    status: ReportStatus;
-    postSnapshot?: ReportPostSnapshot;
-}
+// Utility type for report post snapshot (can reference PetRow or CommentRow)
+export type ReportPostSnapshot = PetRow | { text: string };
 
 export interface OwnedPet {
     id: string;
@@ -259,33 +144,21 @@ export interface LocationDetails {
     address: string;
 }
 
-export interface Message {
-    senderEmail: string;
-    text: string;
-    timestamp: string;
-    isUnread?: boolean; // Helper for UI
-}
-
-export interface Chat {
-    id: string;
-    petId?: string;
-    participantEmails: string[];
-    messages: Message[];
-    lastReadTimestamps: { [userEmail: string]: string };
-}
+// Type aliases for backward compatibility (deprecated - use Row types directly)
+/** @deprecated Use MessageRow instead */
+export type Message = MessageRow;
+/** @deprecated Use ChatRow instead */
+export type Chat = ChatRow;
 
 export interface PotentialMatch {
-    pet: Pet;
+    pet: PetRow;
     score: number;
     explanation: string;
 }
 
-export interface BannedIP {
-    id: string;
-    ipAddress: string;
-    reason: string;
-    createdAt: string;
-}
+// Type alias for backward compatibility (deprecated - use Row type directly)
+/** @deprecated Use BannedIpRow instead */
+export type BannedIP = BannedIpRow;
 
 export interface Mission {
     id: string;
@@ -296,14 +169,9 @@ export interface Mission {
     icon: 'login' | 'share' | 'comment' | 'report';
 }
 
-export interface ActivityLog {
-    id: string;
-    userId: string;
-    actionType: 'report_pet' | 'comment_added' | 'pet_reunited' | 'daily_login' | 'share_post';
-    points: number;
-    createdAt: string;
-    details?: any;
-}
+// Type alias for backward compatibility (deprecated - use Row type directly)
+/** @deprecated Use ActivityLogRow instead */
+export type ActivityLog = ActivityLogRow;
 
 export interface Reward {
     id: string;

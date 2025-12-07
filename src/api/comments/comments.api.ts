@@ -1,11 +1,19 @@
 import { supabase } from '../../services/supabaseClient';
-import type { Comment } from '../../types';
+import type { CommentRow, CommentLikeRow } from '../../types';
 import type { CreateCommentData } from './comments.types';
 
 /**
- * Fetch comments for a pet
+ * Extended comment type with computed likes field
  */
-export const getCommentsByPetId = async (petId: string): Promise<Comment[]> => {
+export type CommentWithLikes = CommentRow & {
+  likes?: string[];
+};
+
+/**
+ * Fetch comments for a pet
+ * Returns database rows with snake_case column names
+ */
+export const getCommentsByPetId = async (petId: string): Promise<CommentWithLikes[]> => {
   const { data, error } = await supabase
     .from('comments')
     .select('*')
@@ -16,7 +24,7 @@ export const getCommentsByPetId = async (petId: string): Promise<Comment[]> => {
   if (!data) return [];
 
   // Fetch likes for all comments
-  const commentIds = data.map((c: any) => c.id);
+  const commentIds = data.map((c) => c.id);
   const { data: likes } = commentIds.length > 0
     ? await supabase
         .from('comment_likes')
@@ -24,19 +32,13 @@ export const getCommentsByPetId = async (petId: string): Promise<Comment[]> => {
         .in('comment_id', commentIds)
     : { data: [] };
 
-  return data.map((c: any) => {
+  return data.map((c) => {
     const commentLikes = (likes || [])
-      .filter((l: any) => l.comment_id === c.id)
-      .map((l: any) => l.user_id);
+      .filter((l) => l.comment_id === c.id)
+      .map((l) => l.user_id);
     
     return {
-      id: c.id,
-      userId: c.user_id,
-      userEmail: c.user_email,
-      userName: c.user_name,
-      text: c.text,
-      timestamp: c.created_at,
-      parentId: c.parent_id,
+      ...c,
       likes: commentLikes,
     };
   });
@@ -44,8 +46,9 @@ export const getCommentsByPetId = async (petId: string): Promise<Comment[]> => {
 
 /**
  * Fetch a single comment by ID
+ * Returns database row with snake_case column names
  */
-export const getCommentById = async (id: string): Promise<Comment | null> => {
+export const getCommentById = async (id: string): Promise<CommentWithLikes | null> => {
   const { data, error } = await supabase
     .from('comments')
     .select('*')
@@ -62,19 +65,14 @@ export const getCommentById = async (id: string): Promise<Comment | null> => {
     .eq('comment_id', id);
 
   return {
-    id: data.id,
-    userId: data.user_id,
-    userEmail: data.user_email,
-    userName: data.user_name,
-    text: data.text,
-    timestamp: data.created_at,
-    parentId: data.parent_id,
-    likes: (likes || []).map((l: any) => l.user_id),
+    ...data,
+    likes: (likes || []).map((l) => l.user_id),
   };
 };
 
 /**
  * Fetch likes for a comment
+ * Returns array of user IDs
  */
 export const getCommentLikes = async (commentId: string): Promise<string[]> => {
   const { data, error } = await supabase
@@ -85,7 +83,7 @@ export const getCommentLikes = async (commentId: string): Promise<string[]> => {
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((l: any) => l.user_id);
+  return data.map((l) => l.user_id);
 };
 
 /**

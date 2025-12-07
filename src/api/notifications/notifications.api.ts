@@ -1,10 +1,11 @@
 import { supabase } from '../../services/supabaseClient';
-import type { Notification } from '../../types';
+import type { NotificationRow } from '../../types';
 
 /**
  * Fetch all notifications for a user
+ * Returns database rows with snake_case column names
  */
-export const getNotifications = async (userId: string): Promise<Notification[]> => {
+export const getNotifications = async (userId: string): Promise<NotificationRow[]> => {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
@@ -14,14 +15,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((n: any) => ({
-    id: n.id,
-    userId: n.user_id,
-    message: n.message,
-    link: n.link,
-    isRead: n.is_read,
-    timestamp: n.created_at,
-  }));
+  return data;
 };
 
 /**
@@ -40,8 +34,9 @@ export const getUnreadNotificationsCount = async (userId: string): Promise<numbe
 
 /**
  * Fetch a single notification by ID
+ * Returns database row with snake_case column names
  */
-export const getNotificationById = async (id: string): Promise<Notification | null> => {
+export const getNotificationById = async (id: string): Promise<NotificationRow | null> => {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
@@ -51,14 +46,7 @@ export const getNotificationById = async (id: string): Promise<Notification | nu
   if (error) throw error;
   if (!data) return null;
   
-  return {
-    id: data.id,
-    userId: data.user_id,
-    message: data.message,
-    link: data.link,
-    isRead: data.is_read,
-    timestamp: data.created_at,
-  };
+  return data;
 };
 
 /**
@@ -97,7 +85,7 @@ export const createNotification = async (data: {
   id: string;
   userId: string;
   message: string;
-  link?: Notification['link'];
+  link?: NotificationRow['link'];
 }): Promise<void> => {
   const { error } = await supabase.from('notifications').insert({
     id: data.id,
