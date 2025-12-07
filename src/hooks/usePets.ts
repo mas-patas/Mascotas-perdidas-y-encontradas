@@ -2,8 +2,8 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { PET_STATUS } from '../constants';
 import type { Pet, PetStatus, AnimalType, PetSize } from '../types';
-import * as petsApi from '../api/pets.api';
-import { usePetsRealtime } from '../api/pets.query';
+import * as petsApi from '../api/pets/pets.api';
+import { usePetsRealtime } from '../api/pets/pets.query';
 
 const LIST_PAGE_SIZE = 12;
 const DASHBOARD_CATEGORY_LIMIT = 8;

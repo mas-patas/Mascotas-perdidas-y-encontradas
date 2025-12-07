@@ -2,59 +2,85 @@
  * Central export point for all API functions and query hooks
  */
 
-// Query Keys
-export { queryKeys } from './queryKeys';
+// Query Keys - Combined from all modules
+import { queryKeys as usersKeys } from './users/users.keys';
+import { queryKeys as petsKeys } from './pets/pets.keys';
+import { queryKeys as campaignsKeys } from './campaigns/campaigns.keys';
+import { queryKeys as chatsKeys } from './chats/chats.keys';
+import { queryKeys as notificationsKeys } from './notifications/notifications.keys';
+import { queryKeys as reportsKeys } from './reports/reports.keys';
+import { queryKeys as supportTicketsKeys } from './supportTickets/supportTickets.keys';
+import { queryKeys as businessesKeys } from './businesses/businesses.keys';
+import { queryKeys as commentsKeys } from './comments/comments.keys';
+import { queryKeys as savedSearchesKeys } from './savedSearches/savedSearches.keys';
+import { queryKeys as bannedIpsKeys } from './bannedIps/bannedIps.keys';
+import { queryKeys as gamificationKeys } from './gamification/gamification.keys';
+
+export const queryKeys = {
+  ...usersKeys,
+  ...petsKeys,
+  ...campaignsKeys,
+  ...chatsKeys,
+  ...notificationsKeys,
+  ...reportsKeys,
+  ...supportTicketsKeys,
+  ...businessesKeys,
+  ...commentsKeys,
+  ...savedSearchesKeys,
+  ...bannedIpsKeys,
+  ...gamificationKeys,
+} as const;
 
 // Type Definitions
-export * from './pets.types';
-export * from './comments.types';
-export * from './campaigns.types';
-export * from './chats.types';
-export * from './reports.types';
-export * from './supportTickets.types';
-export * from './businesses.types';
-export * from './savedSearches.types';
+export * from './pets/pets.types';
+export * from './comments/comments.types';
+export * from './campaigns/campaigns.types';
+export * from './chats/chats.types';
+export * from './reports/reports.types';
+export * from './supportTickets/supportTickets.types';
+export * from './businesses/businesses.types';
+export * from './savedSearches/savedSearches.types';
 
 // API Functions
-export * as usersApi from './users.api';
-export * as petsApi from './pets.api';
-export * as campaignsApi from './campaigns.api';
-export * as chatsApi from './chats.api';
-export * as notificationsApi from './notifications.api';
-export * as reportsApi from './reports.api';
-export * as supportTicketsApi from './supportTickets.api';
-export * as businessesApi from './businesses.api';
-export * as commentsApi from './comments.api';
-export * as savedSearchesApi from './savedSearches.api';
-export * as bannedIpsApi from './bannedIps.api';
-export * as gamificationApi from './gamification.api';
-export * as pushSubscriptionsApi from './pushSubscriptions.api';
+export * as usersApi from './users/users.api';
+export * as petsApi from './pets/pets.api';
+export * as campaignsApi from './campaigns/campaigns.api';
+export * as chatsApi from './chats/chats.api';
+export * as notificationsApi from './notifications/notifications.api';
+export * as reportsApi from './reports/reports.api';
+export * as supportTicketsApi from './supportTickets/supportTickets.api';
+export * as businessesApi from './businesses/businesses.api';
+export * as commentsApi from './comments/comments.api';
+export * as savedSearchesApi from './savedSearches/savedSearches.api';
+export * as bannedIpsApi from './bannedIps/bannedIps.api';
+export * as gamificationApi from './gamification/gamification.api';
+export * as pushSubscriptionsApi from './pushSubscriptions/pushSubscriptions.api';
 
 // Query Hooks
-export * from './users.query';
-export * from './pets.query';
-export * from './campaigns.query';
-export * from './chats.query';
-export * from './notifications.query';
-export * from './reports.query';
-export * from './supportTickets.query';
-export * from './businesses.query';
-export * from './comments.query';
-export * from './savedSearches.query';
-export * from './bannedIps.query';
-export * from './gamification.query';
-export * from './admin.query';
+export * from './users/users.query';
+export * from './pets/pets.query';
+export * from './campaigns/campaigns.query';
+export * from './chats/chats.query';
+export * from './notifications/notifications.query';
+export * from './reports/reports.query';
+export * from './supportTickets/supportTickets.query';
+export * from './businesses/businesses.query';
+export * from './comments/comments.query';
+export * from './savedSearches/savedSearches.query';
+export * from './bannedIps/bannedIps.query';
+export * from './gamification/gamification.query';
+export * from './admin/admin.query';
 
 // Mutation Hooks
-export * from './pets.mutation';
-export * from './comments.mutation';
-export * from './campaigns.mutation';
-export * from './chats.mutation';
-export * from './notifications.mutation';
-export * from './reports.mutation';
-export * from './supportTickets.mutation';
-export * from './businesses.mutation';
-export * from './users.mutation';
-export * from './savedSearches.mutation';
-export * from './bannedIps.mutation';
-export * from './pushSubscriptions.mutation';
+export * from './pets/pets.mutation';
+export * from './comments/comments.mutation';
+export * from './campaigns/campaigns.mutation';
+export * from './chats/chats.mutation';
+export * from './notifications/notifications.mutation';
+export * from './reports/reports.mutation';
+export * from './supportTickets/supportTickets.mutation';
+export * from './businesses/businesses.mutation';
+export * from './users/users.mutation';
+export * from './savedSearches/savedSearches.mutation';
+export * from './bannedIps/bannedIps.mutation';
+export * from './pushSubscriptions/pushSubscriptions.mutation';
