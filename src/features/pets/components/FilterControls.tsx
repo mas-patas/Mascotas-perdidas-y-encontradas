@@ -95,16 +95,16 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     <nav className="space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
                         {/* Removed Home button from Sidebar as requested */}
                         <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
-                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Finales Felices</span>
+                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Reencuentros</span>
                         </button>
                         <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
-                            <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa Global</span>
+                            <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa de mascotas</span>
                         </button>
                         <button onClick={() => navigate('/campanas')} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
                             <MegaphoneIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Campañas</span>
                         </button>
                         <button onClick={() => navigate('/tips')} className={navLinkClass(location.pathname === '/tips')}>
-                            <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Consejos</span>
+                            <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Tips y Consejos</span>
                         </button>
                         {currentUser?.role === USER_ROLES.SUPERADMIN && (
                             <button onClick={() => navigate('/servicios')} className={navLinkClass(location.pathname === '/servicios')}>

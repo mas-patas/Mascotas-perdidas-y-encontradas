@@ -21,6 +21,7 @@ import { mapPetFromDb } from '@/utils/mappers';
 import { PET_STATUS } from '@/constants';
 import { PullToRefresh } from '@/shared';
 import { LazyImage } from '@/shared';
+import { supabase } from '@/services/supabaseClient';
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"
@@ -289,7 +290,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         { target: '[data-tour="ratings-section"]', title: 'Mis Calificaciones', content: 'Construye tu reputación con feedback de otros usuarios.', position: 'top' }
     ];
 
-    const inputClass = "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-gray-900";
+    const inputClass = "w-full p-2 sm:p-2.5 border border-card-border rounded-md focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition bg-white text-text-main text-sm";
 
     const filterOptions = [
         { label: 'Todos', value: 'ALL' },
@@ -327,20 +328,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
 
     return (
         <PullToRefresh onRefresh={handleRefresh}>
-            <div className="space-y-8 pb-20">
+            <div className="space-y-4 sm:space-y-6 md:space-y-8 pb-12 sm:pb-16 md:pb-20">
                 <OnboardingTour steps={profileTourSteps} tourId="profile_v1" />
 
                 {/* HEADER PERFIL */}
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="flex flex-col md:flex-row justify-between items-center md:items-start mb-6 gap-4">
-                        <h2 className="text-3xl font-bold text-brand-dark text-center md:text-left">Mi Perfil</h2>
-                        <div className="flex gap-2">
+                <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border border-card-border">
+                    <div className="flex flex-col md:flex-row justify-between items-center md:items-start mb-4 sm:mb-5 md:mb-6 gap-3 sm:gap-4">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-brand-dark text-center md:text-left">Mi Perfil</h2>
+                        <div className="flex gap-1.5 sm:gap-2 w-full md:w-auto justify-center md:justify-end">
                             {myBusiness && (
                                 <button 
                                     onClick={() => setIsBusinessModalOpen(true)}
-                                    className="flex items-center gap-2 text-sm py-2 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-bold"
+                                    className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm py-1.5 sm:py-2 px-2 sm:px-3 bg-status-found text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-bold"
                                 >
-                                    <StoreIcon /> Gestionar mi Negocio
+                                    <StoreIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Gestionar mi Negocio</span><span className="sm:hidden">Negocio</span>
                                 </button>
                             )}
                             {!isEditing && (
@@ -353,42 +354,42 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             )}
                         </div>
                     </div>
-                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">{error}</div>}
+                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-md relative mb-3 sm:mb-4 text-xs sm:text-sm" role="alert">{error}</div>}
                     
                     {isEditing ? (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-6">
+                        <div className="space-y-3 sm:space-y-4">
+                            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
                                 <div className="flex-shrink-0">
                                     {editableUser.avatarUrl ? (
-                                        <LazyImage src={editableUser.avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full object-cover" />
+                                        <LazyImage src={editableUser.avatarUrl} alt="Avatar" className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover" />
                                     ) : (
-                                        <div className="w-24 h-24 rounded-full bg-brand-primary text-white flex items-center justify-center text-4xl font-bold">
+                                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-brand-primary text-white flex items-center justify-center text-3xl sm:text-4xl font-bold">
                                             {(editableUser.firstName || '?').charAt(0).toUpperCase()}
                                         </div>
                                     )}
-                                    <label htmlFor="avatar-upload" className="mt-2 block text-sm text-center text-brand-primary hover:underline cursor-pointer">
+                                    <label htmlFor="avatar-upload" className="mt-2 block text-xs sm:text-sm text-center text-brand-primary hover:underline cursor-pointer">
                                         Cambiar foto
                                     </label>
                                     <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={loadingProfile} />
                                 </div>
-                                <div className="flex-grow space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="flex-grow space-y-3 sm:space-y-4 w-full">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900">Nombres</label>
+                                            <label className="block text-xs sm:text-sm font-medium text-text-main">Nombres</label>
                                             <input type="text" name="firstName" value={editableUser.firstName} onChange={handleInputChange} className={inputClass} />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900">Apellidos</label>
+                                            <label className="block text-xs sm:text-sm font-medium text-text-main">Apellidos</label>
                                             <input type="text" name="lastName" value={editableUser.lastName} onChange={handleInputChange} className={inputClass} />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900">Teléfono</label>
+                                            <label className="block text-xs sm:text-sm font-medium text-text-main">Teléfono</label>
                                             <input type="tel" name="phone" value={editableUser.phone} onChange={handleInputChange} className={inputClass} />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900">Fecha de Nacimiento</label>
+                                            <label className="block text-xs sm:text-sm font-medium text-text-main">Fecha de Nacimiento</label>
                                             <input 
                                                 type="date" 
                                                 name="birthDate" 
@@ -400,59 +401,59 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-900">País</label>
+                                        <label className="block text-xs sm:text-sm font-medium text-text-main">País</label>
                                         <select name="country" value={editableUser.country} onChange={handleInputChange} className={inputClass}>
                                             {countries.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg" disabled={loadingProfile}>Cancelar</button>
-                                <button onClick={handleSaveProfile} disabled={loadingProfile} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark">{loadingProfile ? 'Guardando...' : 'Guardar Cambios'}</button>
+                            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
+                                <button onClick={() => { setIsEditing(false); setError(''); }} className="py-2 px-4 bg-gray-200 text-text-sub rounded-lg text-sm font-semibold" disabled={loadingProfile}>Cancelar</button>
+                                <button onClick={handleSaveProfile} disabled={loadingProfile} className="py-2 px-4 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark text-sm">{loadingProfile ? 'Guardando...' : 'Guardar Cambios'}</button>
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col lg:flex-row gap-8">
-                            <div className="flex-1 flex flex-col items-center md:flex-row md:items-start gap-6 w-full">
-                                <div className="relative">
+                        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
+                            <div className="flex-1 flex flex-col items-center md:flex-row md:items-start gap-4 sm:gap-6 w-full">
+                                <div className="relative flex-shrink-0">
                                     {user.avatarUrl ? (
-                                        <div className="w-32 h-32 rounded-full overflow-hidden shadow-md">
+                                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full overflow-hidden shadow-md">
                                             <LazyImage src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                         </div>
                                     ) : (
-                                        <div className="w-32 h-32 rounded-full bg-brand-primary text-white flex items-center justify-center text-5xl font-bold shadow-md">
+                                        <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full bg-brand-primary text-white flex items-center justify-center text-3xl sm:text-4xl md:text-5xl font-bold shadow-md">
                                             {(user.firstName || '?').charAt(0).toUpperCase()}
                                         </div>
                                     )}
                                 </div>
-                                <div className="text-center md:text-left space-y-3 text-gray-600 w-full flex flex-col items-center md:items-start">
-                                    <p className="w-full"><span className="font-semibold text-gray-800">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
-                                    <p className="w-full"><span className="font-semibold text-gray-800">Usuario:</span> @{user.username}</p>
-                                    <p className="w-full"><span className="font-semibold text-gray-800">Email:</span> {user.email}</p>
-                                    {user.phone && <p className="w-full"><span className="font-semibold text-gray-800">Teléfono:</span> {user.phone}</p>}
-                                    {user.birthDate && <p className="w-full"><span className="font-semibold text-gray-800">Fecha de Nacimiento:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
-                                    {user.country && <p className="w-full"><span className="font-semibold text-gray-800">País:</span> {user.country}</p>}
+                                <div className="text-center md:text-left space-y-2 sm:space-y-3 text-text-sub w-full flex flex-col items-center md:items-start">
+                                    <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
+                                    <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Usuario:</span> @{user.username}</p>
+                                    <p className="w-full text-sm sm:text-base break-all"><span className="font-semibold text-text-main">Email:</span> {user.email}</p>
+                                    {user.phone && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Teléfono:</span> {user.phone}</p>}
+                                    {user.birthDate && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Fecha de Nacimiento:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
+                                    {user.country && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">País:</span> {user.country}</p>}
                                     
                                     {/* Mobile Edit Button */}
                                     <button 
                                         onClick={() => setIsEditing(true)} 
-                                        className="md:hidden mt-2 flex items-center justify-center gap-2 text-sm py-2.5 px-6 bg-blue-100 text-brand-primary rounded-xl hover:bg-blue-200 transition-colors font-bold w-full max-w-xs mx-auto"
+                                        className="md:hidden mt-2 flex items-center justify-center gap-2 text-xs sm:text-sm py-2 px-4 bg-blue-100 text-brand-primary rounded-lg hover:bg-blue-200 transition-colors font-bold w-full max-w-xs mx-auto"
                                     >
-                                        <EditIcon /> Editar Perfil
+                                        <EditIcon className="h-4 w-4" /> Editar Perfil
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center min-w-[220px] shadow-sm" data-tour="gamification-card">
-                                <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">Insignia de Comunidad</h4>
+                            <div className="w-full lg:w-auto flex-shrink-0 bg-gradient-to-br from-gray-50 to-brand-light p-3 sm:p-4 md:p-5 rounded-xl lg:rounded-2xl border border-card-border flex flex-col items-center justify-center lg:min-w-[220px] shadow-sm" data-tour="gamification-card">
+                                <h4 className="text-[10px] sm:text-xs font-bold text-brand-primary uppercase tracking-wider mb-2 sm:mb-3">Insignia de Comunidad</h4>
                                 <GamificationBadge points={gamificationPoints} size="lg" showProgress={true} />
                                 <button 
                                     onClick={() => setIsDashboardOpen(true)}
-                                    className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs uppercase tracking-wide py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                    className="mt-3 sm:mt-4 w-full bg-gradient-to-r from-brand-primary to-brand-dark text-white font-bold text-[10px] sm:text-xs uppercase tracking-wide py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg lg:rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-1.5 sm:gap-2"
                                     data-tour="gamification-dashboard-btn"
                                 >
-                                    <TrophyIcon className="h-4 w-4" /> Ver Doggy Dashboard
+                                    <TrophyIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Ver Doggy Dashboard</span><span className="sm:hidden">Dashboard</span>
                                 </button>
                             </div>
                         </div>
@@ -461,19 +462,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 
                 {/* SAVED SEARCHES SECTION */}
                 {savedSearches.length > 0 && (
-                    <div className="space-y-4">
-                        <h3 className="text-2xl font-semibold text-gray-700 flex items-center gap-2"><BellIcon className="text-brand-secondary h-6 w-6"/> Mis Alertas de Búsqueda</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-3 sm:space-y-4">
+                        <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main flex items-center gap-1.5 sm:gap-2"><BellIcon className="text-brand-secondary h-5 w-5 sm:h-6 sm:w-6"/> Mis Alertas de Búsqueda</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {savedSearches.map(search => (
-                                <div key={search.id} className="bg-white p-4 rounded-lg shadow border border-gray-200 relative group hover:border-brand-secondary transition-colors">
-                                    <h4 className="font-bold text-gray-800">{search.name}</h4>
-                                    <p className="text-xs text-gray-500 mt-1">Creada el {new Date(search.createdAt).toLocaleDateString()}</p>
+                                <div key={search.id} className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-card-border relative group hover:border-brand-secondary transition-colors">
+                                    <h4 className="font-bold text-text-main text-sm sm:text-base">{search.name}</h4>
+                                    <p className="text-[10px] sm:text-xs text-icon-gray mt-1">Creada el {new Date(search.createdAt).toLocaleDateString()}</p>
                                     <div className="mt-2 flex flex-wrap gap-1">
                                         {Object.entries(search.filters).map(([key, val]) => (
-                                            val !== 'Todos' && <span key={key} className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-600">{val as string}</span>
+                                            val !== 'Todos' && <span key={key} className="text-[9px] sm:text-[10px] bg-gray-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-text-sub">{val as string}</span>
                                         ))}
                                     </div>
-                                    <button onClick={() => handleDeleteSavedSearch(search.id)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
+                                    <button onClick={() => handleDeleteSavedSearch(search.id)} className="absolute top-2 right-2 text-icon-gray hover:text-status-lost opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="h-4 w-4" /></button>
                                 </div>
                             ))}
                         </div>
@@ -481,72 +482,72 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 )}
 
                 {/* OWNED PETS */}
-                <div className="space-y-4" data-tour="my-pets-section">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-2xl font-semibold text-gray-700">Mis Mascotas</h3>
-                        <button onClick={() => { setEditingOwnedPet(null); setIsAddPetModalOpen(true); }} className="flex items-center gap-2 bg-brand-secondary hover:bg-amber-400 text-brand-dark font-bold py-2 px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105">
-                            <PlusIcon /> Agregar Mascota
+                <div className="space-y-3 sm:space-y-4" data-tour="my-pets-section">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                        <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main">Mis Mascotas</h3>
+                        <button onClick={() => { setEditingOwnedPet(null); setIsAddPetModalOpen(true); }} className="flex items-center gap-1.5 sm:gap-2 bg-brand-secondary hover:bg-amber-400 text-brand-dark font-bold py-1.5 sm:py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-transform transform hover:scale-105 text-xs sm:text-sm">
+                            <PlusIcon className="h-4 w-4" /> <span className="hidden sm:inline">Agregar Mascota</span><span className="sm:hidden">Agregar</span>
                         </button>
                     </div>
                      {user.ownedPets && user.ownedPets.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
                             {user.ownedPets.map(pet => (
-                               <div key={pet.id} className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col relative transition-transform transform hover:-translate-y-1 hover:shadow-xl">
-                                    <button onClick={(e) => { e.stopPropagation(); setPetToDelete(pet); }} className="absolute top-2 right-2 z-10 p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"><TrashIcon /></button>
+                               <div key={pet.id} className="bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg overflow-hidden flex flex-col relative transition-transform transform hover:-translate-y-1 hover:shadow-xl">
+                                    <button onClick={(e) => { e.stopPropagation(); setPetToDelete(pet); }} className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 z-10 p-1 sm:p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"><TrashIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
                                    <div className="cursor-pointer" onClick={() => setViewingOwnedPet(pet)}>
-                                       <div className="w-full h-40">
+                                       <div className="w-full h-32 sm:h-36 md:h-40">
                                             <LazyImage src={pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'} alt={pet.name} className="w-full h-full object-cover" />
                                        </div>
-                                       <div className="p-5 flex-grow flex flex-col">
-                                           <h4 className="text-xl font-bold text-brand-dark">{pet.name}</h4>
-                                           <p className="text-gray-600 text-sm">{pet.animalType} - {pet.breed}</p>
+                                       <div className="p-3 sm:p-4 md:p-5 flex-grow flex flex-col">
+                                           <h4 className="text-base sm:text-lg md:text-xl font-bold text-brand-dark">{pet.name}</h4>
+                                           <p className="text-text-sub text-xs sm:text-sm">{pet.animalType} - {pet.breed}</p>
                                        </div>
                                    </div>
                                </div>
                             ))}
                         </div>
                     ) : (
-                         <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
-                            <p className="text-lg text-gray-500">Aún no has agregado ninguna de tus mascotas.</p>
+                         <div className="text-center py-8 sm:py-10 px-4 sm:px-6 bg-white rounded-lg shadow-sm border border-card-border">
+                            <p className="text-sm sm:text-base md:text-lg text-text-sub">Aún no has agregado ninguna de tus mascotas.</p>
                         </div>
                     )}
                 </div>
 
                 {/* SAVED PETS */}
-                <div className="space-y-4" data-tour="saved-pets-section">
-                    <h3 className="text-2xl font-semibold text-gray-700">Publicaciones guardadas</h3>
+                <div className="space-y-3 sm:space-y-4" data-tour="saved-pets-section">
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main">Publicaciones guardadas</h3>
                     {savedPets.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
                             {savedPets.map(pet => {
                                 const petOwner = users.find(u => u.email === pet.userEmail);
                                 return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                             })}
                         </div>
                     ) : (
-                        <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
-                            <p className="text-lg text-gray-500">No has guardado ninguna publicación.</p>
+                        <div className="text-center py-8 sm:py-10 px-4 sm:px-6 bg-white rounded-lg shadow-sm border border-card-border">
+                            <p className="text-sm sm:text-base md:text-lg text-text-sub">No has guardado ninguna publicación.</p>
                         </div>
                     )}
                 </div>
 
                 {/* MY REPORTS (PAGINATED & FILTERABLE) */}
-                <div className="space-y-4">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100 pb-4 mb-4">
-                        <div className="flex items-center gap-4 relative">
-                            <h3 className="text-2xl font-semibold text-gray-700 whitespace-nowrap">Mis reportes</h3>
+                <div className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 border-b border-card-border pb-3 sm:pb-4 mb-3 sm:mb-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 md:gap-4 relative w-full md:w-auto">
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main whitespace-nowrap">Mis reportes</h3>
                             
                             {/* Dropdown Filter */}
                             <div className="relative" ref={filterRef}>
                                 <button
                                     onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm border border-gray-200"
+                                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 text-text-sub rounded-lg font-medium transition-colors text-xs sm:text-sm border border-card-border"
                                 >
                                     <span>{filterOptions.find(o => o.value === filterStatus)?.label || 'Filtrar'}</span>
-                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                                    <ChevronDownIcon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {isFilterDropdownOpen && (
-                                    <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-20 py-1 overflow-hidden animate-fade-in-up">
+                                    <div className="absolute top-full left-0 mt-2 w-40 sm:w-48 bg-white rounded-xl shadow-xl border border-card-border z-20 py-1 overflow-hidden animate-fade-in-up">
                                         {filterOptions.map((option) => (
                                             <button
                                                 key={option.value}
@@ -554,8 +555,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                                     setFilterStatus(option.value);
                                                     setIsFilterDropdownOpen(false);
                                                 }}
-                                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                                                    filterStatus === option.value ? 'font-bold text-brand-primary bg-blue-50' : 'text-gray-600'
+                                                className={`w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                                                    filterStatus === option.value ? 'font-bold text-brand-primary bg-brand-light' : 'text-text-sub'
                                                 }`}
                                             >
                                                 {option.label}
@@ -573,18 +574,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                     </div>
 
                     {isLoadingReports ? (
-                        <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
+                        <div className="text-center py-8 sm:py-10"><div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                     ) : myReportedPets.length > 0 ? (
                         <>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
                                 {myReportedPets.filter(p => p).map(pet => {
                                     const expired = isPetExpired(pet);
                                     return (
                                         <div key={pet.id} className="relative">
                                             {expired && (
-                                                <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-xl border-2 border-red-200 backdrop-blur-sm">
-                                                    <p className="text-red-600 font-bold mb-2 text-lg uppercase">Expirado</p>
-                                                    {onRenewPet && <button onClick={() => onRenewPet(pet)} className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse"><SparklesIcon /> Renovar</button>}
+                                                <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-lg sm:rounded-xl border-2 border-red-200 backdrop-blur-sm p-2">
+                                                    <p className="text-status-lost font-bold mb-2 text-xs sm:text-sm md:text-base uppercase">Expirado</p>
+                                                    {onRenewPet && <button onClick={() => onRenewPet(pet)} className="flex items-center gap-1.5 sm:gap-2 bg-brand-primary text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse text-xs sm:text-sm"><SparklesIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Renovar</button>}
                                                 </div>
                                             )}
                                             <PetCard pet={pet} owner={user} onViewUser={onViewUser} onNavigate={onNavigate} />
@@ -594,44 +595,44 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                             </div>
                             
                             {/* Mobile Pagination (Bottom) */}
-                            <div className="flex justify-center mt-6 md:hidden">
+                            <div className="flex justify-center mt-4 sm:mt-6 md:hidden">
                                 <Pagination />
                             </div>
                         </>
                     ) : (
-                        <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md">
-                            <p className="text-xl text-gray-500">No hay publicaciones en esta categoría.</p>
-                            <p className="text-gray-400 mt-2">Intenta cambiar el filtro o crea un nuevo reporte.</p>
+                        <div className="text-center py-12 sm:py-16 px-4 sm:px-6 bg-white rounded-lg shadow-sm border border-card-border">
+                            <p className="text-base sm:text-lg md:text-xl text-text-sub">No hay publicaciones en esta categoría.</p>
+                            <p className="text-icon-gray mt-2 text-sm sm:text-base">Intenta cambiar el filtro o crea un nuevo reporte.</p>
                         </div>
                     )}
                 </div>
 
                 {/* RATINGS */}
-                <div className="space-y-4" data-tour="ratings-section">
-                    <h3 className="text-2xl font-semibold text-gray-700">Mis Calificaciones</h3>
+                <div className="space-y-3 sm:space-y-4" data-tour="ratings-section">
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main">Mis Calificaciones</h3>
                     {isLoadingRatings ? (
-                        <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto"></div></div>
+                        <div className="text-center py-8 sm:py-10"><div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                     ) : myRatings.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                             {myRatings.map(rating => (
-                                <div key={rating.id} className="bg-white p-4 rounded-lg shadow border border-gray-100">
+                                <div key={rating.id} className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-card-border">
                                     <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-2">
-                                            {rating.raterAvatar ? <img src={rating.raterAvatar} className="w-8 h-8 rounded-full object-cover" /> : <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-xs">{rating.raterName.charAt(0).toUpperCase()}</div>}
-                                            <div>
-                                                <p className="text-sm font-bold text-gray-800">@{rating.raterName}</p>
-                                                <p className="text-xs text-gray-500">{new Date(rating.createdAt).toLocaleDateString()}</p>
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            {rating.raterAvatar ? <img src={rating.raterAvatar} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0" /> : <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-200 rounded-full flex items-center justify-center text-icon-gray font-bold text-[10px] sm:text-xs flex-shrink-0">{rating.raterName.charAt(0).toUpperCase()}</div>}
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs sm:text-sm font-bold text-text-main truncate">@{rating.raterName}</p>
+                                                <p className="text-[10px] sm:text-xs text-icon-gray">{new Date(rating.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>
                                         <StarRating rating={rating.rating} size="sm" />
                                     </div>
-                                    <p className="text-sm text-gray-600">{rating.comment}</p>
+                                    <p className="text-xs sm:text-sm text-text-sub break-words">{rating.comment}</p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-10 px-6 bg-white rounded-lg shadow-md">
-                            <p className="text-lg text-gray-500">Aún no tienes calificaciones.</p>
+                        <div className="text-center py-8 sm:py-10 px-4 sm:px-6 bg-white rounded-lg shadow-sm border border-card-border">
+                            <p className="text-sm sm:text-base md:text-lg text-text-sub">Aún no tienes calificaciones.</p>
                         </div>
                     )}
                 </div>

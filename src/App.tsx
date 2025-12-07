@@ -565,7 +565,7 @@ const App: React.FC = () => {
         { target: '[data-tour="header-report-btn"]', title: '¡Reporta una Mascota!', content: 'Aquí puedes publicar rápidamente si perdiste a tu mascota, encontraste una o viste una deambulando.', position: 'bottom' },
         { target: '[data-tour="nav-map"]', title: 'Mapa de Mascotas', content: 'Explora un mapa interactivo para ver dónde se han perdido o encontrado mascotas cerca de tu ubicación.', position: 'right' },
         { target: '[data-tour="nav-campaigns"]', title: 'Campañas de Ayuda', content: 'Descubre eventos de esterilización y adopción organizados por la comunidad.', position: 'right' },
-        { target: '[data-tour="nav-reunited"]', title: 'Finales Felices', content: 'Inspírate con historias de éxito de mascotas que regresaron a casa.', position: 'right' },
+        { target: '[data-tour="nav-reunited"]', title: 'Reencuentros', content: 'Inspírate con historias de éxito de mascotas que regresaron a casa.', position: 'right' },
         { target: '[data-tour="sidebar-filters"]', title: 'Filtra tu Búsqueda', content: 'Usa estos filtros para encontrar mascotas específicas por estado (perdido/encontrado), tipo, raza o ubicación.', position: 'right' },
         { target: '[data-tour="header-account-btn"]', title: 'Tu Perfil', content: 'Accede a tu perfil para ver tus publicaciones, mensajes y tu progreso en el sistema de puntos.', position: 'bottom' }
     ];

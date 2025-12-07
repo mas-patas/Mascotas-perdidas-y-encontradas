@@ -66,14 +66,14 @@ const AboutPage: React.FC = () => {
                             
                             <FadeInWhenVisible delay={200}>
                                 <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-8 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                                    Amor que <span className="text-purple-200">Reúne Familias.</span>
+                                    Amor que <span className="text-brand-secondary">Reúne Familias.</span>
                                 </h1>
                             </FadeInWhenVisible>
                             
                             <FadeInWhenVisible delay={400}>
                                 <button 
                                     onClick={() => navigate('/login')}
-                                    className="bg-white text-purple-900 font-bold py-4 px-10 rounded-full shadow-xl hover:bg-purple-50 transition-all transform hover:scale-105 text-lg"
+                                    className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full shadow-xl hover:bg-brand-light transition-all transform hover:scale-105 text-lg"
                                 >
                                     Únete a la Causa
                                 </button>
@@ -84,35 +84,35 @@ const AboutPage: React.FC = () => {
             </div>
 
             {/* Impact Stats Strip */}
-            <div className="bg-purple-200 py-12 text-purple-900 relative overflow-hidden">
+            <div className="bg-brand-light py-12 text-brand-dark relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-64 h-64 bg-white opacity-20 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
                 <div className="absolute bottom-0 right-0 w-96 h-96 bg-white opacity-20 rounded-full translate-x-1/3 translate-y-1/3"></div>
                 
                 <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center relative z-10">
                     <FadeInWhenVisible delay={100}>
                         <div className="flex flex-col items-center space-y-2">
-                            <div className="bg-white/40 p-3 rounded-full mb-2 text-purple-800">
+                            <div className="bg-white/40 p-3 rounded-full mb-2 text-brand-primary">
                                 <HeartIcon className="h-8 w-8" filled />
                             </div>
-                            <span className="text-4xl font-black tracking-tighter text-purple-800">100%</span>
+                            <span className="text-4xl font-black tracking-tighter text-brand-dark">100%</span>
                             <span className="text-sm font-bold uppercase tracking-widest opacity-80">Compromiso</span>
                         </div>
                     </FadeInWhenVisible>
                     <FadeInWhenVisible delay={200}>
-                        <div className="flex flex-col items-center space-y-2 border-l-0 md:border-l border-r-0 md:border-r border-purple-300/50">
-                            <div className="bg-white/40 p-3 rounded-full mb-2 text-purple-800">
+                        <div className="flex flex-col items-center space-y-2 border-l-0 md:border-l border-r-0 md:border-r border-card-border">
+                            <div className="bg-white/40 p-3 rounded-full mb-2 text-brand-primary">
                                 <UsersIcon className="h-8 w-8" />
                             </div>
-                            <span className="text-4xl font-black tracking-tighter text-purple-800">+5,000</span>
+                            <span className="text-4xl font-black tracking-tighter text-brand-dark">+5,000</span>
                             <span className="text-sm font-bold uppercase tracking-widest opacity-80">Comunidad Activa</span>
                         </div>
                     </FadeInWhenVisible>
                     <FadeInWhenVisible delay={300}>
                         <div className="flex flex-col items-center space-y-2">
-                            <div className="bg-white/40 p-3 rounded-full mb-2 text-purple-800">
+                            <div className="bg-white/40 p-3 rounded-full mb-2 text-brand-primary">
                                 <HomeIcon className="h-8 w-8" />
                             </div>
-                            <span className="text-4xl font-black tracking-tighter text-purple-800">24/7</span>
+                            <span className="text-4xl font-black tracking-tighter text-brand-dark">24/7</span>
                             <span className="text-sm font-bold uppercase tracking-widest opacity-80">Plataforma Disponible</span>
                         </div>
                     </FadeInWhenVisible>
@@ -125,34 +125,34 @@ const AboutPage: React.FC = () => {
                     <div className="flex flex-col lg:flex-row items-center gap-16">
                         <div className="lg:w-1/2 space-y-6">
                             <FadeInWhenVisible>
-                                <div className="inline-block bg-purple-100 text-purple-700 font-bold px-4 py-1 rounded-full text-sm uppercase tracking-wide mb-2">
+                                <div className="inline-block bg-brand-light text-brand-primary font-bold px-4 py-1 rounded-full text-sm uppercase tracking-wide mb-2">
                                     Quiénes Somos
                                 </div>
-                                <h2 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+                                <h2 className="text-4xl md:text-5xl font-bold text-text-main leading-tight">
                                     Más que una App, <br/>somos esperanza.
                                 </h2>
-                                <p className="text-lg text-gray-600 leading-relaxed">
+                                <p className="text-lg text-text-sub leading-relaxed">
                                     En <strong>Mas Patas</strong>, entendemos que una mascota no es solo un animal, es un miembro amado de la familia. La angustia de perder a un compañero es abrumadora, y las herramientas tradicionales ya no son suficientes.
                                 </p>
-                                <p className="text-lg text-gray-600 leading-relaxed">
+                                <p className="text-lg text-text-sub leading-relaxed">
                                     Nacimos en Perú con una misión clara: <strong>centralizar, agilizar y potenciar</strong> la búsqueda de mascotas perdidas utilizando Inteligencia Artificial y geolocalización.
                                 </p>
                                 <div className="pt-4">
                                     <div className="flex items-center gap-4 mb-4">
-                                        <div className="bg-purple-50 p-2 rounded-full text-purple-600"><SearchIcon /></div>
-                                        <span className="font-semibold text-gray-800 text-lg">Búsqueda Inteligente con IA</span>
+                                        <div className="bg-brand-light p-2 rounded-full text-brand-primary"><SearchIcon /></div>
+                                        <span className="font-semibold text-text-main text-lg">Búsqueda Inteligente con IA</span>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <div className="bg-purple-50 p-2 rounded-full text-purple-600"><SparklesIcon /></div>
-                                        <span className="font-semibold text-gray-800 text-lg">Alertas Comunitarias Inmediatas</span>
+                                        <div className="bg-brand-light p-2 rounded-full text-brand-primary"><SparklesIcon /></div>
+                                        <span className="font-semibold text-text-main text-lg">Alertas Comunitarias Inmediatas</span>
                                     </div>
                                 </div>
                             </FadeInWhenVisible>
                         </div>
                         <div className="lg:w-1/2 relative">
                             <FadeInWhenVisible delay={200}>
-                                <div className="absolute -top-4 -left-4 w-24 h-24 bg-purple-200 rounded-full z-0"></div>
-                                <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-purple-100 opacity-50 rounded-full z-0"></div>
+                                <div className="absolute -top-4 -left-4 w-24 h-24 bg-brand-light rounded-full z-0"></div>
+                                <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-brand-light opacity-50 rounded-full z-0"></div>
                                 <img 
                                     src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1469&q=80" 
                                     alt="Owner hugging dog" 
@@ -165,12 +165,12 @@ const AboutPage: React.FC = () => {
             </section>
 
             {/* Values Section */}
-            <section className="py-20 bg-purple-50">
+            <section className="py-20 bg-brand-light">
                 <div className="max-w-7xl mx-auto px-6">
                     <FadeInWhenVisible>
                         <div className="text-center max-w-3xl mx-auto mb-16">
-                            <h2 className="text-3xl md:text-4xl font-bold text-purple-900 mb-4">Nuestro Estándar de Oro</h2>
-                            <p className="text-xl text-gray-600">
+                            <h2 className="text-3xl md:text-4xl font-bold text-brand-dark mb-4">Nuestro Estándar de Oro</h2>
+                            <p className="text-xl text-text-sub">
                                 Nos inspira el amor incondicional de las mascotas. Por eso, construimos una plataforma basada en tres pilares fundamentales.
                             </p>
                         </div>
@@ -178,36 +178,36 @@ const AboutPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <FadeInWhenVisible delay={100}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-purple-400 h-full">
-                                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-6 text-purple-600">
+                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-brand-primary h-full">
+                                <div className="w-16 h-16 bg-brand-light rounded-2xl flex items-center justify-center mb-6 text-brand-primary">
                                     <SparklesIcon className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-3">Innovación</h3>
-                                <p className="text-gray-600 leading-relaxed">
+                                <h3 className="text-2xl font-bold text-text-main mb-3">Innovación</h3>
+                                <p className="text-text-sub leading-relaxed">
                                     No solo publicamos fotos. Usamos algoritmos de reconocimiento visual (Gemini AI) para sugerir coincidencias automáticamente.
                                 </p>
                             </div>
                         </FadeInWhenVisible>
 
                         <FadeInWhenVisible delay={200}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-fuchsia-400 h-full">
-                                <div className="w-16 h-16 bg-fuchsia-100 rounded-2xl flex items-center justify-center mb-6 text-fuchsia-600">
+                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-brand-secondary h-full">
+                                <div className="w-16 h-16 bg-yellow-50 rounded-2xl flex items-center justify-center mb-6 text-brand-secondary">
                                     <UsersIcon className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-3">Comunidad</h3>
-                                <p className="text-gray-600 leading-relaxed">
+                                <h3 className="text-2xl font-bold text-text-main mb-3">Comunidad</h3>
+                                <p className="text-text-sub leading-relaxed">
                                     La tecnología no busca mascotas, las personas sí. Fomentamos una red de vecinos y veterinarias listos para actuar.
                                 </p>
                             </div>
                         </FadeInWhenVisible>
 
                         <FadeInWhenVisible delay={300}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-pink-400 h-full">
-                                <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mb-6 text-pink-500">
+                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-status-lost h-full">
+                                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6 text-status-lost">
                                     <HeartIcon className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-3">Empatía</h3>
-                                <p className="text-gray-600 leading-relaxed">
+                                <h3 className="text-2xl font-bold text-text-main mb-3">Empatía</h3>
+                                <p className="text-text-sub leading-relaxed">
                                     Sabemos lo que se siente. Diseñamos cada función pensando en reducir la ansiedad del dueño y proteger el bienestar animal.
                                 </p>
                             </div>
@@ -234,7 +234,7 @@ const AboutPage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button 
                                 onClick={() => navigate('/login')}
-                                className="bg-white text-purple-900 font-bold py-4 px-10 rounded-full text-lg shadow-lg hover:bg-purple-50 transition-colors"
+                                className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full text-lg shadow-lg hover:bg-brand-light transition-colors"
                             >
                                 Crear Cuenta Gratis
                             </button>

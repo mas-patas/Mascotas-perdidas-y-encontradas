@@ -1,0 +1,177 @@
+---
+# Arquitectura del Proyecto
+
+This project uses a **feature-driven architecture** to organize code by business domain rather than by file type. This makes the codebase more scalable and maintainable.
+
+## Estructura de Carpetas
+
+```
+src/
+├── features/              # Módulos de características (lógica de negocio)
+│   ├── auth/             # Autenticación y configuración de usuario
+│   ├── pets/             # Gestión de mascotas (reportes, listados, detalles)
+│   ├── profile/          # Perfiles de usuario
+│   ├── admin/            # Panel de administración
+│   ├── campaigns/        # Gestión de campañas (esterilización, adopción)
+│   ├── chat/             # Sistema de mensajería
+│   ├── support/          # Tickets de soporte
+│   ├── reports/          # Sistema de reportes
+│   ├── businesses/      # Listados de negocios (veterinarias, pet shops)
+│   ├── maps/             # Vistas de mapas (Leaflet)
+│   ├── gamification/     # Sistema de puntos y badges
+│   └── notifications/    # Notificaciones
+│
+├── shared/               # Componentes y código compartido
+│   ├── components/       # Componentes UI reutilizables
+│   └── ui/               # Primitivos UI (futuro)
+│
+├── pages/                # Componentes de página de nivel superior
+├── api/                  # Capa de API (React Query)
+│   ├── *.api.ts          # Funciones de API (llamadas a Supabase)
+│   ├── *.query.ts        # Hooks de consulta (useQuery, useInfiniteQuery)
+│   ├── *.mutation.ts     # Hooks de mutación (useMutation)
+│   └── *.types.ts        # Tipos TypeScript específicos de API
+├── contexts/             # Contextos de React (AuthContext, ToastContext)
+├── hooks/                # Hooks globales (usePets, usePetFilters, useGamification)
+├── services/             # Servicios de negocio
+│   ├── supabaseClient.ts # Cliente de Supabase
+│   ├── geminiService.ts  # Integración con Gemini AI para búsqueda
+│   ├── analytics.ts       # Google Analytics
+│   └── gamificationService.ts
+├── utils/                # Funciones utilitarias (formatters, mappers, uuid)
+├── data/                 # Datos estáticos (breeds.ts, locations.ts)
+├── types.ts              # Tipos TypeScript globales
+└── constants.ts          # Constantes globales
+```
+
+## Estructura de Features
+
+Cada feature sigue esta estructura:
+
+```
+features/
+└── [feature-name]/
+    ├── components/        # Componentes específicos del feature
+    ├── hooks/            # Hooks específicos del feature (opcional)
+    ├── utils/            # Utilidades específicas del feature (opcional)
+    └── index.ts          # API pública (exports)
+```
+
+## Patrones de Importación
+
+### Usar Path Aliases (Recomendado)
+
+```typescript
+// Feature imports
+import { PetCard, PetList } from '@/features/pets';
+import { AuthPage } from '@/features/auth';
+import { AdminDashboard } from '@/features/admin';
+
+// Shared components
+import { Layout, Header, Toast } from '@/shared';
+
+// API hooks
+import { usePets, useCreatePet, useUpdatePet } from '@/api';
+
+// Pages
+import { AboutPage } from '@/pages';
+
+// Contexts
+import { useAuth } from '@/contexts/AuthContext';
+
+// Hooks globales
+import { usePetFilters } from '@/hooks/usePetFilters';
+
+// Services
+import { supabase } from '@/services/supabaseClient';
+
+// Utils
+import { formatDate } from '@/utils/formatters';
+
+// Types
+import type { Pet, User } from '@/types';
+```
+
+### Path Aliases Configurados
+
+- `@/features/[feature]` → `./src/features/[feature]`
+- `@/shared/...` → `./src/shared/...`
+- `@/api/...` → `./src/api/...`
+- `@/pages/...` → `./src/pages/...`
+- `@/*` → `./src/*`
+
+## Principios de Arquitectura
+
+### 1. Aislamiento de Features
+- Cada feature es autocontenido
+- Features NO deben importar directamente de otros features
+- Features pueden importar de: `shared/`, `api/`, `utils/`, `hooks/`, `services/`, `contexts/`
+- Pages pueden importar de cualquier feature
+
+### 2. Límites Claros
+- No hay dependencias circulares entre features
+- Cada feature expone solo lo necesario vía `index.ts`
+- La comunicación entre features se hace a través de:
+  - Contextos globales (AuthContext, ToastContext)
+  - API hooks compartidos
+  - Props pasadas desde componentes padre
+
+### 3. Código Compartido
+- Componentes reutilizables → `shared/components`
+- Primitivos UI → `shared/ui` (futuro)
+- Lógica de negocio compartida → `services/`
+- Utilidades → `utils/`
+
+### 4. API Layer (React Query)
+- Separación clara entre:
+  - `*.api.ts`: Funciones puras que llaman a Supabase
+  - `*.query.ts`: Hooks de consulta (useQuery, useInfiniteQuery)
+  - `*.mutation.ts`: Hooks de mutación (useMutation)
+  - `*.types.ts`: Tipos específicos de la API
+
+### 5. Gestión de Estado
+- Estado global: React Context (AuthContext, ToastContext)
+- Estado del servidor: React Query (cache, sincronización)
+- Estado local: useState, useReducer en componentes
+- Estado de formularios: react-hook-form
+
+## Reglas de Ubicación
+
+- **Nueva lógica de negocio** → `features/[feature]/...`
+- **Nuevo componente reutilizable** → `shared/components`
+- **Nuevo primitivo UI** → `shared/ui`
+- **Nuevo hook de API** → `api/`
+- **Nuevo hook global** → `hooks/`
+- **Nueva utilidad global** → `utils/`
+- **Integración con Supabase** → `services/`
+- **Nuevo contexto** → `contexts/`
+
+## Convenciones de Nombres
+
+- **Componentes**: PascalCase (PetCard.tsx, AdminDashboard.tsx)
+- **Hooks**: camelCase con prefijo `use` (usePets.ts, usePetFilters.ts)
+- **Utilidades**: camelCase (formatters.ts, mappers.ts)
+- **API files**: `*.api.ts`, `*.query.ts`, `*.mutation.ts`, `*.types.ts`
+- **Servicios**: camelCase (supabaseClient.ts, geminiService.ts)
+
+## Dependencias Principales
+
+- **React 18.3.1** + **TypeScript 5.8.2**
+- **React Router DOM 6.22.3** (routing)
+- **TanStack React Query 5.28.4** (data fetching, cache)
+- **Supabase 2.39.7** (backend: auth, database, storage)
+- **React Hook Form 7.51.0** (formularios)
+- **Vite 7.2.4** (build tool)
+- **TailwindCSS** (styling via CDN)
+- **Leaflet** (mapas)
+- **Google Gemini AI** (búsqueda inteligente de mascotas)
+
+## Testing
+
+- **Vitest** para unit tests
+- **@testing-library/react** para tests de componentes
+- **Playwright** para e2e tests
+- Tests ubicados junto al código: `*.test.ts`, `*.test.tsx`
+
+alwaysApply: true
+---

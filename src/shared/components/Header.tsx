@@ -166,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 🔵 Vi una mascota perdida
                             </button>
                             <div className="border-t border-gray-100 my-1"></div>
-                            <button onClick={() => { onOpenAdoptionModal(); setIsReportDropdownOpen(false); }} className="w-full text-left px-4 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-purple-700 hover:bg-purple-50 font-bold flex items-center gap-2 transition-all">
+                            <button onClick={() => { onOpenAdoptionModal(); setIsReportDropdownOpen(false); }} className="w-full text-left px-4 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-status-adoption hover:bg-status-adoption/10 font-bold flex items-center gap-2 transition-all">
                                 💜 Dar en adopción
                             </button>
                         </div>
@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* RIGHT: Navigation & Profile */}
                 <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-1 justify-end min-w-0">
-                    <button onClick={() => navigate('/tips')} className={`${navButtonClass} hidden xl:flex`} aria-label="Consejos">
+                    <button onClick={() => navigate('/tips')} className={`${navButtonClass} hidden xl:flex`} aria-label="Tips y Consejos">
                         <LightbulbIcon className="h-5 w-5" /> Tips
                     </button>
 

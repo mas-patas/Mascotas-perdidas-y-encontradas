@@ -97,7 +97,7 @@ const ReunitedPetsPage: React.FC = () => {
     return (
         <div className="bg-white min-h-screen pb-20 font-sans">
             <Helmet>
-                <title>Finales Felices | Mas Patas</title>
+                <title>Reencuentros | Mas Patas</title>
                 <meta name="description" content="Historias reales de reencuentros." />
             </Helmet>
 
@@ -187,7 +187,7 @@ const ReunitedPetsPage: React.FC = () => {
                 <div className="bg-white rounded-2xl shadow-xl p-6 grid grid-cols-2 md:grid-cols-3 divide-x divide-gray-100">
                     <div className="text-center px-4">
                         <p className="text-3xl font-black text-brand-primary">{totalReunited}</p>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">Finales Felices</p>
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">Reencuentros</p>
                     </div>
                     <div className="text-center px-4">
                         <p className="text-3xl font-black text-green-500">{fastReunions}</p>

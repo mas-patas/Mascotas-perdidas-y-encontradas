@@ -42,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({
     return (
         <div className="h-screen overflow-hidden bg-brand-light flex flex-col font-sans">
             {isGhosting && (
-                 <div className="bg-yellow-400 text-yellow-900 text-center py-1 px-4 text-sm font-bold flex justify-between items-center flex-shrink-0">
+                 <div className="bg-brand-secondary text-brand-dark text-center py-1 px-4 text-sm font-bold flex justify-between items-center flex-shrink-0">
                     <span>Modo Fantasma: Actuando como {currentUser?.email}</span>
                     <button onClick={stopGhosting} className="bg-white bg-opacity-50 hover:bg-opacity-75 rounded px-2 py-0.5 text-xs">Salir</button>
                 </div>
@@ -80,18 +80,18 @@ export const Layout: React.FC<LayoutProps> = ({
                     <div className="p-2 sm:p-3 md:p-4 pt-2 lg:p-8 lg:pt-4 flex-grow">
                         <Outlet />
                     </div>
-                    {/* Global Footer with Slogan - Updated to Light Purple */}
-                    <footer className="bg-purple-50 text-purple-900 py-8 mt-auto border-t border-purple-100 flex-shrink-0">
+                    {/* Global Footer with Slogan - Using brand colors */}
+                    <footer className="bg-white text-text-main py-8 mt-auto border-t border-card-border flex-shrink-0">
                         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
                             <div className="max-w-lg">
-                                <p className="font-serif italic text-purple-800 text-xs md:text-sm leading-relaxed opacity-80">
+                                <p className="font-serif italic text-text-sub text-xs md:text-sm leading-relaxed opacity-80">
                                     "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERIAN IRSE"
                                 </p>
                             </div>
-                            <div className="flex flex-col items-center md:items-end text-sm text-purple-700">
+                            <div className="flex flex-col items-center md:items-end text-sm text-text-sub">
                                 <p>&copy; {new Date().getFullYear()} Mas Patas. Todos los derechos reservados.</p>
                                 <div className="mt-2 flex gap-4">
-                                    <Link to="/terminos" className="hover:underline">Términos y Condiciones</Link>
+                                    <Link to="/terminos" className="hover:text-brand-primary transition-colors">Términos y Condiciones</Link>
                                     <span>|</span>
                                     <p>Hecho con <span className="text-red-500">♥</span> en Perú</p>
                                 </div>

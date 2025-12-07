@@ -224,7 +224,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
                         <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
                         <div class="flex flex-wrap justify-center gap-1 mb-2">
-                            <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">${pet.status}</span>
+                            <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-status-lost' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-status-found' : pet.status === PET_STATUS.AVISTADO ? 'bg-status-sighted' : 'bg-status-adoption'}">${pet.status}</span>
                             ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
                         </div>
                         <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
@@ -290,7 +290,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                                 { id: PET_STATUS.PERDIDO, label: 'Perdidos', color: 'bg-red-500' },
                                 { id: PET_STATUS.ENCONTRADO, label: 'Encontrados', color: 'bg-green-500' },
                                 { id: PET_STATUS.AVISTADO, label: 'Avistados', color: 'bg-blue-500' },
-                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-purple-500' },
+                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-status-adoption' },
                                 { id: 'CAMPAIGNS', label: 'Campañas', color: 'bg-indigo-600' }
                             ].map(status => (
                                 <label key={status.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
