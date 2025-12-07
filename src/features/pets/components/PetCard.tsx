@@ -64,7 +64,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
 
                 {/* Status Badge - Top Left */}
                 <div 
-                    className="absolute top-3 left-3 px-2 py-1 text-[10px] font-bold rounded-md shadow-sm z-10 uppercase tracking-wide"
+                    className="absolute top-2 left-2 sm:top-3 sm:left-3 px-1.5 sm:px-2 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-bold rounded-md shadow-sm z-10 uppercase tracking-wide"
                     style={statusStyle}
                 >
                     {pet.status}
@@ -72,7 +72,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
 
                 {/* Reward Badge - Bottom Left (Green) */}
                 {pet.reward && pet.reward > 0 && !isReunited && (
-                    <div className="absolute bottom-3 left-3 px-2 py-1 bg-[#4CAF50] text-white text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-1">
+                    <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#4CAF50] text-white text-[9px] sm:text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-0.5 sm:gap-1">
                         <span>💵 Recompensa</span>
                     </div>
                 )}
@@ -85,32 +85,33 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
                             e.preventDefault();
                             isSaved ? unsavePet(pet.id) : savePet(pet.id);
                         }}
-                        className={`absolute top-2 right-2 p-1.5 rounded-full transition-all duration-200 z-10 shadow-sm ${isSaved ? 'bg-[#FF4F4F] text-white' : 'bg-white/80 text-gray-400 hover:text-[#FF4F4F] hover:bg-white'}`}
+                        className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1 sm:p-1.5 rounded-full transition-all duration-200 z-10 shadow-sm ${isSaved ? 'bg-[#FF4F4F] text-white' : 'bg-white/80 text-gray-400 hover:text-[#FF4F4F] hover:bg-white'}`}
+                        aria-label={isSaved ? "Quitar de guardados" : "Guardar mascota"}
                     >
-                        <BookmarkIcon className="h-3.5 w-3.5" filled={isSaved} />
+                        <BookmarkIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" filled={isSaved} />
                     </button>
                 )}
             </div>
             
             {/* Content Body - Compact & Clean */}
-            <div className="p-3 flex flex-col flex-grow gap-1">
+            <div className="p-2 sm:p-3 flex flex-col flex-grow gap-0.5 sm:gap-1">
                 <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-[#222222] text-base truncate leading-tight w-full" title={pet.name}>
+                    <h3 className="font-bold text-[#222222] text-sm sm:text-base truncate leading-tight w-full" title={pet.name}>
                         {pet.name === 'Desconocido' ? pet.animalType : pet.name}
                     </h3>
                 </div>
                 
-                <p className="text-[#555555] text-xs truncate">
+                <p className="text-[#555555] text-[10px] sm:text-xs truncate">
                     {pet.breed} • {pet.color}
                 </p>
                 
-                <div className="mt-auto pt-2 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs text-[#555555]">
-                        <LocationMarkerIcon className="flex-shrink-0 text-gray-400 h-3 w-3" />
-                        <span className="truncate max-w-[140px]">{pet.location.split(',')[0]}</span>
+                <div className="mt-auto pt-1.5 sm:pt-2 space-y-0.5 sm:space-y-1">
+                    <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-[#555555]">
+                        <LocationMarkerIcon className="flex-shrink-0 text-gray-400 h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                        <span className="truncate max-w-[100px] sm:max-w-[140px]">{pet.location.split(',')[0]}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-[#555555]">
-                        <CalendarIcon className="flex-shrink-0 text-gray-400 h-3 w-3" />
+                    <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-[#555555]">
+                        <CalendarIcon className="flex-shrink-0 text-gray-400 h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         <span>{dateDisplay}</span>
                     </div>
                 </div>

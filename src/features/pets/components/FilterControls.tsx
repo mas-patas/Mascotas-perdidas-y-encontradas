@@ -66,10 +66,10 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
         }));
     };
     
-    // Styling: Semi-transparent white inputs on blue gradient
-    const selectClass = "w-full p-2.5 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-transparent block transition-colors option:text-gray-900";
-    const labelClass = "block mb-1.5 text-xs font-bold text-white/80 uppercase tracking-wider";
-    const navLinkClass = (isActive: boolean) => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${isActive ? 'bg-white/20 text-white shadow-lg' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
+    // Styling: Semi-transparent white inputs on blue gradient - Optimized for mobile
+    const selectClass = "w-full p-2 sm:p-2.5 bg-white/10 border border-white/20 rounded-lg text-xs sm:text-sm text-white placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-transparent block transition-colors option:text-gray-900";
+    const labelClass = "block mb-1 sm:mb-1.5 text-[10px] sm:text-xs font-bold text-white/80 uppercase tracking-wider";
+    const navLinkClass = (isActive: boolean) => `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-200 font-medium text-sm sm:text-base ${isActive ? 'bg-white/20 text-white shadow-lg' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
 
     return (
         <>
@@ -79,36 +79,36 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                 className={`
                     bg-gradient-to-b from-sky-400 to-blue-900 text-white flex flex-col shadow-2xl border-r border-white/10
                     transition-transform duration-300 ease-in-out
-                    fixed inset-y-0 left-0 w-72 z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
-                    pt-20 lg:pt-0
+                    fixed inset-y-0 left-0 w-[85vw] max-w-[320px] sm:w-[75vw] sm:max-w-[360px] lg:w-72 lg:max-w-none z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
+                    pt-14 sm:pt-16 md:pt-20 lg:pt-0
                     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                     ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
                 `}
                 data-tour="sidebar-menu"
             >
-                <div className="p-6 pb-2">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-sm font-bold text-white/70 uppercase tracking-widest">Navegación</h2>
-                        <button onClick={onClose} className="lg:hidden text-white hover:text-gray-200 text-2xl">&times;</button>
+                <div className="p-3 sm:p-4 md:p-6 pb-2">
+                    <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
+                        <h2 className="text-xs sm:text-sm font-bold text-white/70 uppercase tracking-widest">Navegación</h2>
+                        <button onClick={onClose} className="lg:hidden text-white hover:text-gray-200 text-xl sm:text-2xl p-1" aria-label="Cerrar menú">&times;</button>
                     </div>
                     
-                    <nav className="space-y-1" data-tour="sidebar-navigation">
+                    <nav className="space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
                         {/* Removed Home button from Sidebar as requested */}
                         <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
-                            <HeartIcon className="h-5 w-5" /> <span>Finales Felices</span>
+                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Finales Felices</span>
                         </button>
                         <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
-                            <MapIcon className="h-5 w-5" /> <span>Mapa Global</span>
+                            <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa Global</span>
                         </button>
                         <button onClick={() => navigate('/campanas')} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
-                            <MegaphoneIcon className="h-5 w-5" /> <span>Campañas</span>
+                            <MegaphoneIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Campañas</span>
                         </button>
                         <button onClick={() => navigate('/tips')} className={navLinkClass(location.pathname === '/tips')}>
-                            <LightbulbIcon className="h-5 w-5" /> <span>Consejos</span>
+                            <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Consejos</span>
                         </button>
                         {currentUser?.role === USER_ROLES.SUPERADMIN && (
                             <button onClick={() => navigate('/servicios')} className={navLinkClass(location.pathname === '/servicios')}>
-                                <StoreIcon className="h-5 w-5" /> <span>Servicios</span>
+                                <StoreIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Servicios</span>
                             </button>
                         )}
                     </nav>
@@ -116,20 +116,20 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
 
                 {/* Filters Section for HOME */}
                 {isHome && (
-                    <div className="flex-grow px-6 py-6 border-t border-white/10 overflow-y-auto custom-scrollbar">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                <FilterIcon className="text-sky-200" /> Filtros
+                    <div className="flex-grow px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 border-t border-white/10 overflow-y-auto custom-scrollbar">
+                        <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
+                            <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 sm:gap-2">
+                                <FilterIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-200" /> <span>Filtros</span>
                             </h3>
                             <button 
                                 onClick={onClearFilters}
-                                className="text-[10px] uppercase font-bold text-sky-200 hover:text-white transition-colors"
+                                className="text-[9px] sm:text-[10px] uppercase font-bold text-sky-200 hover:text-white transition-colors px-1 py-0.5"
                             >
                                 Limpiar
                             </button>
                         </div>
                         
-                        <div className="space-y-5" data-tour="sidebar-filters">
+                        <div className="space-y-3 sm:space-y-4 md:space-y-5" data-tour="sidebar-filters">
                             <div>
                                 <label htmlFor="type-filter" className={labelClass}>Especie</label>
                                 <select id="type-filter" value={filters.type} onChange={handleTypeChange} className={selectClass}>
@@ -146,7 +146,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                             </div>
 
                             {/* Advanced Filters */}
-                            <div className="pt-4 border-t border-white/10 space-y-5">
+                            <div className="pt-3 sm:pt-4 border-t border-white/10 space-y-3 sm:space-y-4 md:space-y-5">
                                 <div>
                                     <label htmlFor="breed-filter" className={labelClass}>Raza</label>
                                     <select id="breed-filter" value={filters.breed} onChange={(e) => setFilters(f => ({ ...f, breed: e.target.value }))} className={selectClass} disabled={filters.type === 'Todos'}>
@@ -162,9 +162,9 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                 </div>
 
                                 {/* Multi-Color Filter */}
-                                <div className="space-y-3">
+                                <div className="space-y-2 sm:space-y-3">
                                     <label className={labelClass}>Colores (Max 3)</label>
-                                    <div className="grid grid-cols-1 gap-2">
+                                    <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
                                         <select value={filters.color1} onChange={(e) => setFilters(f => ({ ...f, color1: e.target.value }))} className={selectClass}>
                                             <option value="Todos" className="text-gray-900">Color 1 (Principal)</option>
                                             {colorOptions.filter(c => c !== 'Todos').map(c => <option key={c} value={c} className="text-gray-900">{c}</option>)}
@@ -184,8 +184,8 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     </div>
                 )}
                 
-                <div className="p-4 border-t border-white/10 text-center">
-                    <p className="text-[10px] text-blue-200">&copy; {new Date().getFullYear()} Mas Patas v2.0</p>
+                <div className="p-3 sm:p-4 border-t border-white/10 text-center">
+                    <p className="text-[9px] sm:text-[10px] text-blue-200">&copy; {new Date().getFullYear()} Mas Patas v2.0</p>
                 </div>
             </aside>
         </>
