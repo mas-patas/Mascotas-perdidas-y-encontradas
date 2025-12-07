@@ -97,20 +97,57 @@ const ServicesMapPage: React.FC = () => {
                 iconAnchor: [12, 35]
             });
 
+            const popupContent = `
+                <div class="text-center min-w-[180px]">
+                    ${biz.logoUrl ? `<img src="${biz.logoUrl}" class="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-gray-200" />` : ''}
+                    <strong class="block text-lg font-bold text-gray-900">${biz.name}</strong>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white inline-block mb-2 ${isVet ? 'bg-red-500' : 'bg-blue-500'}">
+                        ${biz.type}
+                    </span>
+                    <p class="text-xs text-gray-600 mb-2">${biz.address}</p>
+                    <button onclick="window.location.hash = '#/negocio/${biz.id}'" class="block w-full bg-gray-900 text-white text-sm py-1.5 px-3 rounded hover:bg-gray-700 transition-colors">
+                        Ver Tienda
+                    </button>
+                </div>
+            `;
+
             const marker = L.marker([biz.lat, biz.lng], { icon })
-                .bindPopup(`
-                    <div class="text-center min-w-[180px]">
-                        ${biz.logoUrl ? `<img src="${biz.logoUrl}" class="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-gray-200" />` : ''}
-                        <strong class="block text-lg font-bold text-gray-900">${biz.name}</strong>
-                        <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white inline-block mb-2 ${isVet ? 'bg-red-500' : 'bg-blue-500'}">
-                            ${biz.type}
-                        </span>
-                        <p class="text-xs text-gray-600 mb-2">${biz.address}</p>
-                        <button onclick="window.location.hash = '#/negocio/${biz.id}'" class="block w-full bg-gray-900 text-white text-sm py-1.5 px-3 rounded hover:bg-gray-700 transition-colors">
-                            Ver Tienda
-                        </button>
-                    </div>
-                `);
+                .bindPopup(popupContent, {
+                    maxWidth: 250,
+                    className: 'custom-popup',
+                    closeButton: true,
+                    autoPan: true,
+                    autoPanPadding: [50, 50],
+                    autoPanPaddingTopLeft: [50, 50],
+                    autoPanPaddingBottomRight: [50, 50]
+                });
+            
+            // Update popup size when it opens and after image loads
+            marker.on('popupopen', function() {
+                const popup = marker.getPopup();
+                if (popup) {
+                    // Update immediately
+                    popup.update();
+                    
+                    // Update again after a short delay to ensure images are loaded
+                    setTimeout(() => {
+                        popup.update();
+                    }, 100);
+                    
+                    // Also update when images inside the popup load
+                    const popupElement = popup.getElement();
+                    if (popupElement) {
+                        const images = popupElement.querySelectorAll('img');
+                        images.forEach((img: HTMLImageElement) => {
+                            if (!img.complete) {
+                                img.addEventListener('load', () => {
+                                    popup.update();
+                                }, { once: true });
+                            }
+                        });
+                    }
+                }
+            });
             
             markersToAdd.push(marker);
         });
