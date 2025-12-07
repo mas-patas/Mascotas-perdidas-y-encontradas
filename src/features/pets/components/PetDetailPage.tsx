@@ -9,8 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ConfirmationModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
-import { supabase } from '@/services/supabaseClient';
 import { UserPublicProfileModal } from '@/features/profile';
+import { usePet, useDeleteComment } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
 import { ReunionSuccessModal } from '@/features/pets';
@@ -298,37 +298,10 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const navigate = useNavigate();
     const { currentUser } = useAuth();
     const queryClient = useQueryClient();
+    const deleteComment = useDeleteComment();
     
     // FETCH SPECIFIC PET
-    const { data: fetchedPet, isLoading: isLoadingSingle, isError } = useQuery({
-        queryKey: ['pet_detail', id],
-        enabled: !!id && !propPet, 
-        queryFn: async () => {
-            if (!id) throw new Error("ID no proporcionado");
-
-            const { data, error } = await supabase
-                .from('pets')
-                .select('*, profiles(email, username)')
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-
-            const { data: commentsData } = await supabase
-                .from('comments')
-                .select('*')
-                .eq('pet_id', id)
-                .order('created_at', { ascending: true });
-
-            const commentIds = commentsData?.map((c: any) => c.id) || [];
-            const { data: likesData } = commentIds.length > 0 
-                ? await supabase.from('comment_likes').select('*').in('comment_id', commentIds)
-                : { data: [] };
-
-            return mapPetFromDb(data, [], commentsData || [], likesData || []);
-        },
-        retry: 1
-    });
+    const { data: fetchedPet, isLoading: isLoadingSingle, isError } = usePet(id && !propPet ? id : undefined);
 
     const pet = propPet || fetchedPet;
     
@@ -453,11 +426,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     };
 
     const handleDeleteComment = async (commentId: string) => {
-        if (!confirm("¿Eliminar comentario?")) return;
-        const { error } = await supabase.from('comments').delete().eq('id', commentId);
-        if (!error) {
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+        if (!confirm("¿Eliminar comentario?") || !pet) return;
+        try {
+            await deleteComment.mutateAsync({ id: commentId, petId: pet.id });
+        } catch (error) {
+            console.error('Error deleting comment:', error);
         }
     };
 
@@ -825,7 +798,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     return (
         <div className="max-w-5xl mx-auto pb-10 px-4 sm:px-6">
             <Helmet>
-                <title>{displayName} - {pet.status} | Pets</title>
+                <title>{displayName} - {pet.status} | Mas Patas</title>
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
 

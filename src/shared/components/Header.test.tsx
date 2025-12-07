@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
                     className="text-xl sm:text-2xl font-extrabold tracking-wider cursor-pointer flex items-center gap-2 text-sidebar-dark hover:opacity-80 transition-opacity" 
                     onClick={handleHomeClick}
                  >
-                    PETS
+                    MAS PATAS
                 </h1>
             </div>
             

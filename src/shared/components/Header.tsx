@@ -136,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
                         className="text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-4" 
                         onClick={handleHomeClick}
                      >
-                        PETS<span className="text-[#FF4F4F]">.</span>
+                        MAS PATAS<span className="text-[#FF4F4F]">.</span>
                     </div>
                     
                     <button onClick={handleHomeClick} className="hidden md:flex items-center gap-2 text-gray-600 hover:text-brand-primary font-bold text-sm px-3 py-2 rounded-full hover:bg-gray-100 transition-colors">

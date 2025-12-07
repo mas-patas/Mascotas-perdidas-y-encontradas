@@ -41,3 +41,25 @@ export const useMarkAllNotificationsAsRead = () => {
     }
   });
 };
+
+/**
+ * Mutation hook to create a notification
+ */
+export const useCreateNotification = () => {
+  const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: {
+      id: string;
+      userId: string;
+      message: string;
+      link?: { type: string; id?: string } | string;
+    }) => {
+      await notificationsApi.createNotification(data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications(variables.userId) });
+    }
+  });
+};

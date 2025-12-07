@@ -36,14 +36,42 @@ import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STAT
 
 // Services & Utils
 import { useAuth } from './contexts/AuthContext';
-import { findMatchingPets, generatePetEmbedding } from './services/geminiService';
-import { supabase } from './services/supabaseClient';
+import { findMatchingPets } from './services/geminiService';
 import { generateUUID } from './utils/uuid';
 import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
-import { usePets } from './hooks/usePets';
-import { sendPageView, trackPetReunited, trackReportPet } from './services/analytics';
-import { logActivity, POINTS_CONFIG } from './services/gamificationService';
+import { usePets as usePetsHook } from './hooks/usePets';
+import { sendPageView, trackPetReunited } from './services/analytics';
+
+// API Hooks
+import {
+  useCreatePet,
+  useUpdatePet,
+  useDeletePet,
+  useRenewPet,
+  useUpdatePetStatus,
+  useRecordContactRequest,
+  useCreateSavedSearch,
+  useCreateNotification,
+  useCreateChat,
+  useSendMessage,
+  useMarkChatAsRead,
+  useCreateReport,
+  useUpdateReportStatus,
+  useMarkNotificationAsRead,
+  useMarkAllNotificationsAsRead,
+  useCreateSupportTicket,
+  useUpdateSupportTicket,
+  useCreateCampaign,
+  useUpdateCampaign,
+  useDeleteCampaign,
+  useCreateComment,
+  useToggleCommentLike,
+  useDeleteComment,
+  useUpdateUserStatus,
+  useUpdateUserRole,
+  usePetsByUserId
+} from '@/api';
 
 // Stable empty array to prevent hook dependency loops
 const EMPTY_PETS_ARRAY: Pet[] = [];
@@ -82,7 +110,7 @@ const App: React.FC = () => {
 
     // State from Hooks
     const { filters, setFilters, resetFilters } = usePetFilters(EMPTY_PETS_ARRAY);
-    const { pets, loading: petsLoading, loadMore, hasMore, isError: petsError, refetch: refetchPets } = usePets({ filters });
+    const { pets, loading: petsLoading, loadMore, hasMore, isError: petsError, refetch: refetchPets } = usePetsHook({ filters });
     const { 
         users, setUsers, 
         chats, setChats, 
@@ -167,26 +195,31 @@ const App: React.FC = () => {
         }
     }, [location.pathname]);
 
-    // Status check logic
+    // Status check logic - using notifications query hook
     const hasCheckedStatusRef = useRef<string | null>(null);
+    const { data: userPetsData } = usePetsByUserId(currentUser?.id);
+    const createNotificationForStatus = useCreateNotification();
+    
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser || !userPetsData || !notifications) return;
         if (hasCheckedStatusRef.current === currentUser.id) return;
         const checkStatuses = async () => {
             hasCheckedStatusRef.current = currentUser.id;
             const now = new Date();
-            const { data: userPets } = await supabase.from('pets').select('id, name, expires_at, created_at, status').eq('user_id', currentUser.id);
-            if (!userPets || userPets.length === 0) return;
-            const { data: existingNotifs } = await supabase.from('notifications').select('link').eq('user_id', currentUser.id);
+            if (!userPetsData || userPetsData.length === 0) return;
+            const existingNotifs = notifications || [];
             let newNotificationAdded = false;
-            for (const pet of userPets) {
-                let expirationDate = pet.expires_at ? new Date(pet.expires_at) : new Date(new Date(pet.created_at).getTime() + (60 * 24 * 60 * 60 * 1000));
+            for (const pet of userPetsData) {
+                let expirationDate = pet.expiresAt ? new Date(pet.expiresAt) : new Date(new Date(pet.createdAt || 0).getTime() + (60 * 24 * 60 * 60 * 1000));
                 const isExpired = now > expirationDate;
                 if (isExpired) {
-                    const alreadyNotified = existingNotifs?.some(n => (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id));
+                    const alreadyNotified = existingNotifs.some((n: any) => (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id));
                     if (!alreadyNotified) {
-                        await supabase.from('notifications').insert({
-                            id: generateUUID(), user_id: currentUser.id, message: `Tu publicación de "${pet.name}" ha expirado.`, link: { type: 'pet-renew', id: pet.id }, is_read: false, created_at: now.toISOString()
+                        await createNotificationForStatus.mutateAsync({
+                            id: generateUUID(),
+                            userId: currentUser.id,
+                            message: `Tu publicación de "${pet.name}" ha expirado.`,
+                            link: { type: 'pet-renew', id: pet.id }
                         });
                         newNotificationAdded = true;
                     }
@@ -195,7 +228,7 @@ const App: React.FC = () => {
             if (newNotificationAdded) queryClient.invalidateQueries({ queryKey: ['notifications'] });
         };
         checkStatuses();
-    }, [currentUser?.id]);
+    }, [currentUser?.id, userPetsData, notifications, createNotificationForStatus, queryClient]);
 
     const getUserIdByEmail = (email: string) => users.find(u => u.email === email)?.id;
     
@@ -205,15 +238,36 @@ const App: React.FC = () => {
         setIsReportModalOpen(true);
     };
 
+    const updatePet = useUpdatePet();
+    const createPet = useCreatePet();
+    const createSavedSearch = useCreateSavedSearch();
+    const createNotification = useCreateNotification();
+
     const handleSubmitPet = async (petData: any, idToUpdate?: string) => {
         if (idToUpdate) {
              try {
-                const { error } = await supabase.from('pets').update({
-                    status: petData.status, name: petData.name, animal_type: petData.animalType, breed: petData.breed, color: petData.color, size: petData.size, location: petData.location, date: petData.date, contact: petData.contact, description: petData.description, image_urls: petData.imageUrls, adoption_requirements: petData.adoptionRequirements, share_contact_info: petData.shareContactInfo, reward: petData.reward, currency: petData.currency, lat: petData.lat, lng: petData.lng
-                }).eq('id', idToUpdate);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['pets'] });
-                if (currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+                await updatePet.mutateAsync({
+                    id: idToUpdate,
+                    data: {
+                        status: petData.status,
+                        name: petData.name,
+                        animalType: petData.animalType,
+                        breed: petData.breed,
+                        color: petData.color,
+                        size: petData.size,
+                        location: petData.location,
+                        date: petData.date,
+                        contact: petData.contact,
+                        description: petData.description,
+                        imageUrls: petData.imageUrls,
+                        adoptionRequirements: petData.adoptionRequirements,
+                        shareContactInfo: petData.shareContactInfo,
+                        reward: petData.reward,
+                        currency: petData.currency,
+                        lat: petData.lat,
+                        lng: petData.lng
+                    }
+                });
                 setIsReportModalOpen(false);
              } catch (err: any) { alert('Error al actualizar: ' + err.message); }
             return;
@@ -242,73 +296,34 @@ const App: React.FC = () => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            const newPetId = generateUUID();
-            const now = new Date();
-            const expirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-            
-            let embedding = null;
-            if (isAiSearchEnabled) {
-                const contentToEmbed = `${petData.animalType} ${petData.breed} ${petData.color} ${petData.description}`;
-                embedding = await generatePetEmbedding(contentToEmbed);
-            }
-
-            const { error } = await supabase.from('pets').insert({
-                id: newPetId, 
-                user_id: currentUser.id, 
-                status: petData.status, 
-                name: petData.name, 
-                animal_type: petData.animalType, 
-                breed: petData.breed, 
-                color: petData.color, 
-                size: petData.size, 
-                location: petData.location, 
-                date: petData.date, 
-                contact: petData.contact, 
-                description: petData.description, 
-                image_urls: petData.imageUrls, 
-                adoption_requirements: petData.adoptionRequirements, 
-                share_contact_info: petData.shareContactInfo, 
-                reward: petData.reward, 
-                currency: petData.currency, 
-                contact_requests: [], 
-                lat: petData.lat, 
-                lng: petData.lng, 
-                created_at: now.toISOString(), 
-                expires_at: expirationDate.toISOString(),
-                embedding: embedding 
+            const newPetId = await createPet.mutateAsync({
+                ...petData,
+                userId: currentUser.id,
+                isAiSearchEnabled
             });
-            if (error) throw error;
             
             if (petData.createAlert && petData.status === PET_STATUS.PERDIDO) {
                 const alertName = `Alerta: ${petData.breed} (${petData.color})`;
                 const dept = petData.location.split(',').map((s: string) => s.trim()).pop() || 'Todos';
                 
-                await supabase.from('saved_searches').insert({
-                    id: generateUUID(),
-                    user_id: currentUser.id,
+                await createSavedSearch.mutateAsync({
                     name: alertName,
                     filters: {
                         status: 'Todos', 
                         type: petData.animalType,
                         breed: petData.breed,
                         department: dept
-                    },
-                    created_at: now.toISOString()
+                    }
                 });
             }
 
-            const locationParts = petData.location.split(',').map((s: string) => s.trim());
-            const dept = locationParts[locationParts.length - 1] || 'Unknown';
-            trackReportPet(petData.status, petData.animalType, dept);
-            
-            await logActivity(currentUser.id, 'report_pet', POINTS_CONFIG.REPORT_PET, { petId: newPetId, status: petData.status });
-
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
-            
-            await supabase.from('notifications').insert({
-                id: generateUUID(), user_id: currentUser.id, message: `Has publicado exitosamente el reporte de "${petData.name}".`, link: { type: 'pet', id: newPetId }, is_read: false, created_at: now.toISOString()
+            await createNotification.mutateAsync({
+                id: generateUUID(),
+                userId: currentUser.id,
+                message: `Has publicado exitosamente el reporte de "${petData.name}".`,
+                link: { type: 'pet', id: newPetId }
             });
+            
             setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null); setPetToPrefill(null);
         } catch (err: any) { 
             alert("Error al publicar: " + err.message); 
@@ -317,14 +332,14 @@ const App: React.FC = () => {
         }
     };
 
+    const renewPet = useRenewPet();
+    const updatePetStatus = useUpdatePetStatus();
+    const deletePet = useDeletePet();
+
     const handleRenewPet = async (pet: Pet) => {
         if (!currentUser) return;
         try {
-            const now = new Date();
-            const newExpirationDate = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-            await supabase.from('pets').update({ expires_at: newExpirationDate.toISOString(), created_at: now.toISOString() }).eq('id', pet.id);
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] });
+            await renewPet.mutateAsync(pet.id);
             setPetToRenew(null);
             alert(`Publicación renovada.`);
         } catch (err: any) { alert("Error al renovar: " + err.message); }
@@ -332,36 +347,54 @@ const App: React.FC = () => {
 
     const handleMarkAsFound = async (pet: Pet) => {
         try { 
-            await supabase.from('pets').update({ status: PET_STATUS.REUNIDO }).eq('id', pet.id);
+            await updatePetStatus.mutateAsync({ id: pet.id, status: PET_STATUS.REUNIDO });
             trackPetReunited(pet.id);
-            if (currentUser) await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: pet.id });
-            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
-            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
             setPetToRenew(null); setPetToStatusCheck(null); 
             alert("¡Felicidades!"); 
         } catch(e:any){ alert(e.message); }
     };
     const handleKeepLooking = () => { setPetToStatusCheck(null); };
-    const handleDeletePet = async (petId: string) => { try { await supabase.from('pets').delete().eq('id', petId); queryClient.invalidateQueries({ queryKey: ['pets'] }); if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); navigate('/'); } catch(e:any){ alert(e.message); } };
+    const handleDeletePet = async (petId: string) => { 
+        try { 
+            await deletePet.mutateAsync(petId);
+            navigate('/'); 
+        } catch(e:any){ alert(e.message); } 
+    };
     const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { 
         try { 
-            await supabase.from('pets').update({ status }).eq('id', petId); 
-            if (status === PET_STATUS.REUNIDO && currentUser) await logActivity(currentUser.id, 'pet_reunited', POINTS_CONFIG.PET_REUNITED, { petId: petId });
-            queryClient.invalidateQueries({ queryKey: ['pets'] }); 
-            if(currentUser) queryClient.invalidateQueries({ queryKey: ['myPets', currentUser.id] }); 
+            await updatePetStatus.mutateAsync({ id: petId, status }); 
         } catch(e:any){ alert(e.message); } 
     };
     
-    const handleUpdateUserStatus = async (email: string, status: UserStatus) => { try { await supabase.from('profiles').update({ status }).eq('email', email); setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u)); } catch(e:any){ alert(e.message); } };
-    const handleUpdateUserRole = async (email: string, role: UserRole) => { try { await supabase.from('profiles').update({ role }).eq('email', email); setUsers(prev => prev.map(u => u.email === email ? { ...u, role } : u)); } catch(e:any){ alert(e.message); } };
+    const updateUserStatus = useUpdateUserStatus();
+    const updateUserRole = useUpdateUserRole();
+
+    const handleUpdateUserStatus = async (email: string, status: UserStatus) => { 
+        try { 
+            await updateUserStatus.mutateAsync({ email, status });
+            setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u)); 
+        } catch(e:any){ alert(e.message); } 
+    };
+    const handleUpdateUserRole = async (email: string, role: UserRole) => { 
+        try { 
+            await updateUserRole.mutateAsync({ email, role });
+            setUsers(prev => prev.map(u => u.email === email ? { ...u, role } : u)); 
+        } catch(e:any){ alert(e.message); } 
+    };
     
+    const createChat = useCreateChat();
+    const sendMessage = useSendMessage();
+    const markChatAsRead = useMarkChatAsRead();
+
     const handleStartChat = async (pet: Pet) => {
         if (!currentUser) return navigate('/login');
         const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
         try {
-            const chatId = generateUUID(); const now = new Date().toISOString();
-            await supabase.from('chats').insert({ id: chatId, pet_id: pet.id, participant_emails: [currentUser.email, pet.userEmail], last_read_timestamps: { [currentUser.email]: now, [pet.userEmail]: new Date(0).toISOString() }, created_at: now });
+            const chatId = await createChat.mutateAsync({
+                petId: pet.id,
+                participantEmails: [currentUser.email, pet.userEmail]
+            });
             setChats(prev => [...prev, { id: chatId, petId: pet.id, participantEmails: [currentUser.email, pet.userEmail], messages: [], lastReadTimestamps: {} }]);
             navigate(`/chat/${chatId}`);
         } catch(e:any){ alert(e.message); }
@@ -371,103 +404,154 @@ const App: React.FC = () => {
         if (!currentUser) return navigate('/login');
         const existingChat = chats.find(c => c.participantEmails.includes(currentUser.email) && c.participantEmails.includes(email) && !c.petId);
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
-        const chatId = generateUUID();
-        const now = new Date().toISOString();
-        const { error } = await supabase.from('chats').insert({
-            id: chatId,
-            pet_id: null,
-            participant_emails: [currentUser.email, email],
-            last_read_timestamps: { [currentUser.email]: now, [email]: new Date(0).toISOString() },
-            created_at: now
-        });
-        if (!error) {
-             setChats(prev => [...prev, { id: chatId, petId: undefined, participantEmails: [currentUser.email, email], messages: [], lastReadTimestamps: {} }]);
-             navigate(`/chat/${chatId}`);
-        } else {
-            alert('Error starting chat');
-        }
+        try {
+            const chatId = await createChat.mutateAsync({
+                participantEmails: [currentUser.email, email]
+            });
+            setChats(prev => [...prev, { id: chatId, petId: undefined, participantEmails: [currentUser.email, email], messages: [], lastReadTimestamps: {} }]);
+            navigate(`/chat/${chatId}`);
+        } catch(e:any){ alert('Error starting chat'); }
     };
     
     const handleSendMessage = useCallback(async (chatId: string, text: string) => {
         if (!currentUser) return;
-        try { await supabase.from('messages').insert({ id: generateUUID(), chat_id: chatId, sender_email: currentUser.email, text, created_at: new Date().toISOString() }); } catch(e:any){ console.error(e); }
-    }, [currentUser]);
+        try { 
+            await sendMessage.mutateAsync({ chatId, text }); 
+        } catch(e:any){ console.error(e); }
+    }, [currentUser, sendMessage]);
 
     const handleMarkChatAsRead = useCallback(async (chatId: string) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
         setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: { ...c.lastReadTimestamps, [currentUser.email]: now } } : c));
-        await supabase.from('chats').update({ last_read_timestamps: { [currentUser.email]: now } }).eq('id', chatId); 
-    }, [currentUser]);
+        await markChatAsRead.mutateAsync(chatId); 
+    }, [currentUser, markChatAsRead]);
+
+    const createReport = useCreateReport();
+    const updateReportStatus = useUpdateReportStatus();
+    const createSupportTicket = useCreateSupportTicket();
+    const updateSupportTicket = useUpdateSupportTicket();
 
     const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
         if (!currentUser) return;
         try {
-            const reportId = generateUUID();
-            await supabase.from('reports').insert({ id: reportId, reporter_email: currentUser.email, reported_email: '', type, target_id: targetId, reason, details, status: REPORT_STATUS.PENDING, created_at: new Date().toISOString() });
+            await createReport.mutateAsync({ type, targetId, reason, details, reportedEmail: '' });
             alert('Reporte enviado.');
         } catch(e:any){ alert(e.message); }
     };
 
-    const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => { try { await supabase.from('reports').update({ status }).eq('id', reportId); setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r)); } catch(e:any){ alert(e.message); } };
-    const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { if(currentUser) { await supabase.from('support_tickets').insert({ id: generateUUID(), user_email: currentUser.email, category, subject, description, status: SUPPORT_TICKET_STATUS.PENDING }); } };
-    const handleUpdateSupportTicket = async (ticket: SupportTicket) => { await supabase.from('support_tickets').update({ status: ticket.status, response: ticket.response, assigned_to: ticket.assignedTo }).eq('id', ticket.id); };
+    const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => { 
+        try { 
+            await updateReportStatus.mutateAsync({ id: reportId, status });
+            setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r)); 
+        } catch(e:any){ alert(e.message); } 
+    };
+    const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { 
+        if(currentUser) { 
+            await createSupportTicket.mutateAsync({ category, subject, description }); 
+        } 
+    };
+    const handleUpdateSupportTicket = async (ticket: SupportTicket) => { 
+        await updateSupportTicket.mutateAsync({ 
+            id: ticket.id, 
+            data: { 
+                status: ticket.status, 
+                response: ticket.response, 
+                assignedTo: ticket.assignedTo 
+            } 
+        }); 
+    };
     
+    const createCampaign = useCreateCampaign();
+    const updateCampaign = useUpdateCampaign();
+    const deleteCampaign = useDeleteCampaign();
+
     const handleSaveCampaign = async (data: any, id?: string) => {
-        const dbData = { title: data.title, description: data.description, type: data.type, location: data.location, date: data.date, contact_phone: data.contactPhone, image_urls: data.imageUrls, lat: data.lat, lng: data.lng };
         try {
             if(id) {
-                const { error } = await supabase.from('campaigns').update(dbData).eq('id', id);
-                if (error) throw error;
+                await updateCampaign.mutateAsync({
+                    id,
+                    data: {
+                        title: data.title,
+                        description: data.description,
+                        type: data.type,
+                        location: data.location,
+                        date: data.date,
+                        contactPhone: data.contactPhone,
+                        imageUrls: data.imageUrls,
+                        lat: data.lat,
+                        lng: data.lng
+                    }
+                });
             } else if(currentUser) {
-                const { error } = await supabase.from('campaigns').insert({ ...dbData, id: generateUUID(), user_email: currentUser.email });
-                if (error) throw error;
+                await createCampaign.mutateAsync({
+                    title: data.title,
+                    description: data.description,
+                    type: data.type,
+                    location: data.location,
+                    date: data.date,
+                    contactPhone: data.contactPhone,
+                    imageUrls: data.imageUrls,
+                    lat: data.lat,
+                    lng: data.lng
+                });
             }
-            queryClient.invalidateQueries({ queryKey: ['campaigns'] });
         } catch (err: any) { console.error("Error saving campaign:", err); alert("Error al guardar la campaña: " + err.message); }
     };
 
-    const handleDeleteCampaign = async (id: string) => { await supabase.from('campaigns').delete().eq('id', id); queryClient.invalidateQueries({ queryKey: ['campaigns'] }); };
+    const handleDeleteCampaign = async (id: string) => { 
+        await deleteCampaign.mutateAsync(id); 
+    };
     const handleViewAdminUser = (user: User) => { setSelectedUserProfile(user); setIsUserDetailModalOpen(true); };
     const handleViewPublicProfile = (user: User) => { setPublicProfileUser(user); setIsPublicProfileModalOpen(true); };
     
-    const handleMarkNotificationAsRead = async (id: string) => { await supabase.from('notifications').update({ is_read: true }).eq('id', id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
+    const markNotificationAsRead = useMarkNotificationAsRead();
+    const markAllNotificationsAsRead = useMarkAllNotificationsAsRead();
+
+    const handleMarkNotificationAsRead = async (id: string) => { 
+        await markNotificationAsRead.mutateAsync(id);
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); 
+    };
     const handleMarkAllNotificationsAsRead = async () => {
         if (!currentUser) return;
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+        await markAllNotificationsAsRead.mutateAsync();
     };
     
+    const recordContactRequest = useRecordContactRequest();
+    const createComment = useCreateComment();
+    const toggleCommentLike = useToggleCommentLike();
+    const deleteComment = useDeleteComment();
+
     const handleRecordContactRequest = async (petId: string) => { 
         if(!currentUser) return;
         try {
-            const { error } = await supabase.rpc('request_pet_contact', { pet_id: petId });
-            if (error) {
-                const pet = pets.find(p => p.id === petId);
-                if (pet) {
-                    const reqs = [...(pet.contactRequests || []), currentUser.email];
-                    const uniqueReqs = [...new Set(reqs)];
-                    await supabase.from('pets').update({ contact_requests: uniqueReqs }).eq('id', petId);
-                }
-            }
+            const pet = pets.find(p => p.id === petId);
+            await recordContactRequest.mutateAsync({
+                petId,
+                userEmail: currentUser.email,
+                existingRequests: pet?.contactRequests
+            });
         } catch (e) { console.error("Error recording contact request:", e); }
     };
     const handleAddComment = async (petId: string, text: string, parentId?: string) => {
         if(!currentUser) return;
         try {
-            const { error } = await supabase.from('comments').insert({ id: generateUUID(), pet_id: petId, user_id: currentUser.id, user_email: currentUser.email, user_name: currentUser.username || 'User', text, parent_id: parentId || null });
-            if (error) throw error;
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            await logActivity(currentUser.id, 'comment_added', POINTS_CONFIG.COMMENT_ADDED, { petId });
+            await createComment.mutateAsync({ petId, text, parentId });
         } catch (error: any) { console.error("Error adding comment:", error); alert("Error al enviar el comentario: " + (error.message || "Error desconocido")); }
     };
     const handleLikeComment = async (petId: string, commentId: string) => {
         if(!currentUser) return;
-        const exists = await supabase.from('comment_likes').select('*').eq('user_id', currentUser.id).eq('comment_id', commentId).single();
-        if(exists.data) await supabase.from('comment_likes').delete().eq('user_id', currentUser.id).eq('comment_id', commentId);
-        else await supabase.from('comment_likes').insert({ user_id: currentUser.id, comment_id: commentId });
+        await toggleCommentLike.mutateAsync({ commentId, petId });
     };
-    const handleDeleteComment = async (id: string) => { await supabase.from('comments').delete().eq('id', id); };
+    const handleDeleteComment = async (id: string, petId?: string) => { 
+        // petId is required for cache invalidation
+        if (!petId) {
+            console.warn('handleDeleteComment called without petId');
+            return;
+        }
+        await deleteComment.mutateAsync({ id, petId }); 
+    };
 
     const hasUnreadMessages = currentUser ? chats.some(c => {
         if (!c.participantEmails.includes(currentUser.email)) return false;

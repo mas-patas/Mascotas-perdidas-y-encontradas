@@ -14,7 +14,7 @@ const sendSystemNotification = (title: string, body: string, link?: string) => {
     navigator.serviceWorker.ready.then(registration => {
       registration.showNotification(title, {
         body: body,
-        icon: 'https://placehold.co/192x192/1D4ED8/ffffff?text=Pets',
+        icon: 'https://placehold.co/192x192/1D4ED8/ffffff?text=Mas+Patas',
         data: { link }
       });
     });

@@ -1,10 +1,9 @@
 
-import { useEffect } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../services/supabaseClient';
 import { PET_STATUS } from '../constants';
 import type { Pet, PetStatus, AnimalType, PetSize } from '../types';
-import { mapPetFromDb } from '../utils/mappers';
+import * as petsApi from '../api/pets.api';
+import { usePetsRealtime } from '../api/pets.query';
 
 const LIST_PAGE_SIZE = 12;
 const DASHBOARD_CATEGORY_LIMIT = 8;
@@ -23,41 +22,7 @@ interface UsePetsProps {
     };
 }
 
-// Función auxiliar para enriquecer datos
-const enrichPets = async (rawPets: any[]): Promise<Pet[]> => {
-    if (!rawPets || rawPets.length === 0) return [];
-
-    const validPets = rawPets.filter(p => p && p.id);
-    const uniquePetsMap = new Map(validPets.map(p => [p.id, p]));
-    const uniquePets = Array.from(uniquePetsMap.values());
-    
-    if (uniquePets.length === 0) return [];
-
-    const petIds = uniquePets.map(p => p.id);
-    const userIds = [...new Set(uniquePets.map(p => p.user_id).filter(Boolean))];
-
-    try {
-        const [profilesResult, commentsResult] = await Promise.all([
-            userIds.length > 0 
-                ? supabase.from('profiles').select('id, email').in('id', userIds)
-                : Promise.resolve({ data: [] }),
-            supabase.from('comments').select('*').in('pet_id', petIds).order('created_at', { ascending: true })
-        ]);
-
-        const profiles = profilesResult.data || [];
-        const comments = commentsResult.data || [];
-        
-        let commentIds: string[] = comments.map((c: any) => c.id);
-        const { data: likes } = commentIds.length > 0
-            ? await supabase.from('comment_likes').select('comment_id, user_id').in('comment_id', commentIds)
-            : { data: [] };
-
-        return uniquePets.map(p => mapPetFromDb(p, profiles, comments, likes || []));
-    } catch (error) {
-        console.error("Enrichment partial failure:", error);
-        return uniquePets.map(p => mapPetFromDb(p));
-    }
-};
+// enrichPets is now handled by petsApi.getPetsForDashboard and petsApi.getPets
 
 // Wrapper para simular timeout en promesas
 const fetchWithTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
@@ -98,53 +63,14 @@ export const usePets = ({ filters }: UsePetsProps) => {
 
                     const categories = [PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
 
-                    const fetchCategory = async (status: string) => {
-                        let query = supabase
-                            .from('pets')
-                            .select(columns)
-                            .eq('status', status)
-                            .gt('expires_at', nowIso);
-                        
-                        if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
-                        if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
-
-                        const { data, error } = await query.order('created_at', { ascending: false }).limit(DASHBOARD_CATEGORY_LIMIT);
-                        if (error) throw error;
-                        return data || [];
-                    };
-
-                    const results = await Promise.all(categories.map(fetchCategory));
-                    const combinedRawData = results.flat();
-                    
-                    if (combinedRawData.length === 0) return { data: [], nextCursor: undefined };
-
-                    const enriched = await enrichPets(combinedRawData);
-                    enriched.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-                    
+                    // Use petsApi.getPetsForDashboard which handles enrichment
+                    const enriched = await petsApi.getPetsForDashboard(filters);
                     return { data: enriched, nextCursor: undefined };
 
                 } else {
-                    // FILTERED LIST MODE
-                    const pageSize = LIST_PAGE_SIZE;
-                    const from = pageParam * pageSize;
-                    const to = from + pageSize - 1;
-
-                    let query = supabase.from('pets').select(columns, { count: 'exact' });
-
-                    query = query.eq('status', filters.status).gt('expires_at', nowIso);
-                    
-                    if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
-                    if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
-                    if (filters.size !== 'Todos') query = query.eq('size', filters.size);
-                    if (filters.color1 !== 'Todos') query = query.ilike('color', `%${filters.color1}%`);
-                    if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
-                    
-                    const { data, count, error } = await query.order('created_at', { ascending: false }).range(from, to);
-                    
-                    if (error) throw error;
-
-                    const enriched = await enrichPets(data || []);
-                    return { data: enriched, nextCursor: (from + (data?.length || 0) < (count || 0)) ? pageParam + 1 : undefined };
+                    // FILTERED LIST MODE - Use petsApi.getPets which handles enrichment
+                    const result = await petsApi.getPets({ filters, page: pageParam, pageSize: LIST_PAGE_SIZE });
+                    return { data: result.data, nextCursor: result.nextCursor };
                 }
             };
 
@@ -201,14 +127,8 @@ export const usePets = ({ filters }: UsePetsProps) => {
         refetchOnReconnect: true
     });
 
-    useEffect(() => {
-        const channel = supabase.channel('pets-realtime-rq')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => { queryClient.invalidateQueries({ queryKey: ['pets'] }); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => { queryClient.invalidateQueries({ queryKey: ['pets'] }); })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [queryClient]);
+    // Use dedicated realtime hook
+    usePetsRealtime();
 
     const pets = data?.pages.flatMap(page => page.data) || [];
 

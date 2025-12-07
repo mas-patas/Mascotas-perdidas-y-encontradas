@@ -89,3 +89,24 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<void> 
 
   if (error) throw error;
 };
+
+/**
+ * Create a new notification
+ */
+export const createNotification = async (data: {
+  id: string;
+  userId: string;
+  message: string;
+  link?: Notification['link'];
+}): Promise<void> => {
+  const { error } = await supabase.from('notifications').insert({
+    id: data.id,
+    user_id: data.userId,
+    message: data.message,
+    link: data.link || null,
+    is_read: false,
+    created_at: new Date().toISOString()
+  });
+
+  if (error) throw error;
+};

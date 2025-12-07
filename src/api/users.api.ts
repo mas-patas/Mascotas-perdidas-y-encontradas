@@ -126,3 +126,86 @@ export const updateUserRole = async (email: string, role: string): Promise<void>
 
   if (error) throw error;
 };
+
+/**
+ * Update user profile
+ */
+export const updateUserProfile = async (userId: string, data: {
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  dni?: string;
+  birth_date?: string;
+  country?: string;
+  avatar_url?: string;
+}): Promise<void> => {
+  const dbUpdates: any = {
+    updated_at: new Date().toISOString(),
+  };
+  
+  if (data.username !== undefined) dbUpdates.username = data.username;
+  if (data.first_name !== undefined) dbUpdates.first_name = data.first_name;
+  if (data.last_name !== undefined) dbUpdates.last_name = data.last_name;
+  if (data.phone !== undefined) dbUpdates.phone = data.phone;
+  if (data.dni !== undefined) dbUpdates.dni = data.dni;
+  if (data.birth_date !== undefined) dbUpdates.birth_date = data.birth_date;
+  if (data.country !== undefined) dbUpdates.country = data.country;
+  if (data.avatar_url !== undefined) dbUpdates.avatar_url = data.avatar_url;
+
+  const { error: updateError, data: updatedData } = await supabase
+    .from('profiles')
+    .update(dbUpdates)
+    .eq('id', userId)
+    .select();
+
+  if (updateError || !updatedData || updatedData.length === 0) {
+    // Try insert if update failed (profile might not exist)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No auth session');
+    
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({ id: userId, email: user.email, ...dbUpdates });
+    
+    if (insertError) throw new Error((updateError || insertError)?.message);
+  }
+};
+
+/**
+ * Create a user profile (for OAuth auto-creation)
+ */
+export const createUserProfile = async (data: {
+  id: string;
+  email: string;
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  role?: string;
+  status?: string;
+  country?: string;
+}): Promise<void> => {
+  const { error } = await supabase.from('profiles').insert({
+    id: data.id,
+    email: data.email,
+    username: data.username,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    avatar_url: data.avatar_url,
+    role: data.role || USER_ROLES.USER,
+    status: data.status || USER_STATUS.ACTIVE,
+    country: data.country || 'Perú',
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) throw error;
+};
+
+/**
+ * Ping database for keep-alive (lightweight query)
+ */
+export const pingDatabase = async (): Promise<void> => {
+  const { error } = await supabase.from('profiles').select('id').limit(1);
+  if (error) throw error;
+};

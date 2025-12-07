@@ -9,8 +9,8 @@ import { AddPetModal } from '@/features/pets';
 import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
-import { supabase } from '@/services/supabaseClient';
 import { StarRating } from '@/shared';
+import { useDeleteSavedSearch } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
 import { GamificationDashboard } from '@/features/gamification';
 import { BusinessManagementModal } from '@/features/businesses';
@@ -167,11 +167,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
         }
     });
 
+    const deleteSavedSearch = useDeleteSavedSearch();
+
     const handleDeleteSavedSearch = async (id: string) => {
         if(!confirm('¿Eliminar esta alerta?')) return;
         try {
-            await supabase.from('saved_searches').delete().eq('id', id);
-            queryClient.invalidateQueries({ queryKey: ['savedSearches', user.id] });
+            await deleteSavedSearch.mutateAsync(id);
         } catch(e) {
             console.error(e);
         }

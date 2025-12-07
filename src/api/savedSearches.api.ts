@@ -68,3 +68,15 @@ export const createSavedSearch = async (data: CreateSavedSearchData): Promise<st
   if (error) throw error;
   return searchId;
 };
+
+/**
+ * Delete a saved search
+ */
+export const deleteSavedSearch = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('saved_searches')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};

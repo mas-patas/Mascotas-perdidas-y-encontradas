@@ -121,7 +121,7 @@ const BusinessDetailPage: React.FC = () => {
             {/* Hero Header */}
             <div className="relative h-72 md:h-96 w-full bg-gray-900 group">
                 <img 
-                    src={business.coverUrl || 'https://placehold.co/1200x400/1e3a8a/ffffff?text=Pets+Store'} 
+                    src={business.coverUrl || 'https://placehold.co/1200x400/1e3a8a/ffffff?text=Mas+Patas+Store'} 
                     alt="Cover" 
                     className="w-full h-full object-cover opacity-80" 
                 />

@@ -104,9 +104,9 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
     return (
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto">
             <Helmet>
-                <title>{campaign.title} - Campañas Pets</title>
+                <title>{campaign.title} - Campañas Mas Patas</title>
                 <meta name="description" content={`${campaign.type}: ${campaign.title} el ${formattedDate} en ${simplifiedLocation}.`} />
-                <meta property="og:title" content={`${campaign.title} - Pets`} />
+                <meta property="og:title" content={`${campaign.title} - Mas Patas`} />
                 <meta property="og:description" content={`${campaign.type} en ${simplifiedLocation}. ${campaign.description.substring(0, 100)}...`} />
                 <meta property="og:image" content={images[0] || 'https://placehold.co/600x400/EEE/31343C?text=Campañas'} />
                 <meta property="og:type" content="website" />

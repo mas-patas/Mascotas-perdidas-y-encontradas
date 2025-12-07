@@ -97,7 +97,7 @@ const ReunitedPetsPage: React.FC = () => {
     return (
         <div className="bg-white min-h-screen pb-20 font-sans">
             <Helmet>
-                <title>Finales Felices | Pets</title>
+                <title>Finales Felices | Mas Patas</title>
                 <meta name="description" content="Historias reales de reencuentros." />
             </Helmet>
 

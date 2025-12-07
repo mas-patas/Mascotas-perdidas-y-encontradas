@@ -7,8 +7,8 @@ import { trackReportPet, trackPetReunited } from '@/services/analytics';
 import { logActivity, POINTS_CONFIG } from '@/services/gamificationService';
 import { generatePetEmbedding } from '@/services/geminiService';
 import { generateUUID } from '@/utils/uuid';
-import { supabase } from '@/services/supabaseClient';
 import { PET_STATUS } from '@/constants';
+import * as notificationsApi from './notifications.api';
 
 /**
  * Mutation hook to create a new pet
@@ -34,13 +34,11 @@ export const useCreatePet = () => {
       });
 
       // Create notification
-      await supabase.from('notifications').insert({
+      await notificationsApi.createNotification({
         id: generateUUID(),
-        user_id: currentUser.id,
+        userId: currentUser.id,
         message: `Has publicado exitosamente el reporte de "${data.name}".`,
-        link: { type: 'pet', id: petId },
-        is_read: false,
-        created_at: new Date().toISOString()
+        link: { type: 'pet', id: petId }
       });
 
       // Track analytics

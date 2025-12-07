@@ -65,10 +65,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return;
             }
 
-            const { error: dbError } = await supabase.from('profiles').select('id').limit(1);
-
-            if (dbError) {
-                console.error('Keep-alive database ping failed:', dbError);
+            try {
+                const { usersApi } = await import('@/api');
+                await usersApi.pingDatabase();
+            } catch (error) {
+                console.error('Keep-alive database ping failed:', error);
             }
         };
         const intervalId = setInterval(pingSupabase, 60000);
@@ -180,29 +181,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     const lastName = metadata.family_name || metadata.full_name?.split(' ').slice(1).join(' ') || '';
                     const avatarUrl = metadata.avatar_url || metadata.picture || '';
 
-                    const { error: insertError } = await supabase.from('profiles').insert({
-                        id: uid,
-                        email: email,
-                        username: tempUsername,
-                        first_name: firstName,
-                        last_name: lastName,
-                        avatar_url: avatarUrl,
-                        role: USER_ROLES.USER,
-                        status: USER_STATUS.ACTIVE,
-                        country: 'Perú', // Default
-                        updated_at: new Date().toISOString()
-                    });
-
-                    if (!insertError) {
+                    try {
+                        const { usersApi } = await import('@/api');
+                        await usersApi.createUserProfile({
+                            id: uid,
+                            email: email,
+                            username: tempUsername,
+                            first_name: firstName,
+                            last_name: lastName,
+                            avatar_url: avatarUrl,
+                            role: USER_ROLES.USER,
+                            status: USER_STATUS.ACTIVE,
+                            country: 'Perú'
+                        });
                         // Retry fetch after creating profile
                         return fetchProfile(authUser, retryCount + 1);
-                    } else {
+                    } catch (insertError) {
                         console.error("Error creating profile from OAuth:", insertError);
+                        // Fallback for UI if DB insert failed
+                        console.warn("Using fallback profile data due to error:", error.message);
                     }
                 }
-                
-                // Fallback for UI if DB insert failed
-                console.warn("Using fallback profile data due to error:", error.message);
                 if (mountedRef.current) {
                     setCurrentUser({
                         id: uid,
@@ -293,7 +292,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('No auth session');
         
-        const dbUpdates = {
+        const { usersApi } = await import('@/api');
+        await usersApi.updateUserProfile(user.id, {
             username: profileData.username,
             first_name: profileData.firstName,
             last_name: profileData.lastName,
@@ -301,23 +301,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             dni: profileData.dni,
             birth_date: profileData.birthDate,
             country: profileData.country,
-            avatar_url: profileData.avatarUrl,
-            updated_at: new Date().toISOString(),
-        };
-
-        const { error: updateError, data } = await supabase
-            .from('profiles')
-            .update(dbUpdates)
-            .eq('id', user.id)
-            .select();
-
-        if (updateError || !data || data.length === 0) {
-             const { error: insertError } = await supabase
-                .from('profiles')
-                .insert({ id: user.id, email: user.email, ...dbUpdates });
-             
-             if (insertError) throw new Error((updateError || insertError)?.message);
-        }
+            avatar_url: profileData.avatarUrl
+        });
 
         setCurrentUser(prev => prev ? { ...prev, ...profileData } : null);
     };

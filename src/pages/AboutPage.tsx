@@ -132,7 +132,7 @@ const AboutPage: React.FC = () => {
                                     Más que una App, <br/>somos esperanza.
                                 </h2>
                                 <p className="text-lg text-gray-600 leading-relaxed">
-                                    En <strong>Pets</strong>, entendemos que una mascota no es solo un animal, es un miembro amado de la familia. La angustia de perder a un compañero es abrumadora, y las herramientas tradicionales ya no son suficientes.
+                                    En <strong>Mas Patas</strong>, entendemos que una mascota no es solo un animal, es un miembro amado de la familia. La angustia de perder a un compañero es abrumadora, y las herramientas tradicionales ya no son suficientes.
                                 </p>
                                 <p className="text-lg text-gray-600 leading-relaxed">
                                     Nacimos en Perú con una misión clara: <strong>centralizar, agilizar y potenciar</strong> la búsqueda de mascotas perdidas utilizando Inteligencia Artificial y geolocalización.

@@ -27,3 +27,22 @@ export const useCreateSavedSearch = () => {
     }
   });
 };
+
+/**
+ * Mutation hook to delete a saved search
+ */
+export const useDeleteSavedSearch = () => {
+  const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await savedSearchesApi.deleteSavedSearch(id);
+    },
+    onSuccess: () => {
+      if (currentUser) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.savedSearches(currentUser.id) });
+      }
+    }
+  });
+};

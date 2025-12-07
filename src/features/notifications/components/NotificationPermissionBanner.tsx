@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BellIcon, XCircleIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/services/supabaseClient';
+import { useUpsertPushSubscription } from '@/api';
 
 // Helper to convert VAPID key for the browser
 function urlBase64ToUint8Array(base64String: string) {
@@ -26,6 +26,7 @@ const PUBLIC_VAPID_KEY = '';
 const NotificationPermissionBanner: React.FC = () => {
     const [showBanner, setShowBanner] = useState(false);
     const { currentUser } = useAuth();
+    const upsertPushSubscription = useUpsertPushSubscription();
 
     useEffect(() => {
         // Only show if supported, permission is default (not granted/denied), and user is logged in
@@ -67,17 +68,15 @@ const NotificationPermissionBanner: React.FC = () => {
                             // Serialize subscription to get keys
                             const subData = JSON.parse(JSON.stringify(subscription));
                             
-                            const { error } = await supabase.from('push_subscriptions').upsert({
-                                user_id: currentUser.id,
-                                endpoint: subData.endpoint,
-                                p256dh: subData.keys.p256dh,
-                                auth: subData.keys.auth,
-                            }, { onConflict: 'endpoint' });
-
-                            if (error) {
-                                console.error("Error guardando suscripción en BD:", error);
-                            } else {
+                            try {
+                                await upsertPushSubscription.mutateAsync({
+                                    endpoint: subData.endpoint,
+                                    p256dh: subData.keys.p256dh,
+                                    auth: subData.keys.auth,
+                                });
                                 console.log("Suscripción Web Push guardada exitosamente.");
+                            } catch (error) {
+                                console.error("Error guardando suscripción en BD:", error);
                             }
                         }
                     } catch (subError) {
@@ -89,7 +88,7 @@ const NotificationPermissionBanner: React.FC = () => {
                 // This works even without VAPID keys to give user feedback
                 new Notification("¡Notificaciones activadas!", {
                     body: "Te avisaremos cuando haya novedades importantes sobre mascotas.",
-                    icon: "https://placehold.co/192x192/1D4ED8/ffffff?text=Pets"
+                    icon: "https://placehold.co/192x192/1D4ED8/ffffff?text=Mas+Patas"
                 });
             }
             

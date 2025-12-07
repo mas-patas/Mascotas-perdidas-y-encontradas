@@ -89,7 +89,7 @@ export const Layout: React.FC<LayoutProps> = ({
                                 </p>
                             </div>
                             <div className="flex flex-col items-center md:items-end text-sm text-purple-700">
-                                <p>&copy; {new Date().getFullYear()} Pets. Todos los derechos reservados.</p>
+                                <p>&copy; {new Date().getFullYear()} Mas Patas. Todos los derechos reservados.</p>
                                 <div className="mt-2 flex gap-4">
                                     <Link to="/terminos" className="hover:underline">Términos y Condiciones</Link>
                                     <span>|</span>
