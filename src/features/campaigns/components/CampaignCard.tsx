@@ -22,7 +22,7 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
     return (
         <Link 
             to={`/campanas/${campaign.id}`}
-            className="bg-white rounded-2xl shadow-lg overflow-hidden transition-transform transform hover:-translate-y-1 hover:shadow-2xl flex flex-col h-full cursor-pointer group border border-gray-100"
+            className="bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-200 hover:bg-sky-50/30 hover:shadow-lg hover:shadow-gray-900/60 flex flex-col h-full cursor-pointer group border border-gray-100"
         >
             <div className="relative">
                 <img className="w-full h-52 object-cover transition-transform duration-700 group-hover:scale-105" src={image} alt={campaign.title} />
