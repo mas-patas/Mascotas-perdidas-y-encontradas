@@ -13,15 +13,25 @@ interface MessagesPageProps {
 }
 
 const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, currentUser, onSelectChat, onBack }) => {
-
     const getChatDetails = (chat: ChatRow) => {
         const pet = chat.pet_id ? pets.find(p => p.id === chat.pet_id) : null;
         const participantEmails = chat.participant_emails || [];
-        const otherUserEmail = participantEmails.find(email => email !== currentUser.email);
-        const otherUser = otherUserEmail ? users.find(u => u.email === otherUserEmail) : null;
+        
+        // Normalize emails for comparison (lowercase, trim)
+        const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+        const currentUserEmailNormalized = normalizeEmail(currentUser.email);
+        
+        const otherUserEmail = participantEmails.find(email => normalizeEmail(email) !== currentUserEmailNormalized);
+        
+        // Try to find user with normalized email comparison
+        const otherUser = otherUserEmail ? users.find(u => {
+            const userEmailNormalized = normalizeEmail(u.email);
+            return userEmailNormalized === normalizeEmail(otherUserEmail);
+        }) : null;
+        
         const messages = (chat.messages as MessageRow[] | null) || [];
         const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-        return { pet, otherUser, lastMessage };
+        return { pet, otherUser, otherUserEmail, lastMessage };
     };
 
     return (
@@ -32,8 +42,14 @@ const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, current
                 {chats.length > 0 ? (
                     <div className="space-y-3">
                         {chats.map(chat => {
-                            const { pet, otherUser, lastMessage } = getChatDetails(chat);
-                            if (!otherUser) return null;
+                            const { pet, otherUser, otherUserEmail, lastMessage } = getChatDetails(chat);
+                            // Show chat even if otherUser is not found (might be admin or user not loaded yet)
+                            const displayName = otherUser?.username || 
+                                               (otherUser?.firstName && otherUser?.lastName ? `${otherUser.firstName} ${otherUser.lastName}` : null) ||
+                                               otherUser?.email?.split('@')[0] || 
+                                               otherUserEmail?.split('@')[0] ||
+                                               'Usuario';
+                            const displayAvatar = otherUser?.avatarUrl || (otherUser?.firstName ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random` : null);
 
                             return (
                                 <div 
@@ -46,15 +62,25 @@ const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, current
                                             <span className="h-2.5 w-2.5 rounded-full bg-brand-primary"></span>
                                         )}
                                     </div>
-                                    <img src={pet?.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-14 w-14 rounded-full object-cover mr-4 border border-gray-200" />
+                                    <div className="h-14 w-14 rounded-full mr-4 border border-gray-200 overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                                        {displayAvatar ? (
+                                            <img src={displayAvatar} alt={displayName} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <span className="text-lg font-bold text-gray-600">{displayName.charAt(0).toUpperCase()}</span>
+                                        )}
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-center mb-1">
-                                            <p className="font-semibold text-brand-dark truncate">{pet ? `Sobre: ${pet.name}` : 'Soporte / Admin'}</p>
+                                            <p className="font-semibold text-brand-dark truncate">
+                                                {pet ? `Sobre: ${pet.name}` : `${displayName}`}
+                                            </p>
                                             {lastMessage && (
                                                 <p className="text-xs text-gray-400 whitespace-nowrap ml-2">{formatTime(lastMessage.created_at)}</p>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-1 font-medium">@{otherUser.username || 'usuario'}</p>
+                                        <p className="text-xs text-gray-500 mb-1 font-medium">
+                                            {otherUser ? `@${displayName}` : (otherUserEmail ? `@${otherUserEmail.split('@')[0]}` : '@Usuario')}
+                                        </p>
                                         {lastMessage ? (
                                             <p className={`text-sm truncate ${chat.isUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
                                                 <span className="font-normal text-gray-400">{lastMessage.sender_email === currentUser.email ? 'Tú: ' : ''}</span>

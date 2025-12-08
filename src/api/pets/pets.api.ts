@@ -62,8 +62,27 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
   if (error) throw error;
 
   const enriched = await enrichPets(data || []);
-  // Map PetRow[] to Pet[] using mapPetFromDb
-  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  
+  // Get unique user IDs from pets
+  const userIds = [...new Set(enriched.map(p => p.user_id).filter(Boolean))];
+  
+  // Fetch profiles for these users
+  let profiles: ProfileRow[] = [];
+  if (userIds.length > 0) {
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', userIds);
+    
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    } else {
+      profiles = profilesData || [];
+    }
+  }
+  
+  // Map PetRow[] to Pet[] using mapPetFromDb with profiles
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p, profiles));
   const hasMore = from + (data?.length || 0) < (count || 0);
   
   return { 
@@ -112,8 +131,26 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
   const enriched = await enrichPets(combinedRawData);
   enriched.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   
-  // Map PetRow[] to Pet[] using mapPetFromDb
-  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  // Get unique user IDs from pets
+  const userIds = [...new Set(enriched.map(p => p.user_id).filter(Boolean))];
+  
+  // Fetch profiles for these users
+  let profiles: ProfileRow[] = [];
+  if (userIds.length > 0) {
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', userIds);
+    
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    } else {
+      profiles = profilesData || [];
+    }
+  }
+  
+  // Map PetRow[] to Pet[] using mapPetFromDb with profiles
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p, profiles));
   
   return mappedPets;
 };
@@ -131,7 +168,21 @@ export const getPetById = async (id: string): Promise<Pet | null> => {
   if (error) throw error;
   if (!data) return null;
   
-  return mapPetFromDb(data);
+  // Fetch profile for this pet's owner
+  let profiles: ProfileRow[] = [];
+  if (data.user_id) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user_id)
+      .single();
+    
+    if (!profileError && profileData) {
+      profiles = [profileData];
+    }
+  }
+  
+  return mapPetFromDb(data, profiles);
 };
 
 /**
@@ -148,8 +199,22 @@ export const getPetsByUserId = async (userId: string): Promise<Pet[]> => {
   if (!data) return [];
 
   const enriched = await enrichPets(data);
-  // Map PetRow[] to Pet[] using mapPetFromDb
-  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  
+  // Fetch profile for this user
+  let profiles: ProfileRow[] = [];
+  if (userId) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (!profileError && profileData) {
+      profiles = [profileData];
+    }
+  }
+  // Map PetRow[] to Pet[] using mapPetFromDb with profiles
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p, profiles));
   return mappedPets;
 };
 

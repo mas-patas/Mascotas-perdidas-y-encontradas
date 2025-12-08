@@ -393,45 +393,105 @@ const App: React.FC = () => {
         const existingChat = chats.find(c => c.pet_id === pet.id && c.participant_emails?.includes(currentUser.email));
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
         try {
-            // Get user email from profile - pet.user_id references profiles table
-            const petOwner = users.find(u => u.id === pet.user_id);
-            const petOwnerEmail = petOwner?.email || '';
+            // Try multiple methods to get owner email
+            let petOwnerEmail = '';
+            let petOwner: User | null = null;
+            
+            // Method 1: Check if pet has userEmail property (from mapped Pet type)
+            const petWithEmail = pet as any;
+            if (petWithEmail.userEmail) {
+                petOwnerEmail = petWithEmail.userEmail;
+                petOwner = users.find(u => u.email === petOwnerEmail) || null;
+            }
+            
+            // Method 2: Find by user_id in users list
+            if (!petOwnerEmail && pet.user_id) {
+                petOwner = users.find(u => u.id === pet.user_id) || null;
+                petOwnerEmail = petOwner?.email || '';
+            }
+            
+            // Method 3: If still not found, fetch from database
+            if (!petOwnerEmail && pet.user_id) {
+                try {
+                    const { getUserById } = await import('@/api/users/users.api');
+                    const ownerProfile = await getUserById(pet.user_id);
+                    if (ownerProfile) {
+                        petOwnerEmail = ownerProfile.email;
+                        petOwner = ownerProfile;
+                        // Add to users list for future use
+                        setUsers((prev: User[]) => {
+                            if (!prev.find(u => u.id === pet.user_id)) {
+                                return [...prev, ownerProfile];
+                            }
+                            return prev;
+                        });
+                    }
+                } catch (fetchError) {
+                    // Silently fail and continue
+                }
+            }
+            
+            if (!petOwnerEmail) {
+                alert('No se pudo encontrar el dueño de la mascota. Por favor, intenta nuevamente.');
+                return;
+            }
+            
+            // Normalize emails (lowercase, trim)
+            const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+            const normalizedCurrentUserEmail = normalizeEmail(currentUser.email);
+            const normalizedPetOwnerEmail = normalizeEmail(petOwnerEmail);
+            
             const chatId = await createChat.mutateAsync({
                 petId: pet.id,
-                participantEmails: [currentUser.email, petOwnerEmail]
+                participantEmails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail]
             });
             const now = new Date().toISOString();
             setChats((prev: ChatRow[]) => [...prev, { 
                 id: chatId, 
                 pet_id: pet.id, 
-                participant_emails: [currentUser.email, petOwnerEmail], 
+                participant_emails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail], 
                 messages: null, 
                 last_read_timestamps: {}, 
                 created_at: now 
             } as ChatRow]);
             navigate(`/chat/${chatId}`);
-        } catch(e:any){ alert(e.message); }
+        } catch(e:any){ 
+            alert(e.message); 
+        }
     };
 
     const handleStartUserChat = async (email: string) => {
         if (!currentUser) return navigate('/login');
-        const existingChat = chats.find(c => c.participant_emails?.includes(currentUser.email) && c.participant_emails?.includes(email) && !c.pet_id);
+        
+        // Normalize emails for comparison
+        const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+        const normalizedCurrentEmail = normalizeEmail(currentUser.email);
+        const normalizedOtherEmail = normalizeEmail(email);
+        
+        const existingChat = chats.find(c => {
+            const emails = c.participant_emails || [];
+            return emails.some(e => normalizeEmail(e) === normalizedCurrentEmail) && 
+                   emails.some(e => normalizeEmail(e) === normalizedOtherEmail) && 
+                   !c.pet_id;
+        });
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
         try {
             const chatId = await createChat.mutateAsync({
-                participantEmails: [currentUser.email, email]
+                participantEmails: [normalizedCurrentEmail, normalizedOtherEmail]
             });
             const now = new Date().toISOString();
             setChats((prev: ChatRow[]) => [...prev, { 
                 id: chatId, 
                 pet_id: null, 
-                participant_emails: [currentUser.email, email], 
+                participant_emails: [normalizedCurrentEmail, normalizedOtherEmail], 
                 messages: null, 
                 last_read_timestamps: {}, 
                 created_at: now 
             } as ChatRow]);
             navigate(`/chat/${chatId}`);
-        } catch(e:any){ alert('Error starting chat'); }
+        } catch(e:any){ 
+            alert('Error starting chat'); 
+        }
     };
     
     const handleSendMessage = useCallback(async (chatId: string, text: string) => {

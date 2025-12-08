@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { USER_ROLES, SUPPORT_TICKET_STATUS } from '../constants';
-import type { User, Chat, Report, SupportTicket, Campaign, Notification, BannedIP } from '../types';
+import type { User, ChatRow, ReportRow, SupportTicketRow, CampaignRow, NotificationRow, BannedIpRow } from '../types';
 import { useAuth } from '../contexts/auth';
 import { useToast } from '../contexts/ToastContext';
 import {

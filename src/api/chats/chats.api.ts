@@ -14,15 +14,26 @@ export type ChatWithMessages = ChatRow & {
  * Returns database rows with snake_case column names
  */
 export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> => {
+  // Fetch all chats and filter client-side to ensure we get all chats where user is a participant
   const { data: rawChats, error } = await supabase
     .from('chats')
-    .select('*')
-    .contains('participant_emails', [userEmail]);
+    .select('*');
   
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching chats:', error);
+    throw error;
+  }
   if (!rawChats) return [];
 
-  const chatIds = rawChats.map((c) => c.id);
+  // Filter chats where user is a participant
+  const userChats = rawChats.filter(chat => {
+    const emails = chat.participant_emails || [];
+    return Array.isArray(emails) && emails.includes(userEmail);
+  });
+
+  console.log(`[getChats] Found ${userChats.length} chats for user ${userEmail} out of ${rawChats.length} total chats`);
+
+  const chatIds = userChats.map((c) => c.id);
   let rawMessages: MessageRow[] = [];
   
   if (chatIds.length > 0) {
@@ -32,11 +43,13 @@ export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> =
       .in('chat_id', chatIds)
       .order('created_at', { ascending: true });
     
-    if (msgError) throw msgError;
+    if (msgError) {
+      throw msgError;
+    }
     rawMessages = msgs || [];
   }
 
-  return rawChats.map((c) => {
+  const result = userChats.map((c) => {
     const chatMessages = rawMessages.filter((m) => m.chat_id === c.id);
     
     return {
@@ -44,6 +57,8 @@ export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> =
       messages: chatMessages,
     };
   });
+
+  return result;
 };
 
 /**
@@ -103,20 +118,31 @@ export const createChat = async (data: CreateChatData): Promise<string> => {
   const chatId = generateUUID();
   const now = new Date().toISOString();
 
+  // Normalize emails (lowercase, trim) to ensure consistency
+  const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+  const normalizedEmails = data.participantEmails.map(normalizeEmail).filter(Boolean);
+
+  if (normalizedEmails.length < 2) {
+    throw new Error('Se requieren al menos 2 participantes para crear un chat');
+  }
+
   const lastReadTimestamps: Record<string, string> = {};
-  data.participantEmails.forEach(email => {
+  normalizedEmails.forEach(email => {
     lastReadTimestamps[email] = now;
   });
 
   const { error } = await supabase.from('chats').insert({
     id: chatId,
     pet_id: data.petId || null,
-    participant_emails: data.participantEmails,
+    participant_emails: normalizedEmails,
     last_read_timestamps: lastReadTimestamps,
     created_at: now
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
+  
   return chatId;
 };
 
@@ -152,7 +178,7 @@ export const markChatAsRead = async (chatId: string, userEmail: string): Promise
     .eq('id', chatId)
     .single();
 
-  const timestamps = chatData?.last_read_timestamps || {};
+  const timestamps: Record<string, string> = (chatData?.last_read_timestamps as Record<string, string>) || {};
   timestamps[userEmail] = now;
 
   const { error } = await supabase

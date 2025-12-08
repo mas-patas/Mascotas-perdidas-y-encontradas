@@ -34,8 +34,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     const lastProcessedReadTimeRef = useRef<string>('');
     
     const participantEmails = chat?.participant_emails || [];
-    const otherUserEmail = participantEmails.find(email => email !== currentUser.email);
-    const otherUser = users.find(u => u.email === otherUserEmail);
+    
+    // Normalize emails for comparison (lowercase, trim)
+    const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+    const currentUserEmailNormalized = normalizeEmail(currentUser.email);
+    
+    const otherUserEmail = participantEmails.find(email => normalizeEmail(email) !== currentUserEmailNormalized);
+    
+    // Try to find user with normalized email comparison
+    const otherUser = otherUserEmail ? users.find(u => {
+        const userEmailNormalized = normalizeEmail(u.email);
+        return userEmailNormalized === normalizeEmail(otherUserEmail);
+    }) : null;
+    
+    const displayName = otherUser?.username || 
+                       (otherUser?.firstName && otherUser?.lastName ? `${otherUser.firstName} ${otherUser.lastName}` : null) ||
+                       otherUser?.email?.split('@')[0] || 
+                       otherUserEmail?.split('@')[0] ||
+                       'Usuario';
+    const displayAvatar = otherUser?.avatarUrl || (displayName ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random` : null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -95,10 +112,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                 >
                     &larr; Volver
                 </button>
-                <img src={pet?.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-10 w-10 rounded-full object-cover mr-3 border border-gray-300" />
+                <div className="h-10 w-10 rounded-full mr-3 border border-gray-300 overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                    {displayAvatar ? (
+                        <img src={displayAvatar} alt={displayName} className="h-full w-full object-cover" />
+                    ) : (
+                        <span className="text-sm font-bold text-gray-600">{displayName.charAt(0).toUpperCase()}</span>
+                    )}
+                </div>
                 <div>
-                    <p className="font-bold text-brand-dark text-sm">{pet ? `Conversación sobre ${pet.name}` : 'Mensaje de Administración'}</p>
-                    <p className="text-xs text-gray-500">con @{otherUser?.username || 'usuario'}</p>
+                    <p className="font-bold text-brand-dark text-sm">{pet ? `Conversación sobre ${pet.name}` : `Conversación con ${displayName}`}</p>
+                    <p className="text-xs text-gray-500">con @{displayName}</p>
                 </div>
             </div>
 
@@ -108,9 +131,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                     const messages = (chat.messages as MessageRow[] | null) || [];
                     return messages.map((message: MessageRow, index: number) => {
                         const isCurrentUser = message.sender_email === currentUser.email;
+                        const messageSender = message.sender_email === currentUser.email ? currentUser : (users.find(u => u.email === message.sender_email) || null);
+                        const senderName = messageSender?.username || 
+                                         (messageSender?.firstName && messageSender?.lastName ? `${messageSender.firstName} ${messageSender.lastName}` : null) ||
+                                         message.sender_email?.split('@')[0] || 
+                                         'Usuario';
+                        
                         return (
-                            <div key={message.id || index} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                            <div key={message.id || index} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-start gap-2`}>
+                                {!isCurrentUser && (
+                                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                        {messageSender?.avatarUrl ? (
+                                            <img src={messageSender.avatarUrl} alt={senderName} className="h-full w-full object-cover rounded-full" />
+                                        ) : (
+                                            <span className="text-xs font-bold text-gray-600">{senderName.charAt(0).toUpperCase()}</span>
+                                        )}
+                                    </div>
+                                )}
                                 <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${isCurrentUser ? 'bg-brand-primary text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
+                                    {!isCurrentUser && (
+                                        <p className="text-xs font-semibold text-gray-600 mb-1">@{senderName}</p>
+                                    )}
                                     <p className="text-sm">{message.text}</p>
                                     <p className={`text-[10px] mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-gray-400'} text-right`}>
                                         {formatTime(message.created_at)}
