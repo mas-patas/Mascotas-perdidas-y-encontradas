@@ -1,5 +1,6 @@
 
 import { Pet, Comment } from '../types';
+import { ensurePublicImageUrls } from './imageUtils';
 
 /**
  * Transforma un registro crudo de mascota de la base de datos (snake_case)
@@ -45,7 +46,8 @@ export const mapPetFromDb = (
         date: p.date,
         contact: p.contact,
         description: p.description,
-        imageUrls: p.image_urls || [],
+        // Ensure all image URLs are valid public URLs
+        imageUrls: ensurePublicImageUrls(p.image_urls || []),
         adoptionRequirements: p.adoption_requirements,
         shareContactInfo: p.share_contact_info,
         contactRequests: p.contact_requests || [],

@@ -16,6 +16,7 @@ import { ShareModal } from '@/shared';
 import { ReunionSuccessModal } from '@/features/pets';
 import { mapPetFromDb } from '@/utils/mappers';
 import { ErrorBoundary } from '@/shared';
+import { supabase } from '@/services/supabaseClient';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -306,6 +307,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const pet = propPet || fetchedPet;
     
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    
+    // Reset image index when pet or imageUrls change
+    useEffect(() => {
+        if (pet?.imageUrls && pet.imageUrls.length > 0) {
+            setCurrentImageIndex(0);
+        }
+    }, [pet?.id, pet?.imageUrls?.length]);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -393,7 +401,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             };
 
             if (image) {
-                updateData.image_urls = [image, ...pet.imageUrls];
+                updateData.image_urls = [image, ...(pet.imageUrls || [])];
             }
 
             const { error } = await supabase
@@ -563,28 +571,35 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
-    const renderImages = () => (
-        <div className="relative bg-gray-200 rounded-xl overflow-hidden h-[250px] sm:h-[300px] md:h-[500px] shadow-md border border-card-border group w-full">
-            <img 
-                src={pet.imageUrls[currentImageIndex] || 'https://placehold.co/600x400?text=Sin+Imagen'} 
-                alt={pet.name} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            {pet.imageUrls.length > 1 && (
-                <>
-                    <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(prev => (prev === 0 ? pet.imageUrls.length - 1 : prev - 1))}} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 sm:p-2 md:p-3 rounded-full hover:bg-black/70 transition backdrop-blur-sm">
-                        <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                    </button>
-                    <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(prev => (prev + 1) % pet.imageUrls.length)}} className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 sm:p-2 md:p-3 rounded-full hover:bg-black/70 transition backdrop-blur-sm">
-                        <ChevronRightIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-                    </button>
-                    <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-white text-[10px] sm:text-xs font-bold backdrop-blur-sm">
-                        {currentImageIndex + 1} / {pet.imageUrls.length}
-                    </div>
-                </>
-            )}
-        </div>
-    );
+    const renderImages = () => {
+        // Ensure imageUrls is always an array
+        const imageUrls = pet?.imageUrls || [];
+        const safeImageIndex = Math.min(currentImageIndex, Math.max(0, imageUrls.length - 1));
+        const currentImage = imageUrls[safeImageIndex] || 'https://placehold.co/600x400?text=Sin+Imagen';
+        
+        return (
+            <div className="relative bg-gray-200 rounded-xl overflow-hidden h-[250px] sm:h-[300px] md:h-[500px] shadow-md border border-card-border group w-full">
+                <img 
+                    src={currentImage} 
+                    alt={pet?.name || 'Mascota'} 
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                {imageUrls.length > 1 && (
+                    <>
+                        <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(prev => (prev === 0 ? imageUrls.length - 1 : prev - 1))}} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 sm:p-2 md:p-3 rounded-full hover:bg-black/70 transition backdrop-blur-sm">
+                            <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                        </button>
+                        <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(prev => (prev + 1) % imageUrls.length)}} className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 sm:p-2 md:p-3 rounded-full hover:bg-black/70 transition backdrop-blur-sm">
+                            <ChevronRightIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+                        </button>
+                        <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-white text-[10px] sm:text-xs font-bold backdrop-blur-sm">
+                            {safeImageIndex + 1} / {imageUrls.length}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
 
     const renderDescription = () => (
         <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-card-border w-full">

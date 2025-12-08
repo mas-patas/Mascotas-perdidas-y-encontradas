@@ -1,6 +1,7 @@
 import { supabase } from '../../services/supabaseClient';
-import type { PetRow, CommentRow, ProfileRow, CommentLikeRow } from '../../types';
+import type { PetRow, CommentRow, ProfileRow, CommentLikeRow, Pet } from '../../types';
 import type { PetFilters, FetchPetsParams, CreatePetData, UpdatePetData, MarkReunionData } from './pets.types';
+import { mapPetFromDb } from '../../utils/mappers';
 
 const PET_COLUMNS = 'id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date';
 
@@ -27,7 +28,7 @@ const enrichPets = async (rawPets: PetRow[]): Promise<PetRow[]> => {
  * Fetch pets with filters (for list view)
  */
 
-export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsParams): Promise<{ data: PetRow[]; nextCursor?: number; total?: number }> => {
+export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsParams): Promise<{ data: Pet[]; nextCursor?: number; total?: number }> => {
   const nowIso = new Date().toISOString();
   
   if (filters.status === 'Todos') {
@@ -61,10 +62,12 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
   if (error) throw error;
 
   const enriched = await enrichPets(data || []);
+  // Map PetRow[] to Pet[] using mapPetFromDb
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
   const hasMore = from + (data?.length || 0) < (count || 0);
   
   return { 
-    data: enriched, 
+    data: mappedPets, 
     nextCursor: hasMore ? page + 1 : undefined,
     total: count || 0
   };
@@ -73,7 +76,7 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
 /**
  * Fetch pets for dashboard (all statuses with limits)
  */
-export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise<PetRow[]> => {
+export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise<Pet[]> => {
   const nowIso = new Date().toISOString();
   const { PET_STATUS } = await import('../../constants');
   const categories = [PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
@@ -109,13 +112,16 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
   const enriched = await enrichPets(combinedRawData);
   enriched.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   
-  return enriched;
+  // Map PetRow[] to Pet[] using mapPetFromDb
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  
+  return mappedPets;
 };
 
 /**
  * Fetch a single pet by ID
  */
-export const getPetById = async (id: string): Promise<PetRow | null> => {
+export const getPetById = async (id: string): Promise<Pet | null> => {
   const { data, error } = await supabase
     .from('pets')
     .select(PET_COLUMNS)
@@ -123,13 +129,15 @@ export const getPetById = async (id: string): Promise<PetRow | null> => {
     .single();
   
   if (error) throw error;
-  return data;
+  if (!data) return null;
+  
+  return mapPetFromDb(data);
 };
 
 /**
  * Fetch pets by user ID
  */
-export const getPetsByUserId = async (userId: string): Promise<PetRow[]> => {
+export const getPetsByUserId = async (userId: string): Promise<Pet[]> => {
   const { data, error } = await supabase
     .from('pets')
     .select(PET_COLUMNS)
@@ -140,13 +148,15 @@ export const getPetsByUserId = async (userId: string): Promise<PetRow[]> => {
   if (!data) return [];
 
   const enriched = await enrichPets(data);
-  return enriched;
+  // Map PetRow[] to Pet[] using mapPetFromDb
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  return mappedPets;
 };
 
 /**
  * Fetch pets for map (with coordinates)
  */
-export const getPetsForMap = async (): Promise<PetRow[]> => {
+export const getPetsForMap = async (): Promise<Pet[]> => {
   const nowIso = new Date().toISOString();
   
   const { data, error } = await supabase
@@ -160,7 +170,9 @@ export const getPetsForMap = async (): Promise<PetRow[]> => {
   if (!data) return [];
 
   const enriched = await enrichPets(data);
-  return enriched;
+  // Map PetRow[] to Pet[] using mapPetFromDb
+  const mappedPets: Pet[] = enriched.map(p => mapPetFromDb(p));
+  return mappedPets;
 };
 
 /**

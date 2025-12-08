@@ -85,6 +85,46 @@ export const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, qua
     });
 };
 
+/**
+ * Ensures an image URL is a valid public URL.
+ * If the URL is already a full URL (starts with http/https), returns it as-is.
+ * If it's a path, converts it to a public URL using Supabase storage.
+ * @param url - The image URL or path from the database
+ * @returns A valid public URL
+ */
+export const ensurePublicImageUrl = (url: string): string => {
+    if (!url || typeof url !== 'string') {
+        return '';
+    }
+
+    // If it's already a full URL (http/https), return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+
+    // If it's a path, convert it to a public URL
+    // Remove leading slash if present
+    const cleanPath = url.startsWith('/') ? url.slice(1) : url;
+    
+    const { data } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(cleanPath);
+
+    return data.publicUrl;
+};
+
+/**
+ * Ensures an array of image URLs are all valid public URLs.
+ * @param urls - Array of image URLs or paths
+ * @returns Array of valid public URLs
+ */
+export const ensurePublicImageUrls = (urls: string[]): string[] => {
+    if (!Array.isArray(urls)) {
+        return [];
+    }
+    return urls.map(url => ensurePublicImageUrl(url)).filter(url => url !== '');
+};
+
 // --- MAIN UPLOAD FUNCTION (Simplified) ---
 export const uploadImage = async (file: File): Promise<string> => {
     try {
