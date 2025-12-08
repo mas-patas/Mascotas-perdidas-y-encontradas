@@ -276,7 +276,11 @@ export const createPet = async (data: CreatePetData): Promise<string> => {
     lng: data.lng,
     created_at: now.toISOString(),
     expires_at: expirationDate.toISOString(),
-    embedding: data.embedding || null
+    // Ensure embedding is either a valid array with elements or null
+    // Supabase rejects empty arrays for vector columns
+    embedding: (data.embedding && Array.isArray(data.embedding) && data.embedding.length > 0) 
+      ? data.embedding 
+      : null
   });
 
   if (error) throw error;

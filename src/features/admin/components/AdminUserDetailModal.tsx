@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { User, Pet, Chat, UserStatus, UserRole } from '@/types';
 import { useAuth } from '@/contexts/auth';
 import { USER_ROLES, USER_STATUS } from '@/constants';
@@ -21,45 +22,80 @@ interface AdminUserDetailModalProps {
 
 const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPets, allChats, allUsers, onClose, onUpdateStatus, onUpdateRole, onStartChat, onGhostLogin, onViewUser }) => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'details' | 'posts' | 'messages'>('details');
     const [isEditing, setIsEditing] = useState(false);
+    
+    // Validate user object - must be done after hooks
+    const safeUser = user && user.email && user.role ? user : null;
+    
     const [editableUser, setEditableUser] = useState({
-        role: user.role,
-        status: user.status || USER_STATUS.ACTIVE,
+        role: user?.role || USER_ROLES.USER,
+        status: user?.status || USER_STATUS.ACTIVE,
     });
     const [viewingContactRequesters, setViewingContactRequesters] = useState<Pet | null>(null);
     
     useEffect(() => {
         // Reset state if the user prop changes (e.g., opening a new user modal)
-        setEditableUser({
-            role: user.role,
-            status: user.status || USER_STATUS.ACTIVE,
-        });
-        setIsEditing(false);
-        setActiveTab('details');
+        if (user && user.email && user.role) {
+            setEditableUser({
+                role: user.role,
+                status: user.status || USER_STATUS.ACTIVE,
+            });
+            setIsEditing(false);
+            setActiveTab('details');
+        }
     }, [user]);
+    
+    // Early return after all hooks
+    if (!safeUser) {
+        console.error('AdminUserDetailModal: Invalid user object', user);
+        return null;
+    }
 
-    const canEditRole = currentUser?.role === USER_ROLES.SUPERADMIN && currentUser.email !== user.email;
+    const canEditRole = currentUser?.role === USER_ROLES.SUPERADMIN && currentUser.email !== safeUser.email;
 
-    const userPosts = useMemo(() => allPets.filter(p => p.userEmail === user.email), [allPets, user.email]);
+    const userPosts = useMemo(() => {
+        if (!safeUser?.email) return [];
+        return allPets.filter(p => p.userEmail === safeUser.email);
+    }, [allPets, safeUser?.email]);
     
     const userSentMessages = useMemo(() => {
+        if (!safeUser?.email) return [];
         return allChats
-            .filter(chat => chat.participantEmails.includes(user.email))
-            .flatMap(chat => {
-                const otherUserEmail = chat.participantEmails.find(email => email !== user.email);
-                const pet = chat.petId ? allPets.find(p => p.id === chat.petId) : null;
-                return chat.messages
-                    .filter(message => message.senderEmail === user.email)
-                    .map(message => ({
-                        ...message,
-                        chatId: chat.id,
-                        recipientEmail: otherUserEmail,
-                        petContext: pet,
-                    }));
+            .filter(chat => {
+                const participantEmails = (chat as any).participant_emails || (chat as any).participantEmails || [];
+                return Array.isArray(participantEmails) && participantEmails.includes(safeUser.email);
             })
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [allChats, allPets, user.email]);
+            .flatMap(chat => {
+                const participantEmails = (chat as any).participant_emails || (chat as any).participantEmails || [];
+                const otherUserEmail = participantEmails.find((email: string) => email !== safeUser.email);
+                const petId = (chat as any).pet_id || (chat as any).petId;
+                const pet = petId ? allPets.find(p => p.id === petId) : null;
+                const messages = (chat as any).messages || [];
+                return messages
+                    .filter((message: any) => {
+                        const senderEmail = message.sender_email || message.senderEmail;
+                        return message && senderEmail === safeUser.email;
+                    })
+                    .map((message: any) => {
+                        const timestamp = message.timestamp || message.created_at;
+                        return {
+                            ...message,
+                            chatId: chat.id,
+                            recipientEmail: otherUserEmail,
+                            petContext: pet,
+                            timestamp: timestamp,
+                            text: message.text,
+                        };
+                    });
+            })
+            .sort((a, b) => {
+                const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                return timeB - timeA;
+            });
+    }, [allChats, allPets, safeUser?.email]);
 
     const getRoleClass = (role: UserRole) => {
         switch (role) {
@@ -80,19 +116,19 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
 
     const handleCancel = () => {
         setEditableUser({
-            role: user.role,
-            status: user.status || USER_STATUS.ACTIVE,
+            role: safeUser.role,
+            status: safeUser.status || USER_STATUS.ACTIVE,
         });
         setIsEditing(false);
     };
 
     const handleSaveChanges = () => {
-        if (editableUser.role !== user.role) {
-            onUpdateRole(user.email, editableUser.role);
+        if (editableUser.role !== safeUser.role) {
+            onUpdateRole(safeUser.email, editableUser.role);
         }
-        const originalStatus = user.status || USER_STATUS.ACTIVE;
+        const originalStatus = safeUser.status || USER_STATUS.ACTIVE;
         if (editableUser.status !== originalStatus) {
-            onUpdateStatus(user.email, editableUser.status);
+            onUpdateStatus(safeUser.email, editableUser.status);
         }
         setIsEditing(false);
     };
@@ -124,7 +160,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                     <div className="p-6 relative border-b">
                         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
                         <h2 className="text-2xl font-bold text-brand-dark mb-1">Perfil de Usuario</h2>
-                        <p className="text-gray-500">@{user.username || 'N/A'}</p>
+                        <p className="text-gray-500">@{safeUser.username || 'N/A'}</p>
                     </div>
 
                     <nav className="flex space-x-4 px-6 border-b">
@@ -145,12 +181,12 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                      )}
                                  </div>
                                  <div className="space-y-3 p-4 border rounded-md bg-gray-50">
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Nombre:</span> {user.firstName || 'N/A'} {user.lastName || 'N/A'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Usuario:</span> @{user.username || 'N/A'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Email:</span> {user.email}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">DNI:</span> {user.dni || 'No registrado'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Teléfono:</span> {user.phone || 'No registrado'}</p>
-                                    {user.birthDate && <p><span className="font-semibold text-gray-800 w-28 inline-block">Cumpleaños:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Nombre:</span> {safeUser.firstName || 'N/A'} {safeUser.lastName || 'N/A'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Usuario:</span> @{safeUser.username || 'N/A'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Email:</span> {safeUser.email}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">DNI:</span> {safeUser.dni || 'No registrado'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Teléfono:</span> {safeUser.phone || 'No registrado'}</p>
+                                    {safeUser.birthDate && <p><span className="font-semibold text-gray-800 w-28 inline-block">Cumpleaños:</span> {new Date(safeUser.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
                                     <div className="flex items-center">
                                         <span className="font-semibold text-gray-800 w-28 inline-block">Rol:</span>
                                         {isEditing && canEditRole ? (
@@ -166,14 +202,14 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                             </select>
                                         ) : (
                                             <div className="relative group flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getRoleClass(user.role)}`}>
-                                                    {user.role}
+                                                <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getRoleClass(safeUser.role)}`}>
+                                                    {safeUser.role}
                                                 </span>
                                                 {!canEditRole && (
                                                     <>
                                                         <InfoIcon />
                                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs px-3 py-1.5 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-                                                            {currentUser?.email === user.email 
+                                                            {currentUser?.email === safeUser.email 
                                                                 ? "No puedes cambiar tu propio rol."
                                                                 : "Solo Superadmins pueden cambiar roles."
                                                             }
@@ -198,8 +234,8 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                                 ))}
                                             </select>
                                         ) : (
-                                            <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getStatusClass(user.status)}`}>
-                                                {user.status || 'Activo'}
+                                            <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getStatusClass(safeUser.status)}`}>
+                                                {safeUser.status || 'Activo'}
                                             </span>
                                         )}
                                     </div>
@@ -214,19 +250,25 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                      <div className="mt-6 pt-4 border-t space-y-3">
                                         <h3 className="text-lg font-semibold text-gray-800">Acciones de Moderación</h3>
                                         <div className="flex flex-col sm:flex-row gap-3">
-                                            <button onClick={() => onStartChat(user.email)} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
+                                            <button onClick={() => onStartChat(safeUser.email)} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
                                                 Enviar Mensaje
                                             </button>
                                              <button 
-                                                onClick={() => onUpdateStatus(user.email, user.status === USER_STATUS.ACTIVE ? USER_STATUS.INACTIVE : USER_STATUS.ACTIVE)} 
-                                                className={`flex-1 py-2 px-4 text-white font-semibold rounded-lg transition-colors ${user.status === USER_STATUS.INACTIVE ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
+                                                onClick={() => onUpdateStatus(safeUser.email, safeUser.status === USER_STATUS.ACTIVE ? USER_STATUS.INACTIVE : USER_STATUS.ACTIVE)} 
+                                                className={`flex-1 py-2 px-4 text-white font-semibold rounded-lg transition-colors ${safeUser.status === USER_STATUS.INACTIVE ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
                                             >
-                                                {user.status === USER_STATUS.INACTIVE ? 'Reactivar Usuario' : 'Banear Usuario'}
+                                                {safeUser.status === USER_STATUS.INACTIVE ? 'Reactivar Usuario' : 'Banear Usuario'}
                                             </button>
                                         </div>
                                         {onGhostLogin && (
                                             <button
-                                                onClick={() => onGhostLogin(user)}
+                                                onClick={() => {
+                                                    if (!safeUser || !safeUser.email) {
+                                                        alert('Error: Usuario inválido. No se puede hacer ghost login.');
+                                                        return;
+                                                    }
+                                                    onGhostLogin(safeUser);
+                                                }}
                                                 className="w-full mt-3 py-2 px-4 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
                                             >
                                                 Iniciar sesión como este usuario
@@ -241,7 +283,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                             {userPosts.length > 0 ? (
                                 userPosts.map(pet => (
                                 <div key={pet.id} className="flex items-center gap-4 p-2 bg-gray-50 rounded-lg border">
-                                    <img src={pet.imageUrls[0]} alt={pet.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                                    <img src={pet.imageUrls && pet.imageUrls.length > 0 ? pet.imageUrls[0] : '/placeholder-pet.png'} alt={pet.name || 'Mascota'} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
                                     <div className="flex-1">
                                         <div className="flex justify-between items-center">
                                             <p className="font-semibold text-gray-800">{pet.name}</p>
@@ -257,7 +299,18 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                         </div>
                                         <p className="text-sm text-gray-500">{pet.breed} - <span className="font-medium">{pet.status}</span></p>
                                     </div>
-                                    <p className="text-xs text-gray-400 self-start">{new Date(pet.date).toLocaleDateString()}</p>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <p className="text-xs text-gray-400">{new Date(pet.date).toLocaleDateString()}</p>
+                                        <button
+                                            onClick={() => {
+                                                onClose();
+                                                navigate(`/mascota/${pet.id}`);
+                                            }}
+                                            className="text-xs font-semibold text-brand-primary bg-blue-100 px-3 py-1 rounded-lg hover:bg-blue-200 transition"
+                                        >
+                                            Ir a publicación
+                                        </button>
+                                    </div>
                                 </div>
                                 ))
                             ) : (
@@ -268,15 +321,16 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                         {activeTab === 'messages' && (
                             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                             {userSentMessages.length > 0 ? (
-                                userSentMessages.map((message) => {
+                                userSentMessages.map((message, index) => {
                                     const recipient = allUsers.find(u => u.email === message.recipientEmail);
+                                    const messageTimestamp = message.timestamp || (message as any).created_at;
                                     return (
-                                        <div key={`${message.chatId}-${message.timestamp}`} className="p-3 bg-gray-50 rounded-lg border">
+                                        <div key={`${message.chatId}-${messageTimestamp}-${index}`} className="p-3 bg-gray-50 rounded-lg border">
                                             <div className="flex justify-between items-start text-xs text-gray-500 mb-1">
                                                 <span>
                                                     Para: <span className="font-semibold text-brand-primary">@{recipient?.username || message.recipientEmail || 'desconocido'}</span>
                                                 </span>
-                                                <span className="flex-shrink-0">{new Date(message.timestamp).toLocaleString('es-ES')}</span>
+                                                <span className="flex-shrink-0">{messageTimestamp ? new Date(messageTimestamp).toLocaleString('es-ES') : 'Sin fecha'}</span>
                                             </div>
                                             {message.petContext ? (
                                                 <div className="text-xs text-gray-500 mb-2">
@@ -288,7 +342,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                                 </div>
                                             )}
                                             <blockquote className="text-sm text-gray-800 pl-3 border-l-2 border-gray-300">
-                                                {message.text}
+                                                {message.text || (message as any).text || 'Sin texto'}
                                             </blockquote>
                                         </div>
                                     );

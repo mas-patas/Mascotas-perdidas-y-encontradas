@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as authApi from '@/api/auth/auth.api';
 import { initSession, fetchUserProfileService, handleAuthStateChange } from '@/services/auth/authService';
+import { getStoredGhostingAdmin } from '@/services/auth/ghostingService';
 import type { User } from '@/types';
 
 /**
@@ -76,6 +77,19 @@ export const useAuthSession = () => {
   useEffect(() => {
     const { unsubscribe } = authApi.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
+
+      // Check if we're in ghost mode - if so, don't update the user
+      const ghostingAdmin = getStoredGhostingAdmin();
+      if (ghostingAdmin) {
+        // We're in ghost mode, don't let auth state changes override the impersonated user
+        // Only allow SIGNED_OUT to clear the session
+        if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setLoading(false);
+          queryClient.removeQueries();
+        }
+        return;
+      }
 
       const { shouldUpdate, user } = await handleAuthStateChange(
         event,
