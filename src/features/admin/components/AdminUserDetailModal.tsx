@@ -248,11 +248,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                         {onGhostLogin && (
                                             <button
                                                 onClick={() => {
-                                                    console.log('🔍 AdminUserDetailModal: Button clicked');
-                                                    console.log('  - safeUser:', safeUser?.email, safeUser?.username, safeUser?.id);
-                                                    console.log('  - safeUser object:', safeUser);
                                                     if (!safeUser || !safeUser.email) {
-                                                        console.error('❌ safeUser is invalid:', safeUser);
                                                         alert('Error: Usuario inválido. No se puede hacer ghost login.');
                                                         return;
                                                     }

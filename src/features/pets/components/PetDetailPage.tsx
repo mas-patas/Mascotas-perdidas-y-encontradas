@@ -704,7 +704,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 allComments={pet.comments || []} 
                                 onReply={() => setIsCommentsModalOpen(true)}
                                 onLike={(cid) => onLikeComment(pet.id, cid)}
-                                onReportComment={(cid) => console.log(cid)} 
+                                onReportComment={(cid) => {
+                                    // TODO: Implement comment reporting modal
+                                }} 
                                 currentUser={currentUser}
                                 postOwnerEmail={pet.userEmail}
                             />
@@ -733,86 +735,113 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
     const renderActions = () => (
         <div className="w-full bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-card-border">
-            <div className="space-y-2 sm:space-y-3">
-                {/* Always show the owner information */}
-                <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 p-2 sm:p-3 bg-gray-50 rounded-lg border border-card-border">
-                    <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer flex-shrink-0">
-                        {petOwner?.avatarUrl ? (
-                            <img src={petOwner.avatarUrl} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white shadow-sm" alt="avatar" />
-                        ) : (
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 rounded-full flex items-center justify-center text-icon-gray font-bold text-lg sm:text-xl">
-                                {(petOwner?.firstName?.charAt(0) || ownerName.charAt(0) || '?').toUpperCase()}
-                            </div>
-                        )}
+            {(isOwner || isAdmin) ? (
+                <div className="space-y-2 sm:space-y-3">
+                    {/* Owner section - show "Tu publicación" for owners, "Publicado por" for admins viewing others' posts */}
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 p-2 sm:p-3 bg-gray-50 rounded-lg border border-card-border">
+                        <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer flex-shrink-0">
+                            {petOwner?.avatarUrl ? (
+                                <img src={petOwner.avatarUrl} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white shadow-sm" alt="avatar" />
+                            ) : (
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 rounded-full flex items-center justify-center text-icon-gray font-bold text-lg sm:text-xl">
+                                    {(petOwner?.firstName?.charAt(0) || ownerName.charAt(0) || '?').toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            {isOwner ? (
+                                <>
+                                    <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase">Tu publicación</p>
+                                    <p className="font-black text-text-main text-sm sm:text-base">Gestionar</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase">Publicado por</p>
+                                    <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-black text-text-main hover:text-brand-primary text-sm sm:text-base hover:underline">
+                                        @{ownerName}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase">Publicado por</p>
-                        <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-black text-text-main hover:text-brand-primary text-sm sm:text-base hover:underline">
-                            @{ownerName}
-                        </button>
-                    </div>
-                </div>
 
-                {/* Owner management section - only show if user is the actual owner */}
-                {isOwner && (
-                    <>
-                        {isLost && (
-                            <button 
-                                onClick={() => setIsReunionModalOpen(true)}
-                                className="w-full bg-status-found text-white font-black py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 btn-press text-sm sm:text-base lg:text-lg"
-                            >
-                                <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-brand-secondary" />
-                                ¡Ya encontré a mi mascota!
-                            </button>
-                        )}
-                        <div className="flex gap-2 sm:gap-3">
+                    {/* Owner management section - only show if user is the actual owner */}
+                    {isOwner && (
+                        <>
+                            {isLost && (
+                                <button 
+                                    onClick={() => setIsReunionModalOpen(true)}
+                                    className="w-full bg-status-found text-white font-black py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 btn-press text-sm sm:text-base lg:text-lg"
+                                >
+                                    <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-brand-secondary" />
+                                    ¡Ya encontré a mi mascota!
+                                </button>
+                            )}
+                            <div className="flex gap-2 sm:gap-3">
+                                <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
+                                    <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
+                                </button>
+                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
+                                    <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Admin actions - show if admin but not owner */}
+                    {isAdmin && !isOwner && (
+                        <div className="flex gap-2 sm:gap-3 border-t border-card-border pt-2 sm:pt-3">
                             <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                                <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
+                                <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar (Admin)
                             </button>
                             <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                                <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar
+                                <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar (Admin)
                             </button>
                         </div>
-                    </>
-                )}
-
-                {/* Admin actions - show if admin but not owner */}
-                {isAdmin && !isOwner && (
-                    <div className="flex gap-2 sm:gap-3 border-t border-card-border pt-2 sm:pt-3">
-                        <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                            <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar (Admin)
-                        </button>
-                        <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                            <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar (Admin)
-                        </button>
-                    </div>
-                )}
-
-                {/* Contact and chat section - only show if not the owner */}
-                {!isOwner && (
-                    <>
-                        {pet.shareContactInfo && (
-                            contactRevealed ? (
-                                <div className="bg-green-50 p-3 sm:p-4 rounded-lg border border-green-200 text-center animate-fade-in shadow-sm">
-                                    <a href={`tel:${pet.contact}`} className="text-lg sm:text-xl lg:text-2xl font-black text-status-found hover:underline block mb-1">{pet.contact}</a>
-                                    <a href={`https://wa.me/51${pet.contact}`} target="_blank" rel="noreferrer" className="text-xs sm:text-sm font-bold text-status-found hover:text-green-800 flex items-center justify-center gap-1.5 sm:gap-2">
-                                        <PhoneIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Abrir WhatsApp
-                                    </a>
-                                </div>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-2 sm:space-y-3">
+                    {/* Non-owner section - show "Publicado por" */}
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 p-2 sm:p-3 bg-gray-50 rounded-lg border border-card-border">
+                        <div onClick={() => petOwner && setPublicProfileUser(petOwner)} className="cursor-pointer flex-shrink-0">
+                            {petOwner?.avatarUrl ? (
+                                <img src={petOwner.avatarUrl} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white shadow-sm" alt="avatar" />
                             ) : (
-                                <button onClick={handleRevealContact} className={`w-full py-3 sm:py-4 ${currentUser ? 'bg-brand-primary text-white hover:bg-brand-dark' : 'bg-gray-100 text-text-sub hover:bg-gray-200'} font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg`}>
-                                    {!currentUser ? <LockIcon className="h-5 w-5 sm:h-6 sm:w-6" /> : <PhoneIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
-                                    {currentUser ? 'Ver Teléfono' : 'Ver Teléfono (Ingresa)'}
-                                </button>
-                            )
-                        )}
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-200 rounded-full flex items-center justify-center text-icon-gray font-bold text-lg sm:text-xl">
+                                    {(petOwner?.firstName?.charAt(0) || ownerName.charAt(0) || '?').toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase">Publicado por</p>
+                            <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-black text-text-main hover:text-brand-primary text-sm sm:text-base hover:underline">
+                                @{ownerName}
+                            </button>
+                        </div>
+                    </div>
 
-                        <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg">
-                            <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
-                        </button>
-                    </>
-                )}
-            </div>
+                    {pet.shareContactInfo && (
+                        contactRevealed ? (
+                            <div className="bg-green-50 p-3 sm:p-4 rounded-lg border border-green-200 text-center animate-fade-in shadow-sm">
+                                <a href={`tel:${pet.contact}`} className="text-lg sm:text-xl lg:text-2xl font-black text-status-found hover:underline block mb-1">{pet.contact}</a>
+                                <a href={`https://wa.me/51${pet.contact}`} target="_blank" rel="noreferrer" className="text-xs sm:text-sm font-bold text-status-found hover:text-green-800 flex items-center justify-center gap-1.5 sm:gap-2">
+                                    <PhoneIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Abrir WhatsApp
+                                </a>
+                            </div>
+                        ) : (
+                            <button onClick={handleRevealContact} className={`w-full py-3 sm:py-4 ${currentUser ? 'bg-brand-primary text-white hover:bg-brand-dark' : 'bg-gray-100 text-text-sub hover:bg-gray-200'} font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg`}>
+                                {!currentUser ? <LockIcon className="h-5 w-5 sm:h-6 sm:w-6" /> : <PhoneIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
+                                {currentUser ? 'Ver Teléfono' : 'Ver Teléfono (Ingresa)'}
+                            </button>
+                        )
+                    )}
+
+                    <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg">
+                        <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
+                    </button>
+                </div>
+            )}
         </div>
     );
 
@@ -914,7 +943,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 comments={pet.comments} 
                 onAddComment={onAddComment}
                 onLikeComment={onLikeComment}
-                onReportComment={(cid: string) => console.log('Report', cid)}
+                onReportComment={(cid: string) => {
+                    // TODO: Implement comment reporting modal
+                }}
                 onDeleteComment={handleDeleteComment}
                 currentUser={currentUser} 
             />
