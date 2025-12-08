@@ -43,26 +43,26 @@ const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, use
 
     const getTicketStatusClass = (status: SupportTicketStatus) => {
         switch (status) {
-            case SUPPORT_TICKET_STATUS.PENDING: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case SUPPORT_TICKET_STATUS.IN_PROGRESS: return 'bg-blue-100 text-blue-800 border-blue-200';
-            case SUPPORT_TICKET_STATUS.RESOLVED: return 'bg-green-100 text-green-800 border-green-200';
-            case SUPPORT_TICKET_STATUS.NOT_RESOLVED: return 'bg-red-100 text-red-800 border-red-200';
-            default: return 'bg-gray-100 text-gray-800';
+            case SUPPORT_TICKET_STATUS.PENDING: return 'bg-yellow-50 text-brand-secondary border-yellow-200';
+            case SUPPORT_TICKET_STATUS.IN_PROGRESS: return 'bg-brand-light text-brand-primary border-card-border';
+            case SUPPORT_TICKET_STATUS.RESOLVED: return 'bg-green-50 text-status-found border-green-200';
+            case SUPPORT_TICKET_STATUS.NOT_RESOLVED: return 'bg-red-50 text-status-lost border-red-200';
+            default: return 'bg-gray-100 text-text-sub';
         }
     }
 
     const getReportStatusBadge = (status: ReportStatus) => {
         switch (status) {
             case REPORT_STATUS.PENDING: 
-                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200 flex items-center gap-1"><InfoIcon className="h-3 w-3"/> Pendiente</span>;
+                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-yellow-50 text-brand-secondary border border-yellow-200 flex items-center gap-1"><InfoIcon className="h-3 w-3"/> Pendiente</span>;
             case REPORT_STATUS.ELIMINATED: 
-                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center gap-1"><TrashIcon className="h-3 w-3"/> Eliminado</span>;
+                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-red-50 text-status-lost border border-red-200 flex items-center gap-1"><TrashIcon className="h-3 w-3"/> Eliminado</span>;
             case REPORT_STATUS.INVALID: 
-                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-800 border border-gray-300 flex items-center gap-1"><XCircleIcon className="h-3 w-3"/> Desestimado</span>;
+                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-text-sub border border-gray-300 flex items-center gap-1"><XCircleIcon className="h-3 w-3"/> Desestimado</span>;
             case REPORT_STATUS.NO_ACTION: 
-                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1"><CheckCircleIcon className="h-3 w-3"/> Revisado</span>;
+                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-brand-light text-brand-primary border border-card-border flex items-center gap-1"><CheckCircleIcon className="h-3 w-3"/> Revisado</span>;
             default: 
-                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-800">{status}</span>;
+                return <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-text-sub">{status}</span>;
         }
     }
     
@@ -184,10 +184,10 @@ const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, use
                                                         <h5 className="text-xs font-bold text-brand-dark uppercase mb-1 flex items-center gap-1">
                                                             <UserIcon className="h-3 w-3" /> Respuesta del Equipo
                                                         </h5>
-                                                        <p className="text-sm text-gray-800">{ticket.response}</p>
+                                                        <p className="text-sm text-text-main">{ticket.response}</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="mt-3 text-xs text-gray-400 italic flex items-center gap-1">
+                                                    <div className="mt-3 text-xs text-icon-gray italic flex items-center gap-1">
                                                         <InfoIcon className="h-3 w-3" /> Esperando respuesta de un administrador...
                                                     </div>
                                                 )}
@@ -226,9 +226,9 @@ const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, use
                                                 <div className="bg-gray-50 p-4 flex flex-wrap justify-between items-center gap-3 border-b border-gray-100">
                                                     <div className="flex items-center gap-3">
                                                         <div className={`p-2 rounded-full ${
-                                                            report.type === 'post' ? 'bg-red-100 text-red-600' : 
-                                                            report.type === 'comment' ? 'bg-blue-100 text-blue-600' : 
-                                                            'bg-purple-100 text-purple-600'
+                                                            report.type === 'post' ? 'bg-red-50 text-status-lost' : 
+                                                            report.type === 'comment' ? 'bg-brand-light text-brand-primary' : 
+                                                            'bg-status-adoption/20 text-status-adoption'
                                                         }`}>
                                                             {report.type === 'post' ? <FlagIcon className="h-5 w-5" /> : 
                                                              report.type === 'comment' ? <ChatBubbleIcon className="h-5 w-5" /> : 
@@ -280,8 +280,8 @@ const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, use
                                                             </p>
                                                         </div>
                                                     ) : (
-                                                        <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-sm rounded flex items-center gap-2">
-                                                            <div className="animate-pulse h-2 w-2 bg-yellow-600 rounded-full"></div>
+                                                        <div className="mt-4 p-3 bg-yellow-50 text-brand-secondary text-sm rounded flex items-center gap-2">
+                                                            <div className="animate-pulse h-2 w-2 bg-brand-secondary rounded-full"></div>
                                                             Tu reporte está siendo revisado por nuestro equipo de moderación.
                                                         </div>
                                                     )}

@@ -1,0 +1,247 @@
+---
+# UI Design System
+
+## Sistema de Estilos
+
+### Framework Principal
+- **TailwindCSS** es el ÚNICO sistema de estilos
+- Configurado via CDN en `index.html`
+- **Nunca usar inline styles** a menos que sea absolutamente necesario
+- No usar CSS modules, styled-components u otros sistemas de estilos
+
+### Configuración de Tailwind
+- Fuente por defecto: **Nunito** (Google Fonts)
+- Configuración personalizada en `index.html` (tailwind.config)
+
+## Paleta de Colores
+
+### Colores de Marca
+```css
+'brand-primary': '#1D4ED8'      /* Azul principal */
+'brand-secondary': '#FBBF24'     /* Amarillo/dorado */
+'brand-light': '#EFF6FF'         /* Azul claro de fondo */
+'brand-dark': '#1E3A8A'         /* Azul oscuro */
+'sidebar-dark': '#1E3A8A'        /* Color de sidebar */
+```
+
+### Colores del Sistema de Diseño (Estilo Airbnb 2024)
+```css
+'card-surface': '#FFFFFF'        /* Superficie de tarjetas */
+'card-border': '#E5EAF2'         /* Bordes de tarjetas */
+'text-main': '#222222'           /* Texto principal */
+'text-sub': '#555555'            /* Texto secundario */
+'icon-gray': '#64748B'           /* Iconos grises */
+```
+
+### Colores de Estado
+```css
+'status-lost': '#FF4F4F'         /* Rojo suave - Perdido */
+'status-found': '#28C76F'        /* Verde - Encontrado */
+'status-sighted': '#1677FF'      /* Azul - Avistado */
+'status-adoption': '#A855F7'     /* Púrpura - En Adopción */
+'status-reward': '#4CAF50'       /* Verde suave - Recompensa */
+```
+
+### Colores de Gamificación
+- **Chihuahua (Novato)**: `bg-yellow-500`, `from-yellow-500 to-yellow-600`
+- **Pug (Activo)**: `bg-orange-500`, `from-orange-500 to-orange-700`
+- **Beagle (Rastreador)**: `bg-slate-600`, `from-slate-600 to-slate-800`
+- **Border Collie (Guardián)**: `bg-gray-900`, `from-gray-800 to-black`
+- **Golden Retriever (Héroe)**: `bg-amber-500`, `from-amber-500 to-amber-700`
+- **Gran Danés (Leyenda)**: `bg-indigo-600`, `from-indigo-600 to-indigo-900`
+
+## Componentes UI
+
+### Principios de Diseño
+- **Componentes limpios, pequeños y composables**
+- **Preferir primitivos UI reutilizables** en `shared/ui` cuando los patrones se repiten
+- **Separación de lógica y presentación**
+
+### Tarjetas (Cards)
+- Fondo blanco (`bg-white`)
+- Bordes sutiles (`border border-gray-100`)
+- Sombras: `shadow-card` (hover: `shadow-card-hover`)
+- Border radius: `rounded-xl`
+- Transiciones suaves en hover
+
+```tsx
+<div className="bg-white rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-100">
+```
+
+### Botones
+- Botones primarios: `bg-brand-primary text-white`
+- Botones secundarios: `bg-gray-200 text-gray-800`
+- Hover states con transiciones
+- Estados activos con `transform scale(0.95)`
+
+### Badges de Estado
+- Colores según estado de mascota
+- Tamaño pequeño: `text-[9px] sm:text-[10px]`
+- Font bold, uppercase, tracking-wide
+- Padding: `px-1.5 sm:px-2 py-0.5 sm:py-1`
+
+## Layout Responsive
+
+### Grids Responsivos
+- **Mobile (default)**: 1-2 columnas
+- **Tablet (sm:)**: 3-4 columnas
+- **Desktop (lg:)**: 6-7 columnas (estilo Airbnb)
+
+### Breakpoints de Tailwind
+```css
+sm: 640px   /* Tablet */
+md: 768px   /* Tablet landscape */
+lg: 1024px  /* Desktop */
+xl: 1280px  /* Large desktop */
+```
+
+### Ejemplo de Grid
+```tsx
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+```
+
+## Espaciado
+
+### Principios
+- **Usar espaciado semántico** (p-4, p-6, gap-4)
+- **Evitar valores arbitrarios** a menos que esté justificado
+- **Consistencia** en espaciado entre componentes similares
+
+### Espaciado Común
+- Padding de contenedores: `p-4`, `p-6`, `px-4 py-6`
+- Gaps en grids: `gap-4`, `gap-6`
+- Margins entre secciones: `mb-6`, `mt-8`
+
+### Evitar
+```tsx
+// ❌ Incorrecto
+<div className="p-[13px] gap-[7px]">
+
+// ✅ Correcto
+<div className="p-4 gap-4">
+```
+
+## Tipografía
+
+### Fuente
+- **Nunito** como fuente principal (sans-serif)
+- Pesos disponibles: 400 (normal), 600 (semibold), 700 (bold), 800 (extrabold)
+
+### Tamaños
+- Títulos principales: `text-2xl`, `text-3xl`, `text-4xl`
+- Subtítulos: `text-xl`, `text-lg`
+- Texto normal: `text-base` (16px por defecto)
+- Texto pequeño: `text-sm`, `text-xs`
+
+### Colores de Texto
+- Principal: `text-text-main` o `text-gray-900`
+- Secundario: `text-text-sub` o `text-gray-600`
+- Muted: `text-gray-500`, `text-gray-400`
+
+## Imágenes
+
+### Lazy Loading
+- **Siempre usar componente `LazyImage`** de `@/shared`
+- Aspect ratio 3:2 para imágenes de mascotas
+- Placeholder mientras carga
+- Transiciones suaves en hover
+
+```tsx
+<LazyImage 
+    src={imageUrl} 
+    alt="Descripción"
+    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+/>
+```
+
+## Animaciones y Transiciones
+
+### Transiciones Comunes
+- Hover en cards: `transition-all duration-300`
+- Botones: `transition-colors`
+- Imágenes: `transition-transform duration-700`
+- Modales: transiciones de fade y scale
+
+### Animaciones Personalizadas
+```css
+'bounce-slow': 'bounce 3s infinite'
+'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+```
+
+### Micro-interacciones
+- Botones con efecto press: `transform scale(0.95)` en active
+- Hover ripple effect (CSS puro)
+
+## Modales y Overlays
+
+### Estilo de Modales
+- Fondo oscuro: `bg-black bg-opacity-60` o `bg-opacity-70`
+- Contenedor: `bg-white rounded-lg shadow-2xl`
+- Max width: `max-w-md` o `max-w-lg`
+- Padding: `p-6`
+- Z-index: `z-50`
+
+### Ejemplo
+```tsx
+<div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+    <div className="bg-white rounded-lg shadow-2xl w-full max-w-md">
+        {/* contenido */}
+    </div>
+</div>
+```
+
+## Iconos
+
+### Sistema de Iconos
+- Componentes SVG en `@/shared/components/icons.tsx`
+- Tamaños consistentes: `h-5 w-5`, `h-6 w-6`
+- Colores: `text-icon-gray` o `text-brand-primary`
+- Accesibilidad: incluir `aria-label` cuando sea necesario
+
+## Estados de UI
+
+### Loading States
+- Skeletons o spinners durante carga
+- Estados de error con mensajes claros
+- Estados vacíos con mensajes informativos
+
+### Estados de Formularios
+- Validación visual con colores (rojo para errores)
+- Mensajes de error debajo de campos
+- Estados disabled en botones durante submit
+
+## Accesibilidad
+
+### Principios
+- Contraste adecuado en textos
+- Focus states visibles
+- Labels en formularios
+- ARIA labels cuando sea necesario
+- Navegación por teclado
+
+## Reglas de Refactorización
+
+### Evitar
+- **Strings de clases largas** - refactorizar en componentes más pequeños si se repiten
+- **Valores hardcodeados** - usar constantes o variables
+- **Duplicación de estilos** - extraer a componentes reutilizables
+
+### Ejemplo de Refactorización
+```tsx
+// ❌ Antes - clases largas repetidas
+<div className="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover border border-gray-100">
+<div className="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover border border-gray-100">
+
+// ✅ Después - componente reutilizable
+<Card className="p-6">
+```
+
+## Consistencia Visual
+
+- **Mantener consistencia** en espaciado, colores y tipografía
+- **Seguir patrones existentes** en el código
+- **Revisar componentes similares** antes de crear nuevos
+- **Usar la paleta definida** - no inventar nuevos colores
+
+alwaysApply: true
+---

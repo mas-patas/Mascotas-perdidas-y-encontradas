@@ -58,7 +58,7 @@ export const TipsPage: React.FC = () => {
     return (
         <div className="bg-gray-50 min-h-screen pb-10">
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 py-16 px-6 text-center text-white relative overflow-hidden">
+            <div className="bg-gradient-to-r from-brand-secondary to-amber-500 py-16 px-6 text-center text-white relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                 <div className="relative z-10 max-w-4xl mx-auto">
                     <div className="inline-block p-3 bg-white/20 rounded-full mb-4 backdrop-blur-sm">
@@ -76,19 +76,19 @@ export const TipsPage: React.FC = () => {
                 <div className="bg-white rounded-xl shadow-md p-2 flex flex-wrap sm:flex-nowrap gap-2">
                     <button 
                         onClick={() => setActiveTab('lost')}
-                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'lost' ? 'bg-red-100 text-red-700 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'lost' ? 'bg-red-50 text-status-lost shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
                     >
                         <SearchIcon className="h-5 w-5" /> Si perdiste tu mascota
                     </button>
                     <button 
                         onClick={() => setActiveTab('found')}
-                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'found' ? 'bg-green-100 text-green-700 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'found' ? 'bg-green-50 text-status-found shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
                     >
                         <HeartIcon className="h-5 w-5" filled={activeTab === 'found'} /> Si encontraste una
                     </button>
                     <button 
                         onClick={() => setActiveTab('prevention')}
-                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'prevention' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
+                        className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeTab === 'prevention' ? 'bg-brand-light text-brand-primary shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}
                     >
                         <WarningIcon className="h-5 w-5" /> Prevención y Seguridad
                     </button>
@@ -106,12 +106,12 @@ export const TipsPage: React.FC = () => {
                             color="border-red-500" 
                             steps={lostTips} 
                         />
-                        <div className="bg-white rounded-xl shadow-lg border-t-4 border-orange-500 p-6">
+                        <div className="bg-white rounded-xl shadow-lg border-t-4 border-brand-secondary p-6">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 rounded-full bg-orange-100">
-                                    <PhoneIcon className="h-6 w-6 text-orange-500" />
+                                <div className="p-3 rounded-full bg-yellow-50">
+                                    <PhoneIcon className="h-6 w-6 text-brand-secondary" />
                                 </div>
-                                <h3 className="font-bold text-xl text-gray-800">Cuidado con las Estafas</h3>
+                                <h3 className="font-bold text-xl text-text-main">Cuidado con las Estafas</h3>
                             </div>
                             <p className="text-gray-600 text-sm mb-4 leading-relaxed">
                                 Lamentablemente, hay personas que se aprovechan de la desesperación. 
@@ -174,15 +174,15 @@ export const TipsPage: React.FC = () => {
                             color="border-blue-500" 
                             steps={preventionTips} 
                         />
-                        <div className="bg-blue-600 rounded-xl shadow-lg p-6 text-white flex flex-col justify-center items-center text-center">
-                            <LightbulbIcon className="h-12 w-12 mb-4 text-yellow-300 animate-pulse" />
+                        <div className="bg-brand-primary rounded-xl shadow-lg p-6 text-white flex flex-col justify-center items-center text-center">
+                            <LightbulbIcon className="h-12 w-12 mb-4 text-brand-secondary animate-pulse" />
                             <h3 className="font-bold text-2xl mb-2">¡La prevención es clave!</h3>
                             <p className="text-blue-100 text-sm mb-6">
                                 El 90% de las mascotas perdidas con placa de identificación regresan a casa en las primeras 24 horas.
                             </p>
                             <button 
                                 onClick={() => navigate('/perfil')}
-                                className="bg-white text-blue-600 font-bold py-3 px-6 rounded-full hover:bg-blue-50 transition-colors shadow-lg"
+                                className="bg-white text-brand-primary font-bold py-3 px-6 rounded-full hover:bg-brand-light transition-colors shadow-lg"
                             >
                                 Actualizar Datos de mi Mascota
                             </button>

@@ -60,7 +60,13 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     const mapInstance = useRef<any>(null);
     const markerClusterGroupRef = useRef<any>(null);
     const boundaryLayerRef = useRef<any>(null);
-    const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+    // Inicializar según el tamaño de pantalla: cerrado en mobile, abierto en desktop
+    const [isFiltersOpen, setIsFiltersOpen] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth >= 640; // sm breakpoint de Tailwind
+        }
+        return true; // Default para SSR
+    });
     const [visibleStatuses, setVisibleStatuses] = useState({
         [PET_STATUS.PERDIDO]: true,
         [PET_STATUS.ENCONTRADO]: true,
@@ -186,6 +192,20 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         const L = (window as any).L;
         if (!L) return;
 
+        // Global function to update popup size after image loads
+        (window as any).updatePopupSize = () => {
+            if (mapInstance.current) {
+                mapInstance.current.eachLayer((layer: any) => {
+                    if (layer instanceof L.Marker && layer.isPopupOpen()) {
+                        const popup = layer.getPopup();
+                        if (popup) {
+                            popup.update();
+                        }
+                    }
+                });
+            }
+        };
+
         const clusterGroup = markerClusterGroupRef.current;
         if (clusterGroup) clusterGroup.clearLayers();
         else {
@@ -218,36 +238,110 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses] || !pet.lat || !pet.lng) return;
             const iconSVG = pet.animalType === 'Perro' ? dogIconSVG : (pet.animalType === 'Gato' ? catIconSVG : otherIconSVG);
-            const marker = L.marker([pet.lat, pet.lng], { icon: createCustomIcon(pet.status, iconSVG) })
-                .bindPopup(`
-                    <div class="text-center min-w-[150px]">
-                        <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
-                        <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
-                        <div class="flex flex-wrap justify-center gap-1 mb-2">
-                            <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">${pet.status}</span>
-                            ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
-                        </div>
-                        <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
-                        <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
+            const popupContent = `
+                <div class="text-center min-w-[150px]">
+                    <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
+                    <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
+                    <div class="flex flex-wrap justify-center gap-1 mb-2">
+                        <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-status-lost' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-status-found' : pet.status === PET_STATUS.AVISTADO ? 'bg-status-sighted' : 'bg-status-adoption'}">${pet.status}</span>
+                        ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
                     </div>
-                `);
+                    <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
+                    <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
+                </div>
+            `;
+            const marker = L.marker([pet.lat, pet.lng], { icon: createCustomIcon(pet.status, iconSVG) })
+                .bindPopup(popupContent, {
+                    maxWidth: 250,
+                    className: 'custom-popup',
+                    closeButton: true,
+                    autoPan: true,
+                    autoPanPadding: [50, 50],
+                    autoPanPaddingTopLeft: [50, 50],
+                    autoPanPaddingBottomRight: [50, 50]
+                });
+            
+            // Update popup size when it opens and after image loads
+            marker.on('popupopen', function() {
+                const popup = marker.getPopup();
+                if (popup) {
+                    // Update immediately
+                    popup.update();
+                    
+                    // Update again after a short delay to ensure images are loaded
+                    setTimeout(() => {
+                        popup.update();
+                    }, 100);
+                    
+                    // Also update when images inside the popup load
+                    const popupElement = popup.getElement();
+                    if (popupElement) {
+                        const images = popupElement.querySelectorAll('img');
+                        images.forEach((img: HTMLImageElement) => {
+                            if (!img.complete) {
+                                img.addEventListener('load', () => {
+                                    popup.update();
+                                }, { once: true });
+                            }
+                        });
+                    }
+                }
+            });
+            
             markersToAdd.push(marker);
         });
 
         if (visibleStatuses['CAMPAIGNS']) {
             mapCampaigns.forEach(campaign => {
                 if (!campaign.lat || !campaign.lng) return;
+                const popupContent = `
+                    <div class="text-center min-w-[180px]">
+                        <img src="${campaign.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
+                        <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">${campaign.type}</span>
+                        <p class="text-xs text-gray-600 mb-1">📅 ${new Date(campaign.date).toLocaleDateString()}</p>
+                        <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
+                        <button onclick="window.navigateToPath('/campanas/${campaign.id}')" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">Ver Campaña</button>
+                    </div>
+                `;
                 const marker = L.marker([campaign.lat, campaign.lng], { icon: createCustomIcon('campaign', megaphoneIconSVG, true) })
-                    .bindPopup(`
-                        <div class="text-center min-w-[180px]">
-                            <img src="${campaign.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
-                            <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
-                            <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">${campaign.type}</span>
-                            <p class="text-xs text-gray-600 mb-1">📅 ${new Date(campaign.date).toLocaleDateString()}</p>
-                            <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
-                            <button onclick="window.navigateToPath('/campanas/${campaign.id}')" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">Ver Campaña</button>
-                        </div>
-                    `);
+                    .bindPopup(popupContent, {
+                        maxWidth: 250,
+                        className: 'custom-popup',
+                        closeButton: true,
+                        autoPan: true,
+                        autoPanPadding: [50, 50],
+                        autoPanPaddingTopLeft: [50, 50],
+                        autoPanPaddingBottomRight: [50, 50]
+                    });
+                
+                // Update popup size when it opens and after image loads
+                marker.on('popupopen', function() {
+                    const popup = marker.getPopup();
+                    if (popup) {
+                        // Update immediately
+                        popup.update();
+                        
+                        // Update again after a short delay to ensure images are loaded
+                        setTimeout(() => {
+                            popup.update();
+                        }, 100);
+                        
+                        // Also update when images inside the popup load
+                        const popupElement = popup.getElement();
+                        if (popupElement) {
+                            const images = popupElement.querySelectorAll('img');
+                            images.forEach((img: HTMLImageElement) => {
+                                if (!img.complete) {
+                                    img.addEventListener('load', () => {
+                                        popup.update();
+                                    }, { once: true });
+                                }
+                            });
+                        }
+                    }
+                });
+                
                 markersToAdd.push(marker);
             });
         }
@@ -290,7 +384,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                                 { id: PET_STATUS.PERDIDO, label: 'Perdidos', color: 'bg-red-500' },
                                 { id: PET_STATUS.ENCONTRADO, label: 'Encontrados', color: 'bg-green-500' },
                                 { id: PET_STATUS.AVISTADO, label: 'Avistados', color: 'bg-blue-500' },
-                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-purple-500' },
+                                { id: PET_STATUS.EN_ADOPCION, label: 'En Adopción', color: 'bg-status-adoption' },
                                 { id: 'CAMPAIGNS', label: 'Campañas', color: 'bg-indigo-600' }
                             ].map(status => (
                                 <label key={status.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">

@@ -7,6 +7,8 @@ import { PetStatus, Notification, User } from '@/types';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { NotificationDropdown } from '@/features/notifications';
 import { useGamification } from '@/hooks/useGamification';
+import { getLevelFromPoints } from '@/features/gamification';
+import { ChihuahuaIcon, PugIcon, BeagleIcon, BorderCollieIcon, GoldenIcon, GreatDaneIcon } from './BreedBadges';
 
 interface HeaderProps {
     onReportPet: (status: PetStatus) => void;
@@ -136,7 +138,22 @@ export const Header: React.FC<HeaderProps> = ({
                         className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-0.5 sm:gap-1 md:gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-0.5 sm:mr-1 md:mr-2 lg:mr-4 flex-shrink-0" 
                         onClick={handleHomeClick}
                      >
-                        <span className="whitespace-nowrap">MAS PATAS</span><span className="text-[#FF4F4F]">.</span>
+                        <img 
+                            src="/assets/images/logo.png" 
+                            alt="Mas Patas Logo" 
+                            className="object-contain flex-shrink-0"
+                            style={{ 
+                                height: '85%',
+                                width: 'auto',
+                                maxHeight: '4rem',
+                                minHeight: '2.5rem'
+                            }}
+                            onError={(e) => {
+                                // Fallback si la imagen no existe
+                                (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                        />
+                        <span className="hidden sm:inline whitespace-nowrap">MAS PATAS</span><span className="hidden sm:inline text-[#FF4F4F]">.</span>
                     </div>
                     
                     <button onClick={handleHomeClick} className="hidden md:flex items-center gap-2 text-gray-600 hover:text-brand-primary font-bold text-sm px-3 py-2 rounded-full hover:bg-gray-100 transition-colors">
@@ -166,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 🔵 Vi una mascota perdida
                             </button>
                             <div className="border-t border-gray-100 my-1"></div>
-                            <button onClick={() => { onOpenAdoptionModal(); setIsReportDropdownOpen(false); }} className="w-full text-left px-4 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-purple-700 hover:bg-purple-50 font-bold flex items-center gap-2 transition-all">
+                            <button onClick={() => { onOpenAdoptionModal(); setIsReportDropdownOpen(false); }} className="w-full text-left px-4 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-status-adoption hover:bg-status-adoption/10 font-bold flex items-center gap-2 transition-all">
                                 💜 Dar en adopción
                             </button>
                         </div>
@@ -175,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* RIGHT: Navigation & Profile */}
                 <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-1 justify-end min-w-0">
-                    <button onClick={() => navigate('/tips')} className={`${navButtonClass} hidden xl:flex`} aria-label="Consejos">
+                    <button onClick={() => navigate('/tips')} className={`${navButtonClass} hidden xl:flex`} aria-label="Tips y Consejos">
                         <LightbulbIcon className="h-5 w-5" /> Tips
                     </button>
 
@@ -231,9 +248,22 @@ export const Header: React.FC<HeaderProps> = ({
                             {isAccountDropdownOpen && (
                                 <div className="absolute right-0 mt-2 sm:mt-3 w-[calc(100vw-2rem)] max-w-[240px] sm:w-64 bg-white rounded-xl shadow-2xl py-1 z-30 ring-1 ring-black ring-opacity-5 animate-fade-in border border-gray-100 overflow-hidden">
                                     <div className={`px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r ${level.gradient} text-white`}>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">{level.title}</span>
-                                            <span className="text-[10px] sm:text-xs font-bold bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-full">{points} pts</span>
+                                        <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                                            <div className="flex-shrink-0">
+                                                {(() => {
+                                                    const BadgeIcon = level.icon;
+                                                    return (
+                                                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center ${level.solidBg} ring-2 ring-white/80 shadow-lg`}>
+                                                            <BadgeIcon className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-md filter brightness-125" />
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <div className="flex-1 flex flex-col justify-center min-w-0">
+                                                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider leading-tight truncate">{level.name}</span>
+                                                <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide opacity-90 whitespace-nowrap">{level.title}</span>
+                                            </div>
+                                            <span className="text-[10px] sm:text-xs font-bold bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0">{points} pts</span>
                                         </div>
                                         <div className="w-full bg-black/20 h-1 sm:h-1.5 rounded-full overflow-hidden">
                                             <div className="bg-white h-full" style={{ width: `${progress}%` }}></div>

@@ -1,0 +1,273 @@
+---
+# Coding Style Guide
+
+## Componentes React
+
+### Estilo de Componentes
+- **Solo componentes funcionales** (no class components)
+- **Siempre usar TypeScript** con tipos explícitos
+- **Mantener componentes pequeños y enfocados** (máximo ~300 líneas)
+- **No mezclar lógica de negocio y UI** en el mismo archivo
+- Usar `React.FC` o tipado explícito de props
+
+```typescript
+// ✅ Correcto
+interface PetCardProps {
+    pet: Pet;
+    owner?: User;
+    onViewUser?: (user: User) => void;
+}
+
+export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
+    // ...
+};
+
+// ❌ Incorrecto - Class component
+class PetCard extends React.Component { }
+```
+
+### Organización de Componentes
+- Props interface al inicio del archivo
+- Hooks al inicio del componente
+- Lógica de negocio antes del return
+- JSX al final
+
+```typescript
+interface ComponentProps {
+    // props
+}
+
+export const Component: React.FC<ComponentProps> = ({ prop1, prop2 }) => {
+    // 1. Hooks
+    const { currentUser } = useAuth();
+    const [state, setState] = useState();
+    
+    // 2. Efectos
+    useEffect(() => {
+        // ...
+    }, []);
+    
+    // 3. Handlers y funciones auxiliares
+    const handleClick = () => {
+        // ...
+    };
+    
+    // 4. Cálculos derivados
+    const computed = useMemo(() => {
+        // ...
+    }, [deps]);
+    
+    // 5. JSX
+    return (
+        // ...
+    );
+};
+```
+
+## Hooks
+
+### Custom Hooks
+- **Lógica repetida** → crear custom hooks
+- **Hooks globales** → `src/hooks`
+- **Hooks de feature** → `src/features/[feature]/hooks`
+- Nombres con prefijo `use` (usePets, usePetFilters)
+
+```typescript
+// ✅ Correcto
+export const usePets = (filters: PetFilters) => {
+    const query = useInfiniteQuery({
+        queryKey: ['pets', filters],
+        queryFn: fetchPets,
+    });
+    return query;
+};
+
+// ❌ Incorrecto - lógica duplicada en componentes
+const Component = () => {
+    const query = useInfiniteQuery({ ... }); // duplicado
+};
+```
+
+### React Query Hooks
+- Usar `useQuery` para datos de lectura
+- Usar `useInfiniteQuery` para paginación
+- Usar `useMutation` para operaciones de escritura
+- Siempre definir `queryKey` consistentes
+- Manejar estados de loading y error
+
+```typescript
+// Query
+const { data, isLoading, error } = useQuery({
+    queryKey: ['pets', petId],
+    queryFn: () => petsApi.getPetById(petId),
+});
+
+// Mutation
+const createPet = useMutation({
+    mutationFn: petsApi.createPet,
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['pets'] });
+    },
+});
+```
+
+## Convenciones de Nombres
+
+### Archivos
+- **Componentes**: PascalCase (PetCard.tsx, AdminDashboard.tsx)
+- **Hooks**: camelCase con `use` (usePets.ts, usePetFilters.ts)
+- **Utilidades**: camelCase (formatters.ts, mappers.ts)
+- **Servicios**: camelCase (supabaseClient.ts, geminiService.ts)
+- **API files**: `*.api.ts`, `*.query.ts`, `*.mutation.ts`, `*.types.ts`
+- **Tests**: `*.test.ts`, `*.test.tsx`
+
+### Variables y Funciones
+- **Variables**: camelCase (petList, currentUser)
+- **Funciones**: camelCase (handleSubmit, formatDate)
+- **Constantes**: UPPER_SNAKE_CASE (PET_STATUS, USER_ROLES)
+- **Tipos/Interfaces**: PascalCase (Pet, User, PetCardProps)
+- **Enums**: PascalCase (PetStatus, UserRole)
+
+### Props
+- Usar interfaces para props de componentes
+- Props opcionales con `?`
+- Props de eventos con prefijo `on` (onClick, onSubmit)
+
+```typescript
+interface PetCardProps {
+    pet: Pet;                    // requerido
+    owner?: User;                 // opcional
+    onViewUser?: (user: User) => void;  // callback opcional
+}
+```
+
+## Manejo de Errores
+
+### Principios
+- **Fallar gracefully** - siempre mostrar mensajes de error amigables
+- **Manejar errores de Supabase** - verificar `error` en respuestas
+- **Usar ErrorBoundary** para errores de renderizado
+- **Logging** - usar `console.error` para debugging, no `console.log` en producción
+
+```typescript
+// ✅ Correcto
+try {
+    const { data, error } = await supabase.from('pets').select();
+    if (error) throw error;
+    return data;
+} catch (error) {
+    console.error('Error fetching pets:', error);
+    throw new Error('No se pudieron cargar las mascotas');
+}
+
+// ❌ Incorrecto - sin manejo de error
+const { data } = await supabase.from('pets').select();
+return data;
+```
+
+## Formularios
+
+- Usar **react-hook-form** para gestión de formularios
+- Validación con TypeScript y reglas de negocio
+- Mensajes de error claros y en español
+
+```typescript
+const { register, handleSubmit, formState: { errors } } = useForm<PetFormData>();
+
+<form onSubmit={handleSubmit(onSubmit)}>
+    <input {...register('name', { required: 'El nombre es requerido' })} />
+    {errors.name && <span>{errors.name.message}</span>}
+</form>
+```
+
+## TypeScript
+
+### Tipos
+- **Siempre tipar props, funciones y variables**
+- Usar `type` para uniones y alias
+- Usar `interface` para objetos y props
+- Evitar `any` - usar `unknown` si es necesario
+
+```typescript
+// ✅ Correcto
+type PetStatus = 'Perdido' | 'Encontrado' | 'Reunido';
+interface Pet {
+    id: string;
+    name: string;
+    status: PetStatus;
+}
+
+// ❌ Incorrecto
+const pet: any = { ... };
+```
+
+### Imports
+- Agrupar imports: React, librerías externas, internas, tipos
+- Usar path aliases (`@/features/...`)
+- Imports de tipos con `import type`
+
+```typescript
+// 1. React
+import React, { useState, useEffect } from 'react';
+
+// 2. Librerías externas
+import { useQuery } from '@tanstack/react-query';
+
+// 3. Imports internos
+import { PetCard } from '@/features/pets';
+import { useAuth } from '@/contexts/AuthContext';
+
+// 4. Tipos
+import type { Pet, User } from '@/types';
+```
+
+## Performance
+
+### Optimizaciones
+- Usar `useMemo` para cálculos costosos
+- Usar `useCallback` para funciones pasadas como props
+- Usar `React.memo` para componentes pesados (cuando sea necesario)
+- Lazy loading de imágenes con `LazyImage`
+- Paginación con `useInfiniteQuery`
+
+```typescript
+// ✅ Correcto
+const expensiveValue = useMemo(() => {
+    return computeExpensiveValue(data);
+}, [data]);
+
+const handleClick = useCallback(() => {
+    // ...
+}, [deps]);
+
+// ❌ Incorrecto - recalcula en cada render
+const expensiveValue = computeExpensiveValue(data);
+```
+
+## Comentarios y Documentación
+
+- **Comentarios en español** para explicar lógica compleja
+- JSDoc para funciones públicas y hooks
+- Evitar comentarios obvios
+
+```typescript
+/**
+ * Busca mascotas que coincidan con los criterios usando Gemini AI
+ * @param petData - Datos de la mascota a buscar
+ * @returns Array de posibles coincidencias con scores
+ */
+export const findMatchingPets = async (petData: Pet): Promise<PotentialMatch[]> => {
+    // ...
+};
+```
+
+## Reglas Generales
+
+- **Nombres descriptivos** - evitar abreviaciones confusas
+- **No introducir librerías externas** a menos que se pida explícitamente
+- **Nunca romper límites de features** - respetar arquitectura
+- **Código limpio** - seguir principios SOLID cuando sea aplicable
+- **Consistencia** - seguir patrones existentes en el proyecto
+
+alwaysApply: true
+---

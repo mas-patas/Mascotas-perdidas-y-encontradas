@@ -1,0 +1,213 @@
+---
+# Contexto del Proyecto
+
+## Descripción General
+
+**Mascotas Perdidas y Encontradas** es una aplicación web React + TypeScript para reportar, buscar y gestionar mascotas perdidas y encontradas. La plataforma conecta a dueños de mascotas con personas que las han encontrado o avistado, facilitando el proceso de reunificación.
+
+## Propósito y Objetivos
+
+### Objetivo Principal
+Crear una plataforma escalable y fácil de mantener que permita:
+- Reportar mascotas perdidas, encontradas o avistadas
+- Buscar mascotas usando filtros avanzados y búsqueda por IA
+- Comunicarse entre usuarios mediante sistema de chat
+- Gestionar campañas de esterilización y adopción
+- Administrar negocios relacionados con mascotas (veterinarias, pet shops)
+- Sistema de gamificación con puntos y badges
+- Panel de administración completo
+
+### Valores del Proyecto
+- **Arquitectura limpia y escalable** - Feature-driven architecture
+- **UI altamente reutilizable** - Componentes modulares y composables
+- **Fácil mantenimiento** - Estructura de carpetas clara y separación de responsabilidades
+- **Fuerte separación entre features** - Aislamiento de módulos de negocio
+
+## Stack Tecnológico
+
+### Frontend
+- **React 18.3.1** - Biblioteca UI
+- **TypeScript 5.8.2** - Tipado estático
+- **Vite 7.2.4** - Build tool y dev server
+- **React Router DOM 6.22.3** - Routing
+- **TailwindCSS** (via CDN) - Estilos utility-first
+- **React Hook Form 7.51.0** - Gestión de formularios
+
+### Estado y Datos
+- **TanStack React Query 5.28.4** - Data fetching, cache, sincronización
+- **React Context API** - Estado global (AuthContext, ToastContext)
+
+### Backend y Servicios
+- **Supabase 2.39.7** - Backend as a Service
+  - Autenticación (email/password, Google OAuth)
+  - Base de datos PostgreSQL
+  - Storage (futuro para imágenes)
+  - Row Level Security (RLS)
+- **Google Gemini AI** - Búsqueda inteligente de mascotas usando embeddings
+
+### Mapas y Visualización
+- **Leaflet 1.9.4** - Mapas interactivos
+- **Leaflet MarkerCluster** - Agrupación de marcadores
+
+### Testing
+- **Vitest 4.0.14** - Unit testing
+- **@testing-library/react** - Testing de componentes
+- **Playwright 1.57.0** - E2E testing
+
+### Analytics
+- **Google Analytics 4** - Tracking de eventos y page views
+
+## Características Principales
+
+### 1. Gestión de Mascotas
+- Reportar mascotas perdidas, encontradas, avistadas o en adopción
+- Búsqueda con filtros (tipo, raza, ubicación, estado)
+- Búsqueda por IA usando Gemini (coincidencias inteligentes)
+- Detalles completos con imágenes, ubicación, recompensas
+- Sistema de comentarios y likes
+- Renovación automática de publicaciones (60 días)
+- Notificaciones de expiración
+
+### 2. Autenticación y Perfiles
+- Registro/login con email/password
+- OAuth con Google
+- Perfiles de usuario con información personal
+- Mascotas propias del usuario
+- Sistema de guardado de publicaciones favoritas
+- Avatar y badges de gamificación
+
+### 3. Sistema de Chat
+- Mensajería en tiempo real entre usuarios
+- Chats relacionados con publicaciones de mascotas
+- Chats directos entre usuarios
+- Indicadores de mensajes no leídos
+- Historial de conversaciones
+
+### 4. Campañas
+- Creación de campañas de esterilización y adopción
+- Fechas, ubicaciones y detalles
+- Múltiples imágenes
+- Mapa de campañas
+
+### 5. Negocios
+- Listado de veterinarias, pet shops, estéticas, hoteles
+- Perfiles de negocio con servicios y productos
+- Verificación de negocios
+- Mapa de servicios
+
+### 6. Gamificación
+- Sistema de puntos por acciones (reportar, comentar, compartir)
+- Niveles con badges temáticos (Chihuahua, Pug, Beagle, etc.)
+- Tabla de líderes
+- Misiones y recompensas
+
+### 7. Administración
+- Panel de administración completo
+- Gestión de usuarios (roles, estados)
+- Moderación de reportes y contenido
+- Tickets de soporte
+- Gestión de IPs baneadas
+- Configuración de plataforma (AI search, location alerts)
+
+### 8. Notificaciones
+- Sistema de notificaciones in-app
+- Notificaciones push (futuro)
+- Alertas de expiración de publicaciones
+- Notificaciones de coincidencias
+
+### 9. Reportes y Moderación
+- Sistema de reportes de contenido inapropiado
+- Tickets de soporte
+- Gestión de reportes por administradores
+
+## Estructura de Datos
+
+### Entidades Principales
+- **Pets** - Mascotas reportadas (perdidas, encontradas, etc.)
+- **Users** - Usuarios del sistema
+- **Chats** - Conversaciones entre usuarios
+- **Messages** - Mensajes dentro de chats
+- **Campaigns** - Campañas de esterilización/adopción
+- **Businesses** - Negocios relacionados
+- **Reports** - Reportes de contenido
+- **SupportTickets** - Tickets de soporte
+- **Notifications** - Notificaciones
+- **Comments** - Comentarios en publicaciones
+- **SavedSearches** - Búsquedas guardadas
+
+### Estados y Roles
+- **PetStatus**: Perdido, Encontrado, Avistado, En Adopción, Reunido
+- **UserRole**: User, Moderator, Admin, Superadmin
+- **UserStatus**: Activo, Inactivo
+- **ReportStatus**: Pendiente, Eliminado, Inválido, Sin Acciones
+
+## Configuración y Variables de Entorno
+
+### Variables Requeridas
+- `SUPABASE_URL` - URL del proyecto Supabase
+- `SUPABASE_ANON_KEY` - Clave anónima de Supabase
+- `GEMINI_API_KEY` - Clave API de Google Gemini (para búsqueda IA)
+- `G-XXXXXXXXXX` - Google Analytics Measurement ID
+
+## Flujos Principales
+
+### Flujo de Reporte de Mascota
+1. Usuario hace clic en "Reportar Mascota"
+2. Selecciona estado (Perdido/Encontrado/Avistado)
+3. Completa formulario con datos e imágenes
+4. Sistema busca coincidencias con IA (si está habilitado)
+5. Si hay coincidencias, muestra modal de potenciales matches
+6. Usuario confirma publicación o revisa matches
+7. Publicación se crea en base de datos
+8. Se crea notificación de éxito
+
+### Flujo de Búsqueda
+1. Usuario aplica filtros (tipo, raza, ubicación, estado)
+2. Sistema carga lista paginada de mascotas
+3. Usuario puede hacer scroll infinito para cargar más
+4. Al hacer clic en una mascota, ve detalles completos
+5. Puede iniciar chat, reportar, comentar, compartir
+
+### Flujo de Reunificación
+1. Usuario marca su mascota como "Reunido"
+2. Sistema actualiza estado y crea historia de reencuentro
+3. Se muestra en página de "Reunidos"
+4. Se otorgan puntos de gamificación
+
+## Consideraciones Técnicas
+
+### Performance
+- Paginación infinita para listas grandes
+- Lazy loading de imágenes
+- Cache de React Query para reducir llamadas
+- Timeouts en requests para evitar esperas infinitas
+
+### Seguridad
+- Row Level Security (RLS) en Supabase
+- Validación de roles en frontend y backend
+- IP banning para usuarios problemáticos
+- Sanitización de inputs
+
+### Escalabilidad
+- Arquitectura feature-driven permite agregar features sin afectar existentes
+- Separación clara de responsabilidades
+- API layer centralizado facilita cambios de backend
+
+## Idiomas y Localización
+
+- **Idioma principal**: Español (es-ES)
+- Formateo de fechas en español
+- Mensajes de error y UI en español
+- Formateo de números y monedas según región
+
+## Próximas Mejoras
+
+- Implementación de notificaciones push
+- Mejoras en búsqueda por IA
+- Sistema de alertas por ubicación
+- Integración completa de storage para imágenes
+- Mejoras en sistema de gamificación
+- Optimizaciones de performance
+
+alwaysApply: true
+---
