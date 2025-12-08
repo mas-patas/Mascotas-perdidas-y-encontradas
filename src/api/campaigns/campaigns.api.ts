@@ -1,25 +1,47 @@
 import { supabase } from '../../services/supabaseClient';
-import type { CampaignRow } from '../../types';
+import type { CampaignRow, Campaign } from '../../types';
 import type { CreateCampaignData, UpdateCampaignData } from './campaigns.types';
+import { ensurePublicImageUrls } from '../../utils/imageUtils';
+
+/**
+ * Map CampaignRow to Campaign type
+ */
+const mapCampaignFromDb = (row: CampaignRow): Campaign => {
+  return {
+    id: row.id,
+    userEmail: row.user_email,
+    type: row.type,
+    title: row.title,
+    description: row.description,
+    location: row.location,
+    date: row.date,
+    imageUrls: ensurePublicImageUrls(row.image_urls || []),
+    contactPhone: row.contact_phone,
+    lat: row.lat,
+    lng: row.lng
+  };
+};
 
 /**
  * Fetch all campaigns
- * Returns database rows with snake_case column names
+ * Returns mapped Campaign objects
  */
-export const getCampaigns = async (): Promise<CampaignRow[]> => {
+export const getCampaigns = async (): Promise<Campaign[]> => {
   const { data, error } = await supabase
     .from('campaigns')
     .select('*')
     .order('created_at', { ascending: false });
   
   if (error) throw error;
-  return data || [];
+  if (!data) return [];
+  
+  return data.map(mapCampaignFromDb);
 };
 
 /**
  * Fetch active campaigns (future dates)
  */
-export const getActiveCampaigns = async (): Promise<CampaignRow[]> => {
+export const getActiveCampaigns = async (): Promise<Campaign[]> => {
   const nowIso = new Date().toISOString();
   const today = nowIso.split('T')[0];
   
@@ -30,13 +52,15 @@ export const getActiveCampaigns = async (): Promise<CampaignRow[]> => {
     .order('date', { ascending: true });
   
   if (error) throw error;
-  return data || [];
+  if (!data) return [];
+  
+  return data.map(mapCampaignFromDb);
 };
 
 /**
  * Fetch campaigns for map (with coordinates)
  */
-export const getCampaignsForMap = async (): Promise<CampaignRow[]> => {
+export const getCampaignsForMap = async (): Promise<Campaign[]> => {
   const nowIso = new Date().toISOString();
   const today = nowIso.split('T')[0];
   
@@ -48,13 +72,15 @@ export const getCampaignsForMap = async (): Promise<CampaignRow[]> => {
     .gte('date', today);
   
   if (error) throw error;
-  return data || [];
+  if (!data) return [];
+  
+  return data.map(mapCampaignFromDb);
 };
 
 /**
  * Fetch a single campaign by ID
  */
-export const getCampaignById = async (id: string): Promise<CampaignRow | null> => {
+export const getCampaignById = async (id: string): Promise<Campaign | null> => {
   const { data, error } = await supabase
     .from('campaigns')
     .select('*')
@@ -62,7 +88,9 @@ export const getCampaignById = async (id: string): Promise<CampaignRow | null> =
     .single();
   
   if (error) throw error;
-  return data;
+  if (!data) return null;
+  
+  return mapCampaignFromDb(data);
 };
 
 /**
@@ -88,7 +116,7 @@ export const createCampaign = async (data: CreateCampaignData): Promise<string> 
     image_urls: data.imageUrls,
     lat: data.lat,
     lng: data.lng
-  });
+  } as any);
 
   if (error) throw error;
   return campaignId;
@@ -110,9 +138,8 @@ export const updateCampaign = async (id: string, data: UpdateCampaignData): Prom
   if (data.lat !== undefined) dbData.lat = data.lat;
   if (data.lng !== undefined) dbData.lng = data.lng;
 
-  const { error } = await supabase
-    .from('campaigns')
-    .update(dbData)
+  const { error } = await (supabase.from('campaigns') as any)
+    .update(dbData as any)
     .eq('id', id);
 
   if (error) throw error;

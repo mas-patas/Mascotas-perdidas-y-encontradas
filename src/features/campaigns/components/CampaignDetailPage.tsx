@@ -22,18 +22,31 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
 
     if (!campaign) return <div className="text-center py-10">Campaña no encontrada o cargando...</div>;
 
-    const images = (campaign.imageUrls && Array.isArray(campaign.imageUrls) && campaign.imageUrls.length > 0) 
-        ? campaign.imageUrls 
+    // Ensure imageUrls is always an array
+    const imageUrls = campaign.imageUrls || [];
+    const images = (Array.isArray(imageUrls) && imageUrls.length > 0) 
+        ? imageUrls 
         : ['https://placehold.co/800x600/CCCCCC/FFFFFF?text=Sin+Imagen'];
+    
+    // Reset image index when campaign or images change
+    useEffect(() => {
+        if (images.length > 0) {
+            setCurrentImageIndex(0);
+        }
+    }, [campaign?.id, images.length]);
 
     const nextImage = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+        if (images.length > 0) {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+        }
     };
 
     const prevImage = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrentImageIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
+        if (images.length > 0) {
+            setCurrentImageIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
+        }
     };
     
     const typeColor = campaign.type === 'Esterilización' 
@@ -166,7 +179,7 @@ const CampaignDetailPage: React.FC<CampaignDetailPageProps> = ({ campaign: propC
                 {/* Image Gallery */}
                 <div className="relative w-full mb-8">
                     <img 
-                        src={images[currentImageIndex]} 
+                        src={images[Math.min(currentImageIndex, images.length - 1)] || images[0] || 'https://placehold.co/800x600/CCCCCC/FFFFFF?text=Sin+Imagen'} 
                         alt={campaign.title}
                         className="max-w-full h-auto mx-auto rounded-lg shadow-lg object-contain max-h-[500px] w-full bg-gray-100" 
                     />

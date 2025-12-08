@@ -13,8 +13,10 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
     
     const typeColor = campaign.type === 'Esterilización' ? 'bg-teal-500' : 'bg-indigo-500';
     
-    const image = (campaign.imageUrls && campaign.imageUrls.length > 0) 
-        ? campaign.imageUrls[0] 
+    // Ensure imageUrls is always an array
+    const imageUrls = campaign.imageUrls || [];
+    const image = (Array.isArray(imageUrls) && imageUrls.length > 0) 
+        ? imageUrls[0] 
         : 'https://placehold.co/800x600/CCCCCC/FFFFFF?text=Sin+Imagen';
 
     return (
