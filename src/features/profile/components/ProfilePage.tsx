@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch, PetStatus, PetRow } from '@/types';
+import type { User, Pet, OwnedPet, UserRating, SavedSearchRow, PetStatus, PetRow } from '@/types';
 import { PetCard } from '@/features/pets';
 import { useAuth } from '@/contexts/auth';
 import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@/shared/components/icons';
@@ -21,7 +21,7 @@ import { useGamification } from '@/hooks/useGamification';
 import { PET_STATUS } from '@/constants';
 import { PullToRefresh } from '@/shared';
 import { LazyImage } from '@/shared';
-import { supabase } from '@/services/supabaseClient';
+
 
 const countries = [
     "Perú", "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Ecuador", "México", "Paraguay", "Uruguay", "Venezuela", "Estados Unidos", "España", "Otro"

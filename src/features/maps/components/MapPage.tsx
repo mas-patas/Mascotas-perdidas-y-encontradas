@@ -222,8 +222,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses] || !pet.lat || !pet.lng) return;
             const iconSVG = pet.animal_type === 'Perro' ? dogIconSVG : (pet.animal_type === 'Gato' ? catIconSVG : otherIconSVG);
-            const marker = L.marker([pet.lat, pet.lng], { icon: createCustomIcon(pet.status, iconSVG) })
-                .bindPopup(`
+            const popupContent = `
                     <div class="text-center min-w-[150px]">
                         <img src="${pet.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
                         <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
@@ -234,20 +233,9 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
                         <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
                     </div>
-                    <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
-                    <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
-                </div>
-            `;
+                `;
             const marker = L.marker([pet.lat, pet.lng], { icon: createCustomIcon(pet.status, iconSVG) })
-                .bindPopup(popupContent, {
-                    maxWidth: 250,
-                    className: 'custom-popup',
-                    closeButton: true,
-                    autoPan: true,
-                    autoPanPadding: [50, 50],
-                    autoPanPaddingTopLeft: [50, 50],
-                    autoPanPaddingBottomRight: [50, 50]
-                });
+                .bindPopup(popupContent);
             
             // Update popup size when it opens and after image loads
             marker.on('popupopen', function() {
@@ -284,25 +272,16 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 if (!campaign.lat || !campaign.lng) return;
                 const popupContent = `
                     <div class="text-center min-w-[180px]">
-                        <img src="${campaign.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
+                        <img src="${campaign.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
                         <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
                         <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">${campaign.type}</span>
-                        <p class="text-xs text-gray-600 mb-1">📅 ${new Date(campaign.date).toLocaleDateString()}</p>
+                        <p class="text-xs text-gray-600 mb-1">📅 ${campaign.date ? new Date(campaign.date).toLocaleDateString() : 'N/A'}</p>
                         <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
                         <button onclick="window.navigateToPath('/campanas/${campaign.id}')" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">Ver Campaña</button>
                     </div>
                 `;
                 const marker = L.marker([campaign.lat, campaign.lng], { icon: createCustomIcon('campaign', megaphoneIconSVG, true) })
-                    .bindPopup(`
-                        <div class="text-center min-w-[180px]">
-                            <img src="${campaign.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
-                            <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
-                            <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">${campaign.type}</span>
-                            <p class="text-xs text-gray-600 mb-1">📅 ${campaign.date ? new Date(campaign.date).toLocaleDateString() : 'N/A'}</p>
-                            <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
-                            <button onclick="window.navigateToPath('/campanas/${campaign.id}')" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">Ver Campaña</button>
-                        </div>
-                    `);
+                    .bindPopup(popupContent);
                 markersToAdd.push(marker);
             });
         }

@@ -208,3 +208,52 @@ export interface User {
   avatarUrl?: string;
   businessId?: string;
 }
+
+/**
+ * Pet type with camelCase fields (used in mappers/UI)
+ * Consider: Can this be replaced with PetRow + transformations?
+ * Note: PetRow uses snake_case (animal_type, image_urls, etc.)
+ */
+export interface Pet {
+  id: string;
+  userEmail: string;
+  status: PetStatus;
+  name: string;
+  animalType: AnimalType;
+  breed: string;
+  color: string;
+  size?: PetSize;
+  location: string;
+  date: string;
+  contact: string;
+  description: string;
+  imageUrls: string[];
+  adoptionRequirements?: string;
+  shareContactInfo?: boolean;
+  contactRequests?: string[];
+  reward?: number;
+  currency?: string;
+  lat?: number;
+  lng?: number;
+  comments: Comment[];
+  expiresAt?: string;
+  createdAt: string;
+  reunionStory?: string;
+  reunionDate?: string;
+}
+
+/**
+ * Comment type with camelCase fields (used in mappers/UI)
+ * Consider: Can this be replaced with CommentRow + transformations?
+ * Note: CommentRow uses snake_case (user_id, created_at, etc.)
+ */
+export interface Comment {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  text: string;
+  timestamp: string;
+  parentId?: string | null;
+  likes: string[];
+}
