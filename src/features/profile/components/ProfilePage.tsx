@@ -1,23 +1,23 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch, PetStatus } from '@/types';
+import type { User, Pet, OwnedPet, UserRating, Business, SavedSearch, PetStatus, PetRow } from '@/types';
 import { PetCard } from '@/features/pets';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@/shared/components/icons';
 import { AddPetModal } from '@/features/pets';
 import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
 import { StarRating } from '@/shared';
-import { useDeleteSavedSearch } from '@/api';
+import { useDeleteSavedSearch, useBusinessByOwner } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
 import { GamificationDashboard } from '@/features/gamification';
 import { BusinessManagementModal } from '@/features/businesses';
-import { businessService } from '@/services/businessService';
-import { OnboardingTour, TourStep } from '@/shared';
+import { OnboardingTour } from '@/shared';
+import type { TourStep } from '@/shared';
+import { supabase } from '@/services/supabaseClient';
 import { useGamification } from '@/hooks/useGamification';
-import { mapPetFromDb } from '@/utils/mappers';
 import { PET_STATUS } from '@/constants';
 import { PullToRefresh } from '@/shared';
 import { LazyImage } from '@/shared';
@@ -81,16 +81,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     });
     const [error, setError] = useState('');
     const [loadingProfile, setLoadingProfile] = useState(false);
-    const [myBusiness, setMyBusiness] = useState<Business | null>(null);
-
-    useEffect(() => {
-        const checkBusiness = async () => {
-            if (!user.id) return;
-            const business = await businessService.getBusinessByOwnerId(user.id);
-            setMyBusiness(business);
-        };
-        checkBusiness();
-    }, [user.id]);
+    
+    // Fetch business using React Query hook
+    const { data: myBusiness } = useBusinessByOwner(user.id);
 
     // Function to handle Pull-to-Refresh
     const handleRefresh = async () => {
@@ -132,7 +125,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             
             if (error) throw error;
             
-            const pets = (data || []).map(p => mapPetFromDb(p));
+            const pets = (data || []) as PetRow[];
             return { pets, count: count || 0 };
         },
         placeholderData: keepPreviousData

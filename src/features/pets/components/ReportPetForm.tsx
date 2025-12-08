@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import type { Pet, PetStatus, AnimalType, PetSize } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES } from '@/constants';
 import { dogBreeds, catBreeds, petColors } from '@/data/breeds';

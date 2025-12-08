@@ -3,7 +3,7 @@ import { queryKeys as commentsKeys } from './comments.keys';
 import { queryKeys as petsKeys } from '../pets/pets.keys';
 import * as commentsApi from './comments.api';
 import type { CreateCommentData } from './comments.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { logActivity, POINTS_CONFIG } from '@/services/gamificationService';
 
 const queryKeys = { ...commentsKeys, pets: petsKeys.pets };

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './notifications.keys';
 import * as notificationsApi from './notifications.api';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to mark a notification as read

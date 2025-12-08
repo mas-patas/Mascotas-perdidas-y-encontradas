@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/auth';
 import { ToastProvider } from './contexts/ToastContext';
 
 const rootElement = document.getElementById('root');
@@ -16,18 +16,18 @@ if (!rootElement) {
 
 // --- NUCLEAR OPTION: FORCE UNREGISTER ALL SERVICE WORKERS ---
 // Modified to run only after load to prevent "The document is in an invalid state" error
-window.addEventListener('load', () => {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-      for(let registration of registrations) {
-        console.log('Force Unregistering SW:', registration);
-        registration.unregister().catch(err => console.warn('Unregister failed:', err));
-      }
-    }).catch(err => {
-      console.warn('Service Worker unregistration skipped:', err);
-    });
-  }
-});
+// window.addEventListener('load', () => {
+//   if ('serviceWorker' in navigator) {
+//     navigator.serviceWorker.getRegistrations().then(function(registrations) {
+//       for(let registration of registrations) {
+//         console.log('Force Unregistering SW:', registration);
+//         registration.unregister().catch(err => console.warn('Unregister failed:', err));
+//       }
+//     }).catch(err => {
+//       console.warn('Service Worker unregistration skipped:', err);
+//     });
+//   }
+// });
 
 // Create a client with retry strategy for robust loading
 const queryClient = new QueryClient({

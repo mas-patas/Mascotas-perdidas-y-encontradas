@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Pet, User } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES } from '@/constants';
 import { LocationMarkerIcon, CalendarIcon, DogIcon, CatIcon, InfoIcon, BookmarkIcon } from '@/shared/components/icons';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { LazyImage } from '@/shared';
 
 interface PetCardProps {

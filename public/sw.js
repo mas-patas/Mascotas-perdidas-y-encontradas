@@ -1,5 +1,4 @@
-
-const CACHE_NAME = 'pets-app-v1';
+const CACHE_NAME = 'mas-patas-v1';
 const urlsToCache = [
   '/',
   '/index.html',

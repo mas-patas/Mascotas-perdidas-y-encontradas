@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { CheckCircleIcon, WarningIcon, InfoIcon, XCircleIcon } from './icons';
-import { Toast as ToastType } from '@/contexts/ToastContext';
+import type { Toast as ToastType } from '@/contexts/ToastContext';
 
 interface ToastProps {
     toast: ToastType;

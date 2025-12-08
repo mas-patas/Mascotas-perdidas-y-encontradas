@@ -5,7 +5,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment } from '@/types';
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { ConfirmationModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
@@ -14,7 +14,6 @@ import { usePet, useDeleteComment } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
 import { ReunionSuccessModal } from '@/features/pets';
-import { mapPetFromDb } from '@/utils/mappers';
 import { ErrorBoundary } from '@/shared';
 import { supabase } from '@/services/supabaseClient';
 

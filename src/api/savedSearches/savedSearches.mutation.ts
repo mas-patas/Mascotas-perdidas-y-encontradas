@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './savedSearches.keys';
 import * as savedSearchesApi from './savedSearches.api';
 import type { CreateSavedSearchData } from './savedSearches.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to create a saved search

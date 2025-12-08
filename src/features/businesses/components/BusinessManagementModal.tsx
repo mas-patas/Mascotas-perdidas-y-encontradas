@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Business, BusinessProduct } from '@/types';
-import { businessService } from '@/services/businessService';
+import type { BusinessRow, BusinessProductRow } from '@/types';
+import { useBusiness, useBusinessProducts, useUpdateBusiness, useAddProduct, useDeleteProduct } from '@/api';
 import { XCircleIcon, PlusIcon, TrashIcon, StoreIcon, LocationMarkerIcon, CrosshairIcon, FacebookIcon, InstagramIcon, ExternalLinkIcon, InfoIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
@@ -70,13 +70,17 @@ const normalizeLocationName = (name: string) => {
 };
 
 const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpen, onClose, businessId }) => {
-    const [business, setBusiness] = useState<Business | null>(null);
+    const { data: business, isLoading: loading } = useBusiness(businessId);
+    const { data: products = [] } = useBusinessProducts(businessId);
+    const updateBusinessMutation = useUpdateBusiness();
+    const addProductMutation = useAddProduct();
+    const deleteProductMutation = useDeleteProduct();
+    
     const [activeTab, setActiveTab] = useState<'details' | 'products'>('details');
-    const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     
     // Form States
-    const [formData, setFormData] = useState<Partial<Business>>({});
+    const [formData, setFormData] = useState<Partial<BusinessRow>>({});
     
     // Location State
     const [selectedDept, setSelectedDept] = useState('');
@@ -86,7 +90,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
     const [provinces, setProvinces] = useState<string[]>([]);
     const [districts, setDistricts] = useState<string[]>([]);
 
-    const [newProduct, setNewProduct] = useState<Partial<BusinessProduct>>({ name: '', price: 0, description: '', imageUrls: [] });
+    const [newProduct, setNewProduct] = useState<{ name?: string; price?: number | null; description?: string | null; imageUrls?: string[] }>({ name: '', price: 0, description: '', imageUrls: [] });
     const [isAddingProduct, setIsAddingProduct] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
@@ -101,36 +105,30 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         return () => { isMounted.current = false; };
     }, []);
 
+    // Initialize form data when business loads
     useEffect(() => {
-        if (isOpen && businessId) {
-            setLoading(true);
-            businessService.getBusinessById(businessId).then(data => {
-                if (!isMounted.current) return;
-                setBusiness(data);
-                setFormData(data || {});
-                
-                // Attempt to parse address if it follows the format "Street, District, Province, Department"
-                if (data?.address) {
-                    const parts = data.address.split(',').map(p => p.trim());
-                    if (parts.length >= 4) {
-                        const dept = parts[parts.length - 1];
-                        const prov = parts[parts.length - 2];
-                        const dist = parts[parts.length - 3];
-                        const street = parts.slice(0, parts.length - 3).join(', ');
-                        
-                        setSelectedDept(dept);
-                        setSelectedProv(prov);
-                        setSelectedDist(dist);
-                        setStreetAddress(street);
-                    } else {
-                        setStreetAddress(data.address);
-                    }
+        if (business) {
+            setFormData(business);
+            
+            // Attempt to parse address if it follows the format "Street, District, Province, Department"
+            if (business.address) {
+                const parts = business.address.split(',').map((p: string) => p.trim());
+                if (parts.length >= 4) {
+                    const dept = parts[parts.length - 1];
+                    const prov = parts[parts.length - 2];
+                    const dist = parts[parts.length - 3];
+                    const street = parts.slice(0, parts.length - 3).join(', ');
+                    
+                    setSelectedDept(dept);
+                    setSelectedProv(prov);
+                    setSelectedDist(dist);
+                    setStreetAddress(street);
+                } else {
+                    setStreetAddress(business.address);
                 }
-                
-                setLoading(false);
-            });
+            }
         }
-    }, [isOpen, businessId]);
+    }, [business]);
 
     // Update location lists
     useEffect(() => {
@@ -251,7 +249,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                 }
 
                 const handleMarkerUpdate = (lat: number, lng: number) => {
-                    setFormData(prev => ({ ...prev, lat, lng }));
+                    setFormData((prev: Partial<BusinessRow>) => ({ ...prev, lat, lng }));
                     updateAddressFromCoords(lat, lng);
                 };
 
@@ -300,7 +298,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                     const newLat = parseFloat(lat);
                     const newLng = parseFloat(lon);
                     
-                    setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
+                        setFormData((prev: Partial<BusinessRow>) => ({ ...prev, lat: newLat, lng: newLng }));
                     mapInstance.current.setView([newLat, newLng], 16);
                     
                     if (markerInstance.current) {
@@ -325,7 +323,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition((pos) => {
             const { latitude, longitude } = pos.coords;
-            setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
+            setFormData((prev: Partial<BusinessRow>) => ({ ...prev, lat: latitude, lng: longitude }));
             
             if (mapInstance.current) {
                 mapInstance.current.setView([latitude, longitude], 16);
@@ -343,7 +341,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                     markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
                     markerInstance.current.on('dragend', (e: any) => {
                         const { lat, lng } = e.target.getLatLng();
-                        setFormData(prev => ({ ...prev, lat, lng }));
+                        setFormData((prev: Partial<BusinessRow>) => ({ ...prev, lat, lng }));
                     });
                 }
             }
@@ -356,13 +354,23 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         // Construct full address
         const fullAddress = [streetAddress, selectedDist, selectedProv, selectedDept].filter(Boolean).join(', ');
         const updatedData = {
-            ...formData,
-            address: fullAddress
+            name: formData.name,
+            description: formData.description || undefined,
+            address: fullAddress,
+            phone: formData.phone || undefined,
+            website: formData.website || undefined,
+            facebook: formData.facebook || undefined,
+            instagram: formData.instagram || undefined,
+            logoUrl: formData.logo_url || undefined,
+            coverUrl: formData.cover_url || undefined,
+            bannerUrl: formData.banner_url || undefined,
+            lat: formData.lat ?? undefined,
+            lng: formData.lng ?? undefined,
         };
 
         setIsSaving(true);
         try {
-            await businessService.updateBusiness(business.id, updatedData);
+            await updateBusinessMutation.mutateAsync({ id: business.id, data: updatedData });
             alert('Datos actualizados correctamente');
         } catch (error) {
             alert('Error al guardar');
@@ -378,16 +386,13 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         }
         setIsSaving(true);
         try {
-            await businessService.addProduct({
+            await addProductMutation.mutateAsync({
                 businessId: business.id,
-                name: newProduct.name,
-                description: newProduct.description,
+                name: newProduct.name || '',
+                description: newProduct.description || '',
                 price: Number(newProduct.price),
-                imageUrls: newProduct.imageUrls
+                imageUrls: newProduct.imageUrls || []
             });
-            // Refresh
-            const updated = await businessService.getBusinessById(business.id);
-            setBusiness(updated);
             setNewProduct({ name: '', price: 0, description: '', imageUrls: [] });
             setIsAddingProduct(false);
         } catch (error) {
@@ -402,10 +407,7 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         if (!confirm('¿Eliminar producto?')) return;
         if (!business) return;
         try {
-            await businessService.deleteProduct(productId);
-            // Refresh
-            const updated = await businessService.getBusinessById(business.id);
-            setBusiness(updated);
+            await deleteProductMutation.mutateAsync({ productId, businessId: business.id });
         } catch (e) { alert('Error al eliminar'); }
     };
 
@@ -416,7 +418,8 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
         setIsUploading(true);
         try {
             const url = await uploadImage(file);
-            setFormData(prev => ({ ...prev, [field]: url }));
+            const dbField = field === 'logoUrl' ? 'logo_url' : field === 'coverUrl' ? 'cover_url' : 'banner_url';
+            setFormData((prev: Partial<BusinessRow>) => ({ ...prev, [dbField]: url }));
         } catch (e) { 
             alert('Error subiendo imagen'); 
         } finally {
@@ -425,7 +428,8 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
     };
 
     const handleDeleteImage = (field: 'logoUrl' | 'coverUrl' | 'bannerUrl') => {
-        setFormData(prev => ({ ...prev, [field]: '' }));
+        const dbField = field === 'logoUrl' ? 'logo_url' : field === 'coverUrl' ? 'cover_url' : 'banner_url';
+        setFormData((prev: Partial<BusinessRow>) => ({ ...prev, [dbField]: '' }));
     };
 
     const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -452,9 +456,9 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
     };
 
     const removeProductImage = (index: number) => {
-        setNewProduct(prev => ({
+        setNewProduct((prev) => ({
             ...prev,
-            imageUrls: prev.imageUrls?.filter((_, i) => i !== index)
+            imageUrls: prev.imageUrls?.filter((_: string, i: number) => i !== index)
         }));
     };
 
@@ -580,9 +584,9 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                                         <ImageHelper type="Logo" />
                                     </div>
                                     <div className="w-24 h-24 bg-gray-100 rounded-full mb-3 border overflow-hidden flex items-center justify-center relative group mt-2">
-                                        {formData.logoUrl ? (
+                                        {formData.logo_url ? (
                                             <>
-                                                <img src={formData.logoUrl} className="w-full h-full object-cover" alt="logo preview" />
+                                                <img src={formData.logo_url} className="w-full h-full object-cover" alt="logo preview" />
                                                 <button onClick={() => handleDeleteImage('logoUrl')} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <TrashIcon />
                                                 </button>
@@ -601,9 +605,9 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                                         <ImageHelper type="Portada" />
                                     </div>
                                     <div className="w-full h-24 bg-gray-100 rounded mb-3 border overflow-hidden flex items-center justify-center relative group mt-2">
-                                        {formData.coverUrl ? (
+                                        {formData.cover_url ? (
                                             <>
-                                                <img src={formData.coverUrl} className="w-full h-full object-cover" alt="cover preview" />
+                                                <img src={formData.cover_url} className="w-full h-full object-cover" alt="cover preview" />
                                                 <button onClick={() => handleDeleteImage('coverUrl')} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <TrashIcon />
                                                 </button>
@@ -629,8 +633,8 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                     {activeTab === 'products' && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center">
-                                <h3 className="font-bold text-lg text-gray-800">Mis Productos ({business?.products?.length || 0}/10)</h3>
-                                {(business?.products?.length || 0) < 10 && (
+                                <h3 className="font-bold text-lg text-gray-800">Mis Productos ({products.length}/10)</h3>
+                                {products.length < 10 && (
                                     <button onClick={() => setIsAddingProduct(true)} className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-green-700 transition shadow-sm">
                                         <PlusIcon /> Agregar Nuevo
                                     </button>
@@ -647,26 +651,26 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold mb-1 text-gray-700">Precio (S/.)</label>
-                                            <input type="number" className={inputClass} value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
+                                            <input type="number" className={inputClass} value={newProduct.price || 0} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
                                         </div>
                                     </div>
                                     <div className="mb-3">
                                         <label className="block text-xs font-bold mb-1 text-gray-700">Descripción</label>
-                                        <textarea className={inputClass} rows={2} value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})}></textarea>
+                                        <textarea className={inputClass} rows={2} value={newProduct.description || ''} onChange={e => setNewProduct({...newProduct, description: e.target.value})}></textarea>
                                     </div>
-                                    <div className="mb-3">
-                                        <label className="text-xs font-bold block mb-1 text-gray-700">Imágenes (Máx 3)</label>
-                                        <input type="file" accept="image/*" multiple onChange={handleProductImageUpload} className="text-xs w-full mb-2 text-gray-500" disabled={isUploading} />
-                                        <div className="flex gap-2 mt-1">
-                                            {newProduct.imageUrls?.map((url, idx) => (
-                                                <div key={idx} className="relative w-16 h-16 border rounded overflow-hidden">
-                                                    <img src={url} className="w-full h-full object-cover" />
-                                                    <button onClick={() => removeProductImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 text-xs font-bold hover:bg-red-700">×</button>
-                                                </div>
-                                            ))}
-                                            {isUploading && <span className="text-xs text-gray-500 self-center animate-pulse">Subiendo...</span>}
+                                        <div className="mb-3">
+                                            <label className="text-xs font-bold block mb-1 text-gray-700">Imágenes (Máx 3)</label>
+                                            <input type="file" accept="image/*" multiple onChange={handleProductImageUpload} className="text-xs w-full mb-2 text-gray-500" disabled={isUploading} />
+                                            <div className="flex gap-2 mt-1">
+                                                {newProduct.imageUrls?.map((url: string, idx: number) => (
+                                                    <div key={idx} className="relative w-16 h-16 border rounded overflow-hidden">
+                                                        <img src={url} className="w-full h-full object-cover" />
+                                                        <button onClick={() => removeProductImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 text-xs font-bold hover:bg-red-700">×</button>
+                                                    </div>
+                                                ))}
+                                                {isUploading && <span className="text-xs text-gray-500 self-center animate-pulse">Subiendo...</span>}
+                                            </div>
                                         </div>
-                                    </div>
                                     <div className="flex gap-2 justify-end pt-2 border-t">
                                         <button onClick={() => setIsAddingProduct(false)} className="text-gray-500 text-sm px-3 py-1 hover:text-gray-700">Cancelar</button>
                                         <button onClick={handleAddProduct} disabled={isSaving || isUploading} className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-green-700 disabled:opacity-50">Guardar</button>
@@ -675,16 +679,13 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
                             )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {business?.products?.map(product => (
+                                {products.map((product: BusinessProductRow) => (
                                     <div key={product.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex gap-3 items-start hover:shadow-md transition-shadow">
-                                        <img src={product.imageUrls?.[0] || product.imageUrl || 'https://placehold.co/100'} className="w-20 h-20 object-cover rounded bg-gray-100 flex-shrink-0 border" />
+                                        <img src={product.image_url || 'https://placehold.co/100'} className="w-20 h-20 object-cover rounded bg-gray-100 flex-shrink-0 border" />
                                         <div className="flex-grow min-w-0">
                                             <p className="font-bold text-gray-900 truncate">{product.name}</p>
                                             <p className="text-brand-primary font-black text-sm">S/. {product.price}</p>
-                                            <p className="text-xs text-gray-600 line-clamp-2">{product.description}</p>
-                                            {product.imageUrls && product.imageUrls.length > 1 && (
-                                                <span className="text-[10px] bg-gray-100 text-gray-600 px-1 rounded mt-1 inline-block border">+{product.imageUrls.length - 1} fotos</span>
-                                            )}
+                                            <p className="text-xs text-gray-600 line-clamp-2">{product.description || ''}</p>
                                         </div>
                                         <button onClick={() => handleDeleteProduct(product.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors"><TrashIcon /></button>
                                     </div>

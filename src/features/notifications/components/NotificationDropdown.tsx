@@ -1,7 +1,5 @@
-
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Notification } from '@/types';
+import type { Notification } from '@/types';
 
 interface NotificationDropdownProps {
     notifications: Notification[];
@@ -9,7 +7,7 @@ interface NotificationDropdownProps {
     onClose: () => void;
 }
 
-const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notifications, onMarkAsRead, onClose }) => {
+const NotificationDropdown = ({ notifications, onMarkAsRead, onClose }: NotificationDropdownProps) => {
     const navigate = useNavigate();
 
     const handleNotificationClick = (notification: Notification) => {

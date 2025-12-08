@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './chats.keys';
 import * as chatsApi from './chats.api';
 import type { CreateChatData } from './chats.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to create a chat

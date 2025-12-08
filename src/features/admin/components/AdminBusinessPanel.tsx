@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { BUSINESS_TYPES } from '@/constants';
-import { BusinessType, User } from '@/types';
-import { businessService } from '@/services/businessService';
+import type { BusinessType, User } from '@/types';
+import { useCreateBusiness } from '@/api/businesses/businesses.mutation';
 
 interface AdminBusinessPanelProps {
     allUsers: User[];
@@ -12,7 +12,7 @@ const AdminBusinessPanel: React.FC<AdminBusinessPanelProps> = ({ allUsers }) => 
     const [name, setName] = useState('');
     const [type, setType] = useState<BusinessType>('Veterinaria');
     const [ownerEmail, setOwnerEmail] = useState('');
-    const [loading, setLoading] = useState(false);
+    const createBusiness = useCreateBusiness();
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,9 +24,8 @@ const AdminBusinessPanel: React.FC<AdminBusinessPanelProps> = ({ allUsers }) => 
             return;
         }
 
-        setLoading(true);
         try {
-            await businessService.createBusiness({
+            await createBusiness.mutateAsync({
                 ownerId: owner.id,
                 name,
                 type,
@@ -44,8 +43,6 @@ const AdminBusinessPanel: React.FC<AdminBusinessPanelProps> = ({ allUsers }) => 
             console.error("Creation failed:", error);
             const msg = error.message || error.error_description || JSON.stringify(error);
             alert(`Error al crear negocio: ${msg}. \n\nAsegúrate de haber ejecutado el script SQL 'schema.sql' en Supabase.`);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -68,8 +65,8 @@ const AdminBusinessPanel: React.FC<AdminBusinessPanelProps> = ({ allUsers }) => 
                     <input type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} className="w-full p-2 border rounded" required placeholder="usuario@email.com" />
                     <p className="text-xs text-gray-500 mt-1">Este usuario tendrá permisos de administración sobre la tienda.</p>
                 </div>
-                <button type="submit" disabled={loading} className="w-full bg-brand-primary text-white py-2 rounded font-bold hover:bg-brand-dark disabled:opacity-50">
-                    {loading ? 'Creando...' : 'Crear Negocio'}
+                <button type="submit" disabled={createBusiness.isPending} className="w-full bg-brand-primary text-white py-2 rounded font-bold hover:bg-brand-dark disabled:opacity-50">
+                    {createBusiness.isPending ? 'Creando...' : 'Crear Negocio'}
                 </button>
             </form>
         </div>

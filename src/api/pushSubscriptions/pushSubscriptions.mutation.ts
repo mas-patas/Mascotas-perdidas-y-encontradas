@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import * as pushSubscriptionsApi from './pushSubscriptions.api';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to upsert push subscription

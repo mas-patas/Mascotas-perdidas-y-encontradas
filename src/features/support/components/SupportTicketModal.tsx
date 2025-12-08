@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { SupportTicket, SupportTicketStatus, User, UserRole } from '@/types';
 import { SUPPORT_TICKET_STATUS, USER_ROLES } from '@/constants';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 interface SupportTicketModalProps {
     isOpen: boolean;

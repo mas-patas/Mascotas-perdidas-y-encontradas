@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { GoogleIcon, WarningIcon, EyeIcon, EyeOffIcon, InfoIcon, CheckCircleIcon, ChevronLeftIcon } from '@/shared/components/icons';
 
 type AuthView = 'login' | 'register' | 'forgot';

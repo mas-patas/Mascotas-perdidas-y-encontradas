@@ -3,8 +3,8 @@ import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { Header } from './Header';
 import { FilterControls } from '@/features/pets';
-import { useAuth } from '@/contexts/AuthContext';
-import { Notification, PetStatus, AnimalType, PetSize } from '@/types';
+import { useAuth } from '@/contexts/auth';
+import type { Notification, PetStatus, AnimalType, PetSize } from '@/types';
 import { NotificationPermissionBanner } from '@/features/notifications';
 import { CompleteProfileModal } from '@/features/auth';
 

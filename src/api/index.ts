@@ -3,6 +3,7 @@
  */
 
 // Query Keys - Combined from all modules
+import { queryKeys as authKeys } from './auth/auth.keys';
 import { queryKeys as usersKeys } from './users/users.keys';
 import { queryKeys as petsKeys } from './pets/pets.keys';
 import { queryKeys as campaignsKeys } from './campaigns/campaigns.keys';
@@ -17,6 +18,7 @@ import { queryKeys as bannedIpsKeys } from './bannedIps/bannedIps.keys';
 import { queryKeys as gamificationKeys } from './gamification/gamification.keys';
 
 export const queryKeys = {
+  ...authKeys,
   ...usersKeys,
   ...petsKeys,
   ...campaignsKeys,
@@ -42,6 +44,7 @@ export * from './businesses/businesses.types';
 export * from './savedSearches/savedSearches.types';
 
 // API Functions
+export * as authApi from './auth/auth.api';
 export * as usersApi from './users/users.api';
 export * as petsApi from './pets/pets.api';
 export * as campaignsApi from './campaigns/campaigns.api';
@@ -72,6 +75,7 @@ export * from './gamification/gamification.query';
 export * from './admin/admin.query';
 
 // Mutation Hooks
+export * from './auth/auth.mutation';
 export * from './pets/pets.mutation';
 export * from './comments/comments.mutation';
 export * from './campaigns/campaigns.mutation';

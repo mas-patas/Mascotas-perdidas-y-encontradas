@@ -1,8 +1,12 @@
-
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES, USER_STATUS, REPORT_REASONS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES, BUSINESS_TYPES } from './constants';
 import type { Database } from './types/database.types';
 
-// Type aliases for generated database types (snake_case from database)
+// ============================================================================
+// Database Row/Insert/Update Type Aliases
+// ============================================================================
+// These are convenient shortcuts to Supabase-generated types.
+// All database columns use snake_case as per database schema.
+
 export type BusinessRow = Database['public']['Tables']['businesses']['Row'];
 export type BusinessInsert = Database['public']['Tables']['businesses']['Insert'];
 export type BusinessUpdate = Database['public']['Tables']['businesses']['Update'];
@@ -61,6 +65,24 @@ export type MessageRow = Database['public']['Tables']['messages']['Row'];
 export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 export type MessageUpdate = Database['public']['Tables']['messages']['Update'];
 
+export type UserRatingRow = Database['public']['Tables']['user_ratings']['Row'];
+export type UserRatingInsert = Database['public']['Tables']['user_ratings']['Insert'];
+export type UserRatingUpdate = Database['public']['Tables']['user_ratings']['Update'];
+
+export type PushSubscriptionRow = Database['public']['Tables']['push_subscriptions']['Row'];
+export type PushSubscriptionInsert = Database['public']['Tables']['push_subscriptions']['Insert'];
+export type PushSubscriptionUpdate = Database['public']['Tables']['push_subscriptions']['Update'];
+
+// ============================================================================
+// Database Function Return Types
+// ============================================================================
+
+export type LeaderboardEntry = Database['public']['Functions']['get_weekly_leaderboard']['Returns'][number];
+
+// ============================================================================
+// Enum Types (from constants)
+// ============================================================================
+
 export type PetStatus = typeof PET_STATUS[keyof typeof PET_STATUS];
 export type AnimalType = typeof ANIMAL_TYPES[keyof typeof ANIMAL_TYPES];
 export type PetSize = typeof SIZES[keyof typeof SIZES];
@@ -74,118 +96,115 @@ export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[keyof typeo
 export type CampaignType = typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES];
 export type BusinessType = typeof BUSINESS_TYPES[keyof typeof BUSINESS_TYPES];
 
-// Type aliases for backward compatibility (deprecated - use Row types directly)
-// These will be removed in a future version
-/** @deprecated Use SavedSearchRow instead */
-export type SavedSearch = SavedSearchRow;
-/** @deprecated Use BusinessProductRow instead */
-export type BusinessProduct = BusinessProductRow;
-/** @deprecated Use BusinessRow instead */
-export type Business = BusinessRow;
-/** @deprecated Use CampaignRow instead */
-export type Campaign = CampaignRow;
-/** @deprecated Use NotificationRow instead */
-export type Notification = NotificationRow;
-/** @deprecated Use SupportTicketRow instead */
-export type SupportTicket = SupportTicketRow;
-/** @deprecated Use CommentRow instead */
-export type Comment = CommentRow;
-/** @deprecated Use PetRow instead */
-export type Pet = PetRow;
-/** @deprecated Use ReportRow instead */
-export type Report = ReportRow;
+// ============================================================================
+// Custom Types & Interfaces
+// ============================================================================
+// These are types that don't directly map to database tables:
+// - Enriched/computed types (combining data from multiple sources)
+// - UI-specific types (forms, gamification, etc.)
+// - Helper types for specific use cases
 
-// Utility type for report post snapshot (can reference PetRow or CommentRow)
+/**
+ * Utility type for report post snapshot (can reference PetRow or CommentRow)
+ */
 export type ReportPostSnapshot = PetRow | { text: string };
 
-export interface OwnedPet {
-    id: string;
-    name: string;
-    animalType: 'Perro' | 'Gato';
-    breed: string;
-    colors: string[];
-    description?: string;
-    imageUrls?: string[];
-}
-
-export interface User {
-    id?: string; // Added ID for DB linking
-    email: string;
-    role: UserRole;
-    status?: UserStatus;
-    username?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    dni?: string;
-    birthDate?: string; // Nuevo campo Fecha de Nacimiento
-    country?: string; // Nuevo campo Pais
-    provider?: 'email' | 'google' | 'apple';
-    ownedPets?: OwnedPet[];
-    savedPetIds?: string[];
-    avatarUrl?: string;
-    businessId?: string; // ID of the business if they own one
-}
-
+/**
+ * Enriched user rating with additional display fields from joins
+ */
 export interface UserRating {
-    id: string;
-    raterId: string; // User who gave the rating
-    ratedUserId: string; // User who received the rating
-    rating: number; // 1-5
-    comment: string;
-    createdAt: string;
-    raterName?: string; // Enriched
-    raterAvatar?: string; // Enriched
+  id: string;
+  raterId: string;
+  ratedUserId: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  raterName?: string; // Enriched from profile join
+  raterAvatar?: string; // Enriched from profile join
 }
 
-export interface LocationDetails {
-    city: string;
-    district: string;
-    address: string;
-}
-
-// Type aliases for backward compatibility (deprecated - use Row types directly)
-/** @deprecated Use MessageRow instead */
-export type Message = MessageRow;
-/** @deprecated Use ChatRow instead */
-export type Chat = ChatRow;
-
+/**
+ * Computed type for pet matching results
+ */
 export interface PotentialMatch {
-    pet: PetRow;
-    score: number;
-    explanation: string;
+  pet: PetRow;
+  score: number;
+  explanation: string;
 }
 
-// Type alias for backward compatibility (deprecated - use Row type directly)
-/** @deprecated Use BannedIpRow instead */
-export type BannedIP = BannedIpRow;
+/**
+ * Location details helper type (used for forms/UI)
+ */
+export interface LocationDetails {
+  city: string;
+  district: string;
+  address: string;
+}
 
+/**
+ * UI-specific mission type for gamification
+ */
 export interface Mission {
-    id: string;
-    title: string;
-    description: string;
-    points: number;
-    isCompleted: boolean;
-    icon: 'login' | 'share' | 'comment' | 'report';
+  id: string;
+  title: string;
+  description: string;
+  points: number;
+  isCompleted: boolean;
+  icon: 'login' | 'share' | 'comment' | 'report';
 }
 
-// Type alias for backward compatibility (deprecated - use Row type directly)
-/** @deprecated Use ActivityLogRow instead */
-export type ActivityLog = ActivityLogRow;
-
+/**
+ * UI-specific reward type for gamification
+ */
 export interface Reward {
-    id: string;
-    title: string;
-    description: string;
-    cost: number;
-    icon: string;
-    actionType: 'boost_post' | 'urgent_badge' | 'frame';
+  id: string;
+  title: string;
+  description: string;
+  cost: number;
+  icon: string;
+  actionType: 'boost_post' | 'urgent_badge' | 'frame';
 }
 
-export interface LeaderboardEntry {
-    user_id: string;
-    username: string;
-    avatar_url: string;
-    total_points: number;
-    rank: number;
+// ============================================================================
+// Legacy Types (Evaluate for Removal)
+// ============================================================================
+// TODO: These types use camelCase and may duplicate ProfileRow functionality.
+// Consider migrating to ProfileRow with transformations where needed.
+
+/**
+ * Simplified pet type for owned pets (used in forms/UI)
+ * Consider: Can this be replaced with PetRow or a subset type?
+ */
+export interface OwnedPet {
+  id: string;
+  name: string;
+  animalType: 'Perro' | 'Gato';
+  breed: string;
+  colors: string[];
+  description?: string;
+  imageUrls?: string[];
+}
+
+/**
+ * User type with camelCase fields (used in forms/UI)
+ * Consider: Can this be replaced with ProfileRow + transformations?
+ * Note: ProfileRow uses snake_case (first_name, last_name, avatar_url, etc.)
+ */
+export interface User {
+  id?: string;
+  email: string;
+  role: UserRole;
+  status?: UserStatus;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dni?: string;
+  birthDate?: string;
+  country?: string;
+  provider?: 'email' | 'google' | 'apple';
+  ownedPets?: OwnedPet[];
+  savedPetIds?: string[];
+  avatarUrl?: string;
+  businessId?: string;
 }

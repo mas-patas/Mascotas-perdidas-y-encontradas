@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './pets.keys';
 import * as petsApi from './pets.api';
 import type { CreatePetData, UpdatePetData, MarkReunionData } from './pets.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { trackReportPet, trackPetReunited } from '@/services/analytics';
 import { logActivity, POINTS_CONFIG } from '@/services/gamificationService';
 import { generatePetEmbedding } from '@/services/geminiService';

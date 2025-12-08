@@ -49,6 +49,7 @@ export const useAddProduct = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.business(variables.businessId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessProducts(variables.businessId) });
     }
   });
 };
@@ -66,6 +67,7 @@ export const useDeleteProduct = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.business(variables.businessId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.businessProducts(variables.businessId) });
     }
   });
 };

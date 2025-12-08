@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BellIcon, XCircleIcon } from '@/shared/components/icons';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { useUpsertPushSubscription } from '@/api';
 
 // Helper to convert VAPID key for the browser

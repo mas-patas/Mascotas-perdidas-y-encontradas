@@ -1,5 +1,5 @@
-
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
+import type { Schema } from "@google/genai";
 import type { AnimalType, Pet, PotentialMatch } from "../types";
 import { petColors, dogBreeds, catBreeds } from "../data/breeds";
 import { supabase } from "./supabaseClient";

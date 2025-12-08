@@ -64,6 +64,21 @@ export const getBusinessesForMap = async (): Promise<BusinessRow[]> => {
 };
 
 /**
+ * Fetch products for a business
+ * Returns database rows with snake_case column names
+ */
+export const getBusinessProducts = async (businessId: string): Promise<BusinessProductRow[]> => {
+  const { data, error } = await supabase
+    .from('business_products')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+};
+
+/**
  * Mutation API Functions
  */
 

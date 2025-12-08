@@ -5,5 +5,6 @@ export const queryKeys = {
   businesses: ['businesses'] as const,
   business: (id: string) => ['businesses', id] as const,
   businessByOwner: (ownerId: string) => ['businesses', 'owner', ownerId] as const,
+  businessProducts: (businessId: string) => ['businesses', businessId, 'products'] as const,
 } as const;
 
