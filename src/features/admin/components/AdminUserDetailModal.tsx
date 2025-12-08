@@ -23,34 +23,51 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
     const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<'details' | 'posts' | 'messages'>('details');
     const [isEditing, setIsEditing] = useState(false);
+    
+    // Validate user object - must be done after hooks
+    const safeUser = user && user.email && user.role ? user : null;
+    
     const [editableUser, setEditableUser] = useState({
-        role: user.role,
-        status: user.status || USER_STATUS.ACTIVE,
+        role: user?.role || USER_ROLES.USER,
+        status: user?.status || USER_STATUS.ACTIVE,
     });
     const [viewingContactRequesters, setViewingContactRequesters] = useState<Pet | null>(null);
     
     useEffect(() => {
         // Reset state if the user prop changes (e.g., opening a new user modal)
-        setEditableUser({
-            role: user.role,
-            status: user.status || USER_STATUS.ACTIVE,
-        });
-        setIsEditing(false);
-        setActiveTab('details');
+        if (user && user.email && user.role) {
+            setEditableUser({
+                role: user.role,
+                status: user.status || USER_STATUS.ACTIVE,
+            });
+            setIsEditing(false);
+            setActiveTab('details');
+        }
     }, [user]);
+    
+    // Early return after all hooks
+    if (!safeUser) {
+        console.error('AdminUserDetailModal: Invalid user object', user);
+        return null;
+    }
 
-    const canEditRole = currentUser?.role === USER_ROLES.SUPERADMIN && currentUser.email !== user.email;
+    const canEditRole = currentUser?.role === USER_ROLES.SUPERADMIN && currentUser.email !== safeUser.email;
 
-    const userPosts = useMemo(() => allPets.filter(p => p.userEmail === user.email), [allPets, user.email]);
+    const userPosts = useMemo(() => {
+        if (!safeUser?.email) return [];
+        return allPets.filter(p => p.userEmail === safeUser.email);
+    }, [allPets, safeUser?.email]);
     
     const userSentMessages = useMemo(() => {
+        if (!safeUser?.email) return [];
         return allChats
-            .filter(chat => chat.participantEmails.includes(user.email))
+            .filter(chat => chat.participantEmails && Array.isArray(chat.participantEmails) && chat.participantEmails.includes(safeUser.email))
             .flatMap(chat => {
-                const otherUserEmail = chat.participantEmails.find(email => email !== user.email);
+                const otherUserEmail = chat.participantEmails?.find(email => email !== safeUser.email);
                 const pet = chat.petId ? allPets.find(p => p.id === chat.petId) : null;
-                return chat.messages
-                    .filter(message => message.senderEmail === user.email)
+                const messages = chat.messages || [];
+                return messages
+                    .filter(message => message && message.senderEmail === safeUser.email)
                     .map(message => ({
                         ...message,
                         chatId: chat.id,
@@ -58,8 +75,12 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                         petContext: pet,
                     }));
             })
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [allChats, allPets, user.email]);
+            .sort((a, b) => {
+                const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+                const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+                return timeB - timeA;
+            });
+    }, [allChats, allPets, safeUser?.email]);
 
     const getRoleClass = (role: UserRole) => {
         switch (role) {
@@ -80,19 +101,19 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
 
     const handleCancel = () => {
         setEditableUser({
-            role: user.role,
-            status: user.status || USER_STATUS.ACTIVE,
+            role: safeUser.role,
+            status: safeUser.status || USER_STATUS.ACTIVE,
         });
         setIsEditing(false);
     };
 
     const handleSaveChanges = () => {
-        if (editableUser.role !== user.role) {
-            onUpdateRole(user.email, editableUser.role);
+        if (editableUser.role !== safeUser.role) {
+            onUpdateRole(safeUser.email, editableUser.role);
         }
-        const originalStatus = user.status || USER_STATUS.ACTIVE;
+        const originalStatus = safeUser.status || USER_STATUS.ACTIVE;
         if (editableUser.status !== originalStatus) {
-            onUpdateStatus(user.email, editableUser.status);
+            onUpdateStatus(safeUser.email, editableUser.status);
         }
         setIsEditing(false);
     };
@@ -124,7 +145,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                     <div className="p-6 relative border-b">
                         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
                         <h2 className="text-2xl font-bold text-brand-dark mb-1">Perfil de Usuario</h2>
-                        <p className="text-gray-500">@{user.username || 'N/A'}</p>
+                        <p className="text-gray-500">@{safeUser.username || 'N/A'}</p>
                     </div>
 
                     <nav className="flex space-x-4 px-6 border-b">
@@ -145,12 +166,12 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                      )}
                                  </div>
                                  <div className="space-y-3 p-4 border rounded-md bg-gray-50">
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Nombre:</span> {user.firstName || 'N/A'} {user.lastName || 'N/A'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Usuario:</span> @{user.username || 'N/A'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Email:</span> {user.email}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">DNI:</span> {user.dni || 'No registrado'}</p>
-                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Teléfono:</span> {user.phone || 'No registrado'}</p>
-                                    {user.birthDate && <p><span className="font-semibold text-gray-800 w-28 inline-block">Cumpleaños:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Nombre:</span> {safeUser.firstName || 'N/A'} {safeUser.lastName || 'N/A'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Usuario:</span> @{safeUser.username || 'N/A'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Email:</span> {safeUser.email}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">DNI:</span> {safeUser.dni || 'No registrado'}</p>
+                                    <p><span className="font-semibold text-gray-800 w-28 inline-block">Teléfono:</span> {safeUser.phone || 'No registrado'}</p>
+                                    {safeUser.birthDate && <p><span className="font-semibold text-gray-800 w-28 inline-block">Cumpleaños:</span> {new Date(safeUser.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
                                     <div className="flex items-center">
                                         <span className="font-semibold text-gray-800 w-28 inline-block">Rol:</span>
                                         {isEditing && canEditRole ? (
@@ -166,14 +187,14 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                             </select>
                                         ) : (
                                             <div className="relative group flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getRoleClass(user.role)}`}>
-                                                    {user.role}
+                                                <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getRoleClass(safeUser.role)}`}>
+                                                    {safeUser.role}
                                                 </span>
                                                 {!canEditRole && (
                                                     <>
                                                         <InfoIcon />
                                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs px-3 py-1.5 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-                                                            {currentUser?.email === user.email 
+                                                            {currentUser?.email === safeUser.email 
                                                                 ? "No puedes cambiar tu propio rol."
                                                                 : "Solo Superadmins pueden cambiar roles."
                                                             }
@@ -198,8 +219,8 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                                 ))}
                                             </select>
                                         ) : (
-                                            <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getStatusClass(user.status)}`}>
-                                                {user.status || 'Activo'}
+                                            <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${getStatusClass(safeUser.status)}`}>
+                                                {safeUser.status || 'Activo'}
                                             </span>
                                         )}
                                     </div>
@@ -214,19 +235,29 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                      <div className="mt-6 pt-4 border-t space-y-3">
                                         <h3 className="text-lg font-semibold text-gray-800">Acciones de Moderación</h3>
                                         <div className="flex flex-col sm:flex-row gap-3">
-                                            <button onClick={() => onStartChat(user.email)} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
+                                            <button onClick={() => onStartChat(safeUser.email)} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
                                                 Enviar Mensaje
                                             </button>
                                              <button 
-                                                onClick={() => onUpdateStatus(user.email, user.status === USER_STATUS.ACTIVE ? USER_STATUS.INACTIVE : USER_STATUS.ACTIVE)} 
-                                                className={`flex-1 py-2 px-4 text-white font-semibold rounded-lg transition-colors ${user.status === USER_STATUS.INACTIVE ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
+                                                onClick={() => onUpdateStatus(safeUser.email, safeUser.status === USER_STATUS.ACTIVE ? USER_STATUS.INACTIVE : USER_STATUS.ACTIVE)} 
+                                                className={`flex-1 py-2 px-4 text-white font-semibold rounded-lg transition-colors ${safeUser.status === USER_STATUS.INACTIVE ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
                                             >
-                                                {user.status === USER_STATUS.INACTIVE ? 'Reactivar Usuario' : 'Banear Usuario'}
+                                                {safeUser.status === USER_STATUS.INACTIVE ? 'Reactivar Usuario' : 'Banear Usuario'}
                                             </button>
                                         </div>
                                         {onGhostLogin && (
                                             <button
-                                                onClick={() => onGhostLogin(user)}
+                                                onClick={() => {
+                                                    console.log('🔍 AdminUserDetailModal: Button clicked');
+                                                    console.log('  - safeUser:', safeUser?.email, safeUser?.username, safeUser?.id);
+                                                    console.log('  - safeUser object:', safeUser);
+                                                    if (!safeUser || !safeUser.email) {
+                                                        console.error('❌ safeUser is invalid:', safeUser);
+                                                        alert('Error: Usuario inválido. No se puede hacer ghost login.');
+                                                        return;
+                                                    }
+                                                    onGhostLogin(safeUser);
+                                                }}
                                                 className="w-full mt-3 py-2 px-4 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
                                             >
                                                 Iniciar sesión como este usuario
@@ -241,7 +272,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                             {userPosts.length > 0 ? (
                                 userPosts.map(pet => (
                                 <div key={pet.id} className="flex items-center gap-4 p-2 bg-gray-50 rounded-lg border">
-                                    <img src={pet.imageUrls[0]} alt={pet.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                                    <img src={pet.imageUrls && pet.imageUrls.length > 0 ? pet.imageUrls[0] : '/placeholder-pet.png'} alt={pet.name || 'Mascota'} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
                                     <div className="flex-1">
                                         <div className="flex justify-between items-center">
                                             <p className="font-semibold text-gray-800">{pet.name}</p>
