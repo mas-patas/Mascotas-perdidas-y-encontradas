@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { User, Pet, Chat, UserStatus, UserRole } from '@/types';
 import { useAuth } from '@/contexts/auth';
 import { USER_ROLES, USER_STATUS } from '@/constants';
@@ -21,6 +22,7 @@ interface AdminUserDetailModalProps {
 
 const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPets, allChats, allUsers, onClose, onUpdateStatus, onUpdateRole, onStartChat, onGhostLogin, onViewUser }) => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'details' | 'posts' | 'messages'>('details');
     const [isEditing, setIsEditing] = useState(false);
     
@@ -61,19 +63,32 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
     const userSentMessages = useMemo(() => {
         if (!safeUser?.email) return [];
         return allChats
-            .filter(chat => chat.participantEmails && Array.isArray(chat.participantEmails) && chat.participantEmails.includes(safeUser.email))
+            .filter(chat => {
+                const participantEmails = (chat as any).participant_emails || (chat as any).participantEmails || [];
+                return Array.isArray(participantEmails) && participantEmails.includes(safeUser.email);
+            })
             .flatMap(chat => {
-                const otherUserEmail = chat.participantEmails?.find(email => email !== safeUser.email);
-                const pet = chat.petId ? allPets.find(p => p.id === chat.petId) : null;
-                const messages = chat.messages || [];
+                const participantEmails = (chat as any).participant_emails || (chat as any).participantEmails || [];
+                const otherUserEmail = participantEmails.find((email: string) => email !== safeUser.email);
+                const petId = (chat as any).pet_id || (chat as any).petId;
+                const pet = petId ? allPets.find(p => p.id === petId) : null;
+                const messages = (chat as any).messages || [];
                 return messages
-                    .filter(message => message && message.senderEmail === safeUser.email)
-                    .map(message => ({
-                        ...message,
-                        chatId: chat.id,
-                        recipientEmail: otherUserEmail,
-                        petContext: pet,
-                    }));
+                    .filter((message: any) => {
+                        const senderEmail = message.sender_email || message.senderEmail;
+                        return message && senderEmail === safeUser.email;
+                    })
+                    .map((message: any) => {
+                        const timestamp = message.timestamp || message.created_at;
+                        return {
+                            ...message,
+                            chatId: chat.id,
+                            recipientEmail: otherUserEmail,
+                            petContext: pet,
+                            timestamp: timestamp,
+                            text: message.text,
+                        };
+                    });
             })
             .sort((a, b) => {
                 const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
@@ -284,7 +299,18 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                         </div>
                                         <p className="text-sm text-gray-500">{pet.breed} - <span className="font-medium">{pet.status}</span></p>
                                     </div>
-                                    <p className="text-xs text-gray-400 self-start">{new Date(pet.date).toLocaleDateString()}</p>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <p className="text-xs text-gray-400">{new Date(pet.date).toLocaleDateString()}</p>
+                                        <button
+                                            onClick={() => {
+                                                onClose();
+                                                navigate(`/mascota/${pet.id}`);
+                                            }}
+                                            className="text-xs font-semibold text-brand-primary bg-blue-100 px-3 py-1 rounded-lg hover:bg-blue-200 transition"
+                                        >
+                                            Ir a publicación
+                                        </button>
+                                    </div>
                                 </div>
                                 ))
                             ) : (
@@ -295,15 +321,16 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                         {activeTab === 'messages' && (
                             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                             {userSentMessages.length > 0 ? (
-                                userSentMessages.map((message) => {
+                                userSentMessages.map((message, index) => {
                                     const recipient = allUsers.find(u => u.email === message.recipientEmail);
+                                    const messageTimestamp = message.timestamp || (message as any).created_at;
                                     return (
-                                        <div key={`${message.chatId}-${message.timestamp}`} className="p-3 bg-gray-50 rounded-lg border">
+                                        <div key={`${message.chatId}-${messageTimestamp}-${index}`} className="p-3 bg-gray-50 rounded-lg border">
                                             <div className="flex justify-between items-start text-xs text-gray-500 mb-1">
                                                 <span>
                                                     Para: <span className="font-semibold text-brand-primary">@{recipient?.username || message.recipientEmail || 'desconocido'}</span>
                                                 </span>
-                                                <span className="flex-shrink-0">{new Date(message.timestamp).toLocaleString('es-ES')}</span>
+                                                <span className="flex-shrink-0">{messageTimestamp ? new Date(messageTimestamp).toLocaleString('es-ES') : 'Sin fecha'}</span>
                                             </div>
                                             {message.petContext ? (
                                                 <div className="text-xs text-gray-500 mb-2">
@@ -315,7 +342,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                                 </div>
                                             )}
                                             <blockquote className="text-sm text-gray-800 pl-3 border-l-2 border-gray-300">
-                                                {message.text}
+                                                {message.text || (message as any).text || 'Sin texto'}
                                             </blockquote>
                                         </div>
                                     );
