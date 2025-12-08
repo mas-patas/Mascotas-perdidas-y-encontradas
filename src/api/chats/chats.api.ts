@@ -18,7 +18,7 @@ export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> =
   const { data: rawChats, error } = await supabase
     .from('chats')
     .select('*');
-  
+
   if (error) {
     console.error('Error fetching chats:', error);
     throw error;
@@ -31,18 +31,18 @@ export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> =
     return Array.isArray(emails) && emails.includes(userEmail);
   });
 
-  console.log(`[getChats] Found ${userChats.length} chats for user ${userEmail} out of ${rawChats.length} total chats`);
+
 
   const chatIds = userChats.map((c) => c.id);
   let rawMessages: MessageRow[] = [];
-  
+
   if (chatIds.length > 0) {
     const { data: msgs, error: msgError } = await supabase
       .from('messages')
       .select('*')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: true });
-    
+
     if (msgError) {
       throw msgError;
     }
@@ -51,7 +51,7 @@ export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> =
 
   const result = userChats.map((c) => {
     const chatMessages = rawMessages.filter((m) => m.chat_id === c.id);
-    
+
     return {
       ...c,
       messages: chatMessages,
@@ -71,7 +71,7 @@ export const getChatById = async (chatId: string): Promise<ChatWithMessages | nu
     .select('*')
     .eq('id', chatId)
     .single();
-  
+
   if (chatError) throw chatError;
   if (!chatData) return null;
 
@@ -80,7 +80,7 @@ export const getChatById = async (chatId: string): Promise<ChatWithMessages | nu
     .select('*')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true });
-  
+
   if (msgError) throw msgError;
 
   return {
@@ -99,10 +99,10 @@ export const getMessages = async (chatId: string): Promise<MessageRow[]> => {
     .select('*')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true });
-  
+
   if (error) throw error;
   if (!data) return [];
-  
+
   return data;
 };
 
@@ -142,7 +142,7 @@ export const createChat = async (data: CreateChatData): Promise<string> => {
   if (error) {
     throw error;
   }
-  
+
   return chatId;
 };
 

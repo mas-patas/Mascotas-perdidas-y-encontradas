@@ -3,7 +3,7 @@ import { queryKeys } from './notifications.keys';
 import * as notificationsApi from './notifications.api';
 import { useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
-import { useToast } from '../../contexts/ToastContext';
+import { useToast } from '../../contexts/toast';
 
 /**
  * Helper to send System Notification

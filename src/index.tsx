@@ -2,12 +2,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { AuthProvider } from './contexts/auth';
-import { ToastProvider } from './contexts/ToastContext';
+import { ToastProvider } from './contexts/toast';
+import { ReactQueryProvider } from './contexts/react-query';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -29,32 +28,19 @@ if (!rootElement) {
 //   }
 // });
 
-// Create a client with retry strategy for robust loading
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
-      retry: 1, 
-      retryDelay: 1000, 
-    },
-  },
-});
-
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <HelmetProvider>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
+      <ReactQueryProvider>
+        <BrowserRouter>
           <AuthProvider>
             <ToastProvider>
-                  <App />
+              <App />
             </ToastProvider>
           </AuthProvider>
         </BrowserRouter>
-        <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
+      </ReactQueryProvider>
     </HelmetProvider>
   </React.StrictMode>
 );

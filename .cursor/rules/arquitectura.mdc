@@ -33,11 +33,13 @@ src/
 │   └── *.types.ts        # Tipos TypeScript específicos de API
 ├── contexts/             # Contextos de React (AuthContext, ToastContext)
 ├── hooks/                # Hooks globales (usePets, usePetFilters, useGamification)
+│   └── auth/             # Hooks de autenticación (useAuthSession, useAuthOperations)
 ├── services/             # Servicios de negocio
 │   ├── supabaseClient.ts # Cliente de Supabase
 │   ├── geminiService.ts  # Integración con Gemini AI para búsqueda
 │   ├── analytics.ts       # Google Analytics
-│   └── gamificationService.ts
+│   ├── gamificationService.ts
+│   └── auth/              # Servicios de autenticación (authService, ghostingService)
 ├── utils/                # Funciones utilitarias (formatters, mappers, uuid)
 ├── data/                 # Datos estáticos (breeds.ts, locations.ts)
 ├── types.ts              # Tipos TypeScript globales
@@ -84,6 +86,10 @@ import { usePetFilters } from '@/hooks/usePetFilters';
 
 // Services
 import { supabase } from '@/services/supabaseClient';
+import { initSession } from '@/services/auth/authService';
+
+// Contexts
+import { useAuth } from '@/contexts/auth';
 
 // Utils
 import { formatDate } from '@/utils/formatters';
@@ -98,6 +104,8 @@ import type { Pet, User } from '@/types';
 - `@/shared/...` → `./src/shared/...`
 - `@/api/...` → `./src/api/...`
 - `@/pages/...` → `./src/pages/...`
+- `@/services/...` → `./src/services/...`
+- `@/contexts/...` → `./src/contexts/...`
 - `@/*` → `./src/*`
 
 ## Principios de Arquitectura
@@ -122,12 +130,29 @@ import type { Pet, User } from '@/types';
 - Lógica de negocio compartida → `services/`
 - Utilidades → `utils/`
 
+#### Reglas de Services Layer
+- **Services importan desde API layer, nunca llaman directamente a Supabase**
+- Services agregan lógica de negocio compleja:
+  - Orchestration (múltiples llamadas API en secuencia)
+  - Retry logic y timeouts
+  - Transformaciones complejas de datos
+  - Fallbacks y manejo de errores avanzado
+  - Validaciones de negocio
+- Services son funciones puras (no dependen de React)
+- Si la lógica es simple o específica de React → usar hooks directamente
+
 ### 4. API Layer (React Query)
 - Separación clara entre:
   - `*.api.ts`: Funciones puras que llaman a Supabase
   - `*.query.ts`: Hooks de consulta (useQuery, useInfiniteQuery)
   - `*.mutation.ts`: Hooks de mutación (useMutation)
   - `*.types.ts`: Tipos específicos de la API
+
+#### Reglas de API Layer
+- **TODAS las llamadas a Supabase deben estar en `*.api.ts`**
+- Las funciones API son puras: solo llaman a Supabase y retornan datos
+- No deben contener lógica de negocio (retries, timeouts, transformaciones complejas)
+- Manejo básico de errores: lanzar errores, no manejarlos
 
 ### 5. Gestión de Estado
 - Estado global: React Context (AuthContext, ToastContext)
@@ -145,6 +170,31 @@ import type { Pet, User } from '@/types';
 - **Nueva utilidad global** → `utils/`
 - **Integración con Supabase** → `services/`
 - **Nuevo contexto** → `contexts/`
+
+## Reglas de Separación API/Services/Hooks
+
+### API Layer (`api/*.api.ts`)
+- ✅ **Siempre**: Todas las llamadas a Supabase
+- ✅ Funciones puras que solo llaman a Supabase
+- ❌ No contiene lógica de negocio compleja
+- ❌ No contiene retries, timeouts, o transformaciones complejas
+
+### Services Layer (`services/*.ts`)
+- ✅ **Siempre**: Importa funciones desde API layer
+- ✅ Lógica de negocio compleja (orchestration, retries, timeouts)
+- ✅ Transformaciones complejas de datos
+- ✅ Fallbacks y manejo avanzado de errores
+- ✅ Funciones puras (no dependen de React)
+- ❌ Nunca llama directamente a Supabase
+- ❌ No contiene lógica específica de React (useState, useEffect, etc.)
+
+### Hooks (`hooks/*.ts`)
+- ✅ Lógica específica de React (estado, efectos, ciclo de vida)
+- ✅ Integración de services con React
+- ✅ Lógica simple que no requiere services
+- ✅ Setup de intervals, event listeners, etc.
+- ❌ No contiene llamadas directas a Supabase (usar API layer)
+- ❌ No contiene lógica de negocio compleja (usar services)
 
 ## Convenciones de Nombres
 

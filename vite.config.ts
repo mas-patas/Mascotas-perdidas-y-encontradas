@@ -19,6 +19,8 @@ export default defineConfig(({ mode }) => {
         '@/shared': path.resolve(__dirname, './src/shared'),
         '@/api': path.resolve(__dirname, './src/api'),
         '@/pages': path.resolve(__dirname, './src/pages'),
+        '@/services': path.resolve(__dirname, './src/services'),
+        '@/contexts': path.resolve(__dirname, './src/contexts'),
       },
     },
     build: {

@@ -4,7 +4,7 @@ import * as supportTicketsApi from './supportTickets.api';
 import { useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { SUPPORT_TICKET_STATUS } from '../../constants';
-import { useToast } from '../../contexts/ToastContext';
+import { useToast } from '../../contexts/toast';
 
 // Helper function
 const sendSystemNotification = (title: string, body: string, link?: string) => {
