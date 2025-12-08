@@ -1,11 +1,12 @@
 import { supabase } from '../../services/supabaseClient';
-import type { SupportTicket } from '../../types';
+import type { SupportTicketRow } from '../../types';
 import type { CreateSupportTicketData, UpdateSupportTicketData } from './supportTickets.types';
 
 /**
  * Fetch all support tickets (admin) or tickets by user
+ * Returns database rows with snake_case column names
  */
-export const getSupportTickets = async (userEmail?: string): Promise<SupportTicket[]> => {
+export const getSupportTickets = async (userEmail?: string): Promise<SupportTicketRow[]> => {
   let query = supabase
     .from('support_tickets')
     .select('*')
@@ -20,25 +21,14 @@ export const getSupportTickets = async (userEmail?: string): Promise<SupportTick
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((t: any) => ({
-    id: t.id,
-    userEmail: t.user_email,
-    category: t.category,
-    subject: t.subject,
-    description: t.description,
-    status: t.status,
-    assignedTo: t.assigned_to,
-    response: t.response,
-    assignmentHistory: t.assignment_history || [],
-    timestamp: t.created_at,
-    relatedReportId: t.related_report_id,
-  }));
+  return data;
 };
 
 /**
  * Fetch a single support ticket by ID
+ * Returns database row with snake_case column names
  */
-export const getSupportTicketById = async (id: string): Promise<SupportTicket | null> => {
+export const getSupportTicketById = async (id: string): Promise<SupportTicketRow | null> => {
   const { data, error } = await supabase
     .from('support_tickets')
     .select('*')
@@ -48,19 +38,7 @@ export const getSupportTicketById = async (id: string): Promise<SupportTicket | 
   if (error) throw error;
   if (!data) return null;
   
-  return {
-    id: data.id,
-    userEmail: data.user_email,
-    category: data.category,
-    subject: data.subject,
-    description: data.description,
-    status: data.status,
-    assignedTo: data.assigned_to,
-    response: data.response,
-    assignmentHistory: data.assignment_history || [],
-    timestamp: data.created_at,
-    relatedReportId: data.related_report_id,
-  };
+  return data;
 };
 
 /**

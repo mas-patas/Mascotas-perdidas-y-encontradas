@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/services/supabaseClient';
-import { Pet, AnimalType } from '@/types';
+import type { PetRow, AnimalType } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES } from '@/constants';
 import { HeartIcon, CalendarIcon, UserIcon, ArrowDownIcon, SearchIcon, SparklesIcon, TrophyIcon, DogIcon, CatIcon, ChevronLeftIcon, ChevronRightIcon, LocationMarkerIcon, PetIcon } from '@/shared/components/icons';
 import { Helmet } from 'react-helmet-async';

@@ -1,11 +1,12 @@
 import { supabase } from '../../services/supabaseClient';
-import type { Report } from '../../types';
+import type { ReportRow } from '../../types';
 import type { CreateReportData } from './reports.types';
 
 /**
  * Fetch all reports (admin) or reports by user
+ * Returns database rows with snake_case column names
  */
-export const getReports = async (userEmail?: string): Promise<Report[]> => {
+export const getReports = async (userEmail?: string): Promise<ReportRow[]> => {
   let query = supabase
     .from('reports')
     .select('*')
@@ -20,24 +21,14 @@ export const getReports = async (userEmail?: string): Promise<Report[]> => {
   if (error) throw error;
   if (!data) return [];
   
-  return data.map((r: any) => ({
-    id: r.id,
-    reporterEmail: r.reporter_email,
-    reportedEmail: r.reported_email,
-    type: r.type,
-    targetId: r.target_id,
-    reason: r.reason,
-    details: r.details,
-    status: r.status,
-    timestamp: r.created_at,
-    postSnapshot: r.post_snapshot,
-  }));
+  return data;
 };
 
 /**
  * Fetch a single report by ID
+ * Returns database row with snake_case column names
  */
-export const getReportById = async (id: string): Promise<Report | null> => {
+export const getReportById = async (id: string): Promise<ReportRow | null> => {
   const { data, error } = await supabase
     .from('reports')
     .select('*')
@@ -47,18 +38,7 @@ export const getReportById = async (id: string): Promise<Report | null> => {
   if (error) throw error;
   if (!data) return null;
   
-  return {
-    id: data.id,
-    reporterEmail: data.reporter_email,
-    reportedEmail: data.reported_email,
-    type: data.type,
-    targetId: data.target_id,
-    reason: data.reason,
-    details: data.details,
-    status: data.status,
-    timestamp: data.created_at,
-    postSnapshot: data.post_snapshot,
-  };
+  return data;
 };
 
 /**

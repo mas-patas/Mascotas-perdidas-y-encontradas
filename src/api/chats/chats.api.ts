@@ -1,63 +1,77 @@
 import { supabase } from '../../services/supabaseClient';
-import type { Chat, Message } from '../../types';
+import type { ChatRow, MessageRow } from '../../types';
 import type { CreateChatData } from './chats.types';
 
 /**
- * Fetch all chats for a user
+ * Extended chat type with messages
  */
-export const getChats = async (userEmail: string): Promise<Chat[]> => {
+export type ChatWithMessages = ChatRow & {
+  messages?: MessageRow[];
+};
+
+/**
+ * Fetch all chats for a user
+ * Returns database rows with snake_case column names
+ */
+export const getChats = async (userEmail: string): Promise<ChatWithMessages[]> => {
+  // Fetch all chats and filter client-side to ensure we get all chats where user is a participant
   const { data: rawChats, error } = await supabase
     .from('chats')
-    .select('*')
-    .contains('participant_emails', [userEmail]);
-  
-  if (error) throw error;
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching chats:', error);
+    throw error;
+  }
   if (!rawChats) return [];
 
-  const chatIds = rawChats.map((c: any) => c.id);
-  let rawMessages: any[] = [];
-  
+  // Filter chats where user is a participant
+  const userChats = rawChats.filter(chat => {
+    const emails = chat.participant_emails || [];
+    return Array.isArray(emails) && emails.includes(userEmail);
+  });
+
+
+
+  const chatIds = userChats.map((c) => c.id);
+  let rawMessages: MessageRow[] = [];
+
   if (chatIds.length > 0) {
     const { data: msgs, error: msgError } = await supabase
       .from('messages')
       .select('*')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: true });
-    
-    if (msgError) throw msgError;
+
+    if (msgError) {
+      throw msgError;
+    }
     rawMessages = msgs || [];
   }
 
-  return rawChats.map((c: any) => {
-    const chatMessages = rawMessages
-      .filter((m: any) => m.chat_id === c.id)
-      .map((m: any) => ({
-        senderEmail: m.sender_email,
-        text: m.text,
-        timestamp: m.created_at,
-        isUnread: false, // Will be calculated by the query hook
-      }));
-    
+  const result = userChats.map((c) => {
+    const chatMessages = rawMessages.filter((m) => m.chat_id === c.id);
+
     return {
-      id: c.id,
-      petId: c.pet_id,
-      participantEmails: c.participant_emails,
+      ...c,
       messages: chatMessages,
-      lastReadTimestamps: c.last_read_timestamps || {},
     };
   });
+
+  return result;
 };
 
 /**
  * Fetch a single chat by ID
+ * Returns database row with snake_case column names
  */
-export const getChatById = async (chatId: string): Promise<Chat | null> => {
+export const getChatById = async (chatId: string): Promise<ChatWithMessages | null> => {
   const { data: chatData, error: chatError } = await supabase
     .from('chats')
     .select('*')
     .eq('id', chatId)
     .single();
-  
+
   if (chatError) throw chatError;
   if (!chatData) return null;
 
@@ -66,42 +80,30 @@ export const getChatById = async (chatId: string): Promise<Chat | null> => {
     .select('*')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true });
-  
+
   if (msgError) throw msgError;
 
   return {
-    id: chatData.id,
-    petId: chatData.pet_id,
-    participantEmails: chatData.participant_emails,
-    messages: (messages || []).map((m: any) => ({
-      senderEmail: m.sender_email,
-      text: m.text,
-      timestamp: m.created_at,
-      isUnread: false,
-    })),
-    lastReadTimestamps: chatData.last_read_timestamps || {},
+    ...chatData,
+    messages: messages || [],
   };
 };
 
 /**
  * Fetch messages for a chat
+ * Returns database rows with snake_case column names
  */
-export const getMessages = async (chatId: string): Promise<Message[]> => {
+export const getMessages = async (chatId: string): Promise<MessageRow[]> => {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true });
-  
+
   if (error) throw error;
   if (!data) return [];
-  
-  return data.map((m: any) => ({
-    senderEmail: m.sender_email,
-    text: m.text,
-    timestamp: m.created_at,
-    isUnread: false,
-  }));
+
+  return data;
 };
 
 /**
@@ -116,20 +118,31 @@ export const createChat = async (data: CreateChatData): Promise<string> => {
   const chatId = generateUUID();
   const now = new Date().toISOString();
 
+  // Normalize emails (lowercase, trim) to ensure consistency
+  const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+  const normalizedEmails = data.participantEmails.map(normalizeEmail).filter(Boolean);
+
+  if (normalizedEmails.length < 2) {
+    throw new Error('Se requieren al menos 2 participantes para crear un chat');
+  }
+
   const lastReadTimestamps: Record<string, string> = {};
-  data.participantEmails.forEach(email => {
+  normalizedEmails.forEach(email => {
     lastReadTimestamps[email] = now;
   });
 
   const { error } = await supabase.from('chats').insert({
     id: chatId,
     pet_id: data.petId || null,
-    participant_emails: data.participantEmails,
+    participant_emails: normalizedEmails,
     last_read_timestamps: lastReadTimestamps,
     created_at: now
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
+
   return chatId;
 };
 
@@ -165,7 +178,7 @@ export const markChatAsRead = async (chatId: string, userEmail: string): Promise
     .eq('id', chatId)
     .single();
 
-  const timestamps = chatData?.last_read_timestamps || {};
+  const timestamps: Record<string, string> = (chatData?.last_read_timestamps as Record<string, string>) || {};
   timestamps[userEmail] = now;
 
   const { error } = await supabase

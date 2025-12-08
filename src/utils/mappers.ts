@@ -1,5 +1,4 @@
-
-import { Pet, Comment } from '../types';
+import type { Pet, Comment } from '../types';
 import { ensurePublicImageUrls } from './imageUtils';
 
 /**

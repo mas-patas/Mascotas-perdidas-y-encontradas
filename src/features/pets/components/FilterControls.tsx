@@ -6,7 +6,7 @@ import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '@/constants';
 import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments } from '@/data/locations';
 import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon } from '@/shared/components/icons';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 type Filters = {
     status: PetStatus | 'Todos',

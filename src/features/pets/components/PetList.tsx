@@ -1,14 +1,13 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import type { Pet, User, PetStatus } from '@/types';
+import type { PetRow, User, PetStatus } from '@/types';
 import { PetCard } from '@/features/pets';
 import { PET_STATUS } from '@/constants';
 import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons';
 import { supabase } from '@/services/supabaseClient';
-import { mapPetFromDb } from '@/utils/mappers';
 
 interface PetListProps {
-    pets: Pet[];
+    pets: PetRow[];
     users: User[];
     onViewUser: (user: User) => void;
     filters: any;
@@ -27,7 +26,7 @@ interface PetListProps {
 const PetSection: React.FC<{ 
     title: string; 
     status: string; // Needed for fetching more
-    initialPets: Pet[]; 
+    initialPets: PetRow[]; 
     users: User[]; 
     onViewUser: (user: User) => void; 
     onNavigate: (path: string) => void;
@@ -36,13 +35,13 @@ const PetSection: React.FC<{
     onViewAll: () => void;
 }> = ({ title, status, initialPets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [additionalPets, setAdditionalPets] = useState<Pet[]>([]);
+    const [additionalPets, setAdditionalPets] = useState<PetRow[]>([]);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMoreHorizontal, setHasMoreHorizontal] = useState(true);
 
     // Deduplicate initialPets first to ensure no duplicates in props
     const deduplicatedInitialPets = useMemo(() => {
-        const map = new Map<string, Pet>();
+        const map = new Map<string, PetRow>();
         initialPets.forEach(pet => {
             if (pet && pet.id) {
                 map.set(pet.id, pet);
@@ -53,7 +52,7 @@ const PetSection: React.FC<{
 
     // Combine initial props with fetched data, removing duplicates by ID
     const allPets = useMemo(() => {
-        const allPetsMap = new Map<string, Pet>();
+        const allPetsMap = new Map<string, PetRow>();
         // Add deduplicated initial pets
         deduplicatedInitialPets.forEach(pet => {
             if (pet && pet.id) {
@@ -96,14 +95,12 @@ const PetSection: React.FC<{
             if (error) throw error;
 
             if (data && data.length > 0) {
-                // We need to map these raw DB pets to our Pet type
-                // Note: We might miss some deep user profile data here for optimization, 
-                // but PetCard handles missing owner gracefully or we could do a join if strictly needed.
-                const mappedNewPets = data.map(p => mapPetFromDb(p));
+                // Use database types directly (snake_case)
+                const newPets = data as PetRow[];
                 
                 // Filter out pets that are already in deduplicatedInitialPets to avoid duplicates
                 const existingIds = new Set(deduplicatedInitialPets.map(p => p.id));
-                const newUniquePets = mappedNewPets.filter(p => p && p.id && !existingIds.has(p.id));
+                const newUniquePets = newPets.filter(p => p && p.id && !existingIds.has(p.id));
                 
                 // Also filter out pets already in additionalPets
                 setAdditionalPets(prev => {
@@ -192,7 +189,8 @@ const PetSection: React.FC<{
                 className="flex gap-2 sm:gap-3 md:gap-4 overflow-x-auto pb-3 sm:pb-4 hide-scrollbar scroll-smooth snap-x snap-mandatory w-full"
             >
                 {allPets.map(pet => {
-                    const petOwner = users.find(u => u.email === pet.userEmail);
+                    // Find owner by user_id since PetRow doesn't have userEmail
+                    const petOwner = users.find(u => u.id === pet.user_id);
                     return (
                         <div key={pet.id} className="min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] snap-start flex-shrink-0">
                             <PetCard pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />
@@ -242,7 +240,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
 
     // Deduplicate pets array to prevent duplicate keys
     const deduplicatedPets = useMemo(() => {
-        const petsMap = new Map<string, Pet>();
+        const petsMap = new Map<string, PetRow>();
         pets.forEach(pet => {
             if (pet && pet.id) {
                 petsMap.set(pet.id, pet);

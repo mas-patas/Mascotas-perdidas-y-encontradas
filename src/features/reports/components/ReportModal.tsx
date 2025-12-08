@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ReportReason, ReportType } from '@/types';
+import type { ReportReason, ReportType } from '@/types';
 import { REPORT_REASONS } from '@/constants';
 
 interface ReportModalProps {

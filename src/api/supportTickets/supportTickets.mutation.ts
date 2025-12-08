@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './supportTickets.keys';
 import * as supportTicketsApi from './supportTickets.api';
 import type { CreateSupportTicketData, UpdateSupportTicketData } from './supportTickets.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to create a support ticket

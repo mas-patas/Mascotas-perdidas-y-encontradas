@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { PlusIcon, LogoutIcon, HomeIcon, UserIcon, ChevronDownIcon, ChatBubbleIcon, AdminIcon, MenuIcon, SupportIcon, BellIcon, HeartIcon, LightbulbIcon, DocumentIcon, TrophyIcon } from './icons';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { PetStatus, Notification, User } from '@/types';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { NotificationDropdown } from '@/features/notifications';

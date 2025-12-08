@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Pet } from '@/types';
+import type { Pet } from '@/types';
 import { uploadImage } from '@/utils/imageUtils';
 import { SparklesIcon, HeartIcon, XCircleIcon } from '@/shared/components/icons';
 

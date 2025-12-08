@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './campaigns.keys';
 import * as campaignsApi from './campaigns.api';
 import type { CreateCampaignData, UpdateCampaignData } from './campaigns.types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 
 /**
  * Mutation hook to create a campaign

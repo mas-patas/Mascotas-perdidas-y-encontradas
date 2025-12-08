@@ -1,23 +1,25 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2024",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": [
-      "ES2022",
+      "ES2024",
       "DOM",
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "strict": true,
     "paths": {
       "@/*": [
         "./src/*"
@@ -33,9 +35,16 @@
       ],
       "@/pages/*": [
         "./src/pages/*"
+      ],
+      "@/services/*": [
+        "./src/services/*"
+      ],
+      "@/contexts/*": [
+        "./src/contexts/*"
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "verbatimModuleSyntax": true
   }
 }

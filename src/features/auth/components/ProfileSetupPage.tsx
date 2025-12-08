@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { useNavigate } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon, LockIcon } from '@/shared/components/icons';
 import { supabase } from '@/services/supabaseClient';

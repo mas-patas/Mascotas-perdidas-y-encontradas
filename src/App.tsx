@@ -31,11 +31,11 @@ import type { TourStep } from '@/shared';
 import { AboutPage, TipsPage, TermsPage } from '@/pages';
 
 // Types & Constants
-import type { Pet, PetStatus, Chat, User, UserRole, PotentialMatch, UserStatus, Report, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicket, SupportTicketCategory, Campaign, Comment } from './types';
+import type { PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow } from './types';
 import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
 
 // Services & Utils
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/auth';
 import { findMatchingPets } from './services/geminiService';
 import { generateUUID } from './utils/uuid';
 import { useAppData } from './hooks/useAppData';
@@ -74,7 +74,7 @@ import {
 } from '@/api';
 
 // Stable empty array to prevent hook dependency loops
-const EMPTY_PETS_ARRAY: Pet[] = [];
+const EMPTY_PETS_ARRAY: PetRow[] = [];
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles }: { children?: React.ReactNode, roles?: UserRole[] }) => {
@@ -130,16 +130,16 @@ const App: React.FC = () => {
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
     const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
     const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
-    const [selectedPetForModal, setSelectedPetForModal] = useState<Pet | null>(null);
-    const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
-    const [petToStatusCheck, setPetToStatusCheck] = useState<Pet | null>(null);
+    const [selectedPetForModal, setSelectedPetForModal] = useState<PetRow | null>(null);
+    const [petToRenew, setPetToRenew] = useState<PetRow | null>(null);
+    const [petToStatusCheck, setPetToStatusCheck] = useState<PetRow | null>(null);
     const [isPublicProfileModalOpen, setIsPublicProfileModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [reportStatus, setReportStatus] = useState<PetStatus>(PET_STATUS.PERDIDO);
     const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
-    const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<Pet, 'id' | 'userEmail'> | null>(null);
+    const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<PetRow, 'id' | 'user_id'> | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [petToPrefill, setPetToPrefill] = useState<Partial<Pet> | null>(null);
+    const [petToPrefill, setPetToPrefill] = useState<Partial<PetRow> | null>(null);
     
     // IP Ban State
     const [isIpBanned, setIsIpBanned] = useState(false);
@@ -204,23 +204,25 @@ const App: React.FC = () => {
         if (!currentUser || !userPetsData || !notifications) return;
         if (hasCheckedStatusRef.current === currentUser.id) return;
         const checkStatuses = async () => {
-            hasCheckedStatusRef.current = currentUser.id;
+            hasCheckedStatusRef.current = currentUser.id || '';
             const now = new Date();
             if (!userPetsData || userPetsData.length === 0) return;
             const existingNotifs = notifications || [];
             let newNotificationAdded = false;
             for (const pet of userPetsData) {
-                let expirationDate = pet.expiresAt ? new Date(pet.expiresAt) : new Date(new Date(pet.createdAt || 0).getTime() + (60 * 24 * 60 * 60 * 1000));
+                let expirationDate = pet.expires_at ? new Date(pet.expires_at) : new Date(new Date(pet.created_at || 0).getTime() + (60 * 24 * 60 * 60 * 1000));
                 const isExpired = now > expirationDate;
                 if (isExpired) {
                     const alreadyNotified = existingNotifs.some((n: any) => (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id));
                     if (!alreadyNotified) {
-                        await createNotificationForStatus.mutateAsync({
-                            id: generateUUID(),
-                            userId: currentUser.id,
-                            message: `Tu publicación de "${pet.name}" ha expirado.`,
-                            link: { type: 'pet-renew', id: pet.id }
-                        });
+                        if (currentUser.id) {
+                            await createNotificationForStatus.mutateAsync({
+                                id: generateUUID(),
+                                userId: currentUser.id,
+                                message: `Tu publicación de "${pet.name}" ha expirado.`,
+                                link: { type: 'pet-renew', id: pet.id }
+                            });
+                        }
                         newNotificationAdded = true;
                     }
                 }
@@ -319,7 +321,7 @@ const App: React.FC = () => {
 
             await createNotification.mutateAsync({
                 id: generateUUID(),
-                userId: currentUser.id,
+                userId: currentUser.id || '',
                 message: `Has publicado exitosamente el reporte de "${petData.name}".`,
                 link: { type: 'pet', id: newPetId }
             });
@@ -336,7 +338,7 @@ const App: React.FC = () => {
     const updatePetStatus = useUpdatePetStatus();
     const deletePet = useDeletePet();
 
-    const handleRenewPet = async (pet: Pet) => {
+    const handleRenewPet = async (pet: PetRow) => {
         if (!currentUser) return;
         try {
             await renewPet.mutateAsync(pet.id);
@@ -345,7 +347,7 @@ const App: React.FC = () => {
         } catch (err: any) { alert("Error al renovar: " + err.message); }
     };
 
-    const handleMarkAsFound = async (pet: Pet) => {
+    const handleMarkAsFound = async (pet: PetRow) => {
         try { 
             await updatePetStatus.mutateAsync({ id: pet.id, status: PET_STATUS.REUNIDO });
             trackPetReunited(pet.id);
@@ -372,13 +374,13 @@ const App: React.FC = () => {
     const handleUpdateUserStatus = async (email: string, status: UserStatus) => { 
         try { 
             await updateUserStatus.mutateAsync({ email, status });
-            setUsers(prev => prev.map(u => u.email === email ? { ...u, status } : u)); 
+            setUsers((prev: User[]) => prev.map((u: User) => u.email === email ? { ...u, status } : u)); 
         } catch(e:any){ alert(e.message); } 
     };
     const handleUpdateUserRole = async (email: string, role: UserRole) => { 
         try { 
             await updateUserRole.mutateAsync({ email, role });
-            setUsers(prev => prev.map(u => u.email === email ? { ...u, role } : u)); 
+            setUsers((prev: User[]) => prev.map((u: User) => u.email === email ? { ...u, role } : u)); 
         } catch(e:any){ alert(e.message); } 
     };
     
@@ -386,31 +388,110 @@ const App: React.FC = () => {
     const sendMessage = useSendMessage();
     const markChatAsRead = useMarkChatAsRead();
 
-    const handleStartChat = async (pet: Pet) => {
+    const handleStartChat = async (pet: PetRow) => {
         if (!currentUser) return navigate('/login');
-        const existingChat = chats.find(c => c.petId === pet.id && c.participantEmails.includes(currentUser.email));
+        const existingChat = chats.find(c => c.pet_id === pet.id && c.participant_emails?.includes(currentUser.email));
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
         try {
+            // Try multiple methods to get owner email
+            let petOwnerEmail = '';
+            let petOwner: User | null = null;
+            
+            // Method 1: Check if pet has userEmail property (from mapped Pet type)
+            const petWithEmail = pet as any;
+            if (petWithEmail.userEmail) {
+                petOwnerEmail = petWithEmail.userEmail;
+                petOwner = users.find(u => u.email === petOwnerEmail) || null;
+            }
+            
+            // Method 2: Find by user_id in users list
+            if (!petOwnerEmail && pet.user_id) {
+                petOwner = users.find(u => u.id === pet.user_id) || null;
+                petOwnerEmail = petOwner?.email || '';
+            }
+            
+            // Method 3: If still not found, fetch from database
+            if (!petOwnerEmail && pet.user_id) {
+                try {
+                    const { getUserById } = await import('@/api/users/users.api');
+                    const ownerProfile = await getUserById(pet.user_id);
+                    if (ownerProfile) {
+                        petOwnerEmail = ownerProfile.email;
+                        petOwner = ownerProfile;
+                        // Add to users list for future use
+                        setUsers((prev: User[]) => {
+                            if (!prev.find(u => u.id === pet.user_id)) {
+                                return [...prev, ownerProfile];
+                            }
+                            return prev;
+                        });
+                    }
+                } catch (fetchError) {
+                    // Silently fail and continue
+                }
+            }
+            
+            if (!petOwnerEmail) {
+                alert('No se pudo encontrar el dueño de la mascota. Por favor, intenta nuevamente.');
+                return;
+            }
+            
+            // Normalize emails (lowercase, trim)
+            const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+            const normalizedCurrentUserEmail = normalizeEmail(currentUser.email);
+            const normalizedPetOwnerEmail = normalizeEmail(petOwnerEmail);
+            
             const chatId = await createChat.mutateAsync({
                 petId: pet.id,
-                participantEmails: [currentUser.email, pet.userEmail]
+                participantEmails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail]
             });
-            setChats(prev => [...prev, { id: chatId, petId: pet.id, participantEmails: [currentUser.email, pet.userEmail], messages: [], lastReadTimestamps: {} }]);
+            const now = new Date().toISOString();
+            setChats((prev: ChatRow[]) => [...prev, { 
+                id: chatId, 
+                pet_id: pet.id, 
+                participant_emails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail], 
+                messages: null, 
+                last_read_timestamps: {}, 
+                created_at: now 
+            } as ChatRow]);
             navigate(`/chat/${chatId}`);
-        } catch(e:any){ alert(e.message); }
+        } catch(e:any){ 
+            alert(e.message); 
+        }
     };
 
     const handleStartUserChat = async (email: string) => {
         if (!currentUser) return navigate('/login');
-        const existingChat = chats.find(c => c.participantEmails.includes(currentUser.email) && c.participantEmails.includes(email) && !c.petId);
+        
+        // Normalize emails for comparison
+        const normalizeEmail = (email: string) => email?.toLowerCase().trim() || '';
+        const normalizedCurrentEmail = normalizeEmail(currentUser.email);
+        const normalizedOtherEmail = normalizeEmail(email);
+        
+        const existingChat = chats.find(c => {
+            const emails = c.participant_emails || [];
+            return emails.some(e => normalizeEmail(e) === normalizedCurrentEmail) && 
+                   emails.some(e => normalizeEmail(e) === normalizedOtherEmail) && 
+                   !c.pet_id;
+        });
         if (existingChat) { navigate(`/chat/${existingChat.id}`); return; }
         try {
             const chatId = await createChat.mutateAsync({
-                participantEmails: [currentUser.email, email]
+                participantEmails: [normalizedCurrentEmail, normalizedOtherEmail]
             });
-            setChats(prev => [...prev, { id: chatId, petId: undefined, participantEmails: [currentUser.email, email], messages: [], lastReadTimestamps: {} }]);
+            const now = new Date().toISOString();
+            setChats((prev: ChatRow[]) => [...prev, { 
+                id: chatId, 
+                pet_id: null, 
+                participant_emails: [normalizedCurrentEmail, normalizedOtherEmail], 
+                messages: null, 
+                last_read_timestamps: {}, 
+                created_at: now 
+            } as ChatRow]);
             navigate(`/chat/${chatId}`);
-        } catch(e:any){ alert('Error starting chat'); }
+        } catch(e:any){ 
+            alert('Error starting chat'); 
+        }
     };
     
     const handleSendMessage = useCallback(async (chatId: string, text: string) => {
@@ -423,7 +504,13 @@ const App: React.FC = () => {
     const handleMarkChatAsRead = useCallback(async (chatId: string) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
-        setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastReadTimestamps: { ...c.lastReadTimestamps, [currentUser.email]: now } } : c));
+        setChats((prev: ChatRow[]) => prev.map((c: ChatRow) => {
+            if (c.id === chatId) {
+                const timestamps = (c.last_read_timestamps as Record<string, string>) || {};
+                return { ...c, last_read_timestamps: { ...timestamps, [currentUser.email]: now } };
+            }
+            return c;
+        }));
         await markChatAsRead.mutateAsync(chatId); 
     }, [currentUser, markChatAsRead]);
 
@@ -443,7 +530,7 @@ const App: React.FC = () => {
     const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => { 
         try { 
             await updateReportStatus.mutateAsync({ id: reportId, status });
-            setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r)); 
+            setReports((prev: ReportRow[]) => prev.map((r: ReportRow) => r.id === reportId ? { ...r, status } : r)); 
         } catch(e:any){ alert(e.message); } 
     };
     const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { 
@@ -451,13 +538,13 @@ const App: React.FC = () => {
             await createSupportTicket.mutateAsync({ category, subject, description }); 
         } 
     };
-    const handleUpdateSupportTicket = async (ticket: SupportTicket) => { 
+    const handleUpdateSupportTicket = async (ticket: SupportTicketRow) => { 
         await updateSupportTicket.mutateAsync({ 
             id: ticket.id, 
             data: { 
-                status: ticket.status, 
-                response: ticket.response, 
-                assignedTo: ticket.assignedTo 
+                status: ticket.status || undefined, 
+                response: ticket.response || undefined, 
+                assignedTo: ticket.assigned_to || undefined 
             } 
         }); 
     };
@@ -510,11 +597,11 @@ const App: React.FC = () => {
 
     const handleMarkNotificationAsRead = async (id: string) => { 
         await markNotificationAsRead.mutateAsync(id);
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); 
+        setNotifications((prev: NotificationRow[]) => prev.map((n: NotificationRow) => n.id === id ? { ...n, is_read: true } : n)); 
     };
     const handleMarkAllNotificationsAsRead = async () => {
         if (!currentUser) return;
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications((prev: NotificationRow[]) => prev.map((n: NotificationRow) => ({ ...n, is_read: true })));
         await markAllNotificationsAsRead.mutateAsync();
     };
     
@@ -554,11 +641,12 @@ const App: React.FC = () => {
     };
 
     const hasUnreadMessages = currentUser ? chats.some(c => {
-        if (!c.participantEmails.includes(currentUser.email)) return false;
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (!lastMsg || lastMsg.senderEmail === currentUser.email) return false;
-        const lastRead = c.lastReadTimestamps[currentUser.email] || new Date(0).toISOString();
-        return new Date(lastMsg.timestamp) > new Date(lastRead);
+        if (!c.participant_emails?.includes(currentUser.email)) return false;
+        const lastMsg = c.messages?.[c.messages.length - 1];
+        if (!lastMsg || lastMsg.sender_email === currentUser.email) return false;
+        const timestamps = (c.last_read_timestamps as Record<string, string>) || {};
+        const lastRead = timestamps[currentUser.email] || new Date(0).toISOString();
+        return lastMsg.timestamp ? new Date(lastMsg.timestamp) > new Date(lastRead) : false;
     }) : false;
 
     const homeTourSteps: TourStep[] = [
@@ -601,24 +689,35 @@ const App: React.FC = () => {
                         </ErrorBoundary>
                     } />
                     
-                    <Route path="perfil" element={<ProtectedRoute><ErrorBoundary name="Profile"><ProfilePage user={currentUser!} reportedPets={pets.filter(p => p.userEmail === currentUser?.email)} allPets={pets} users={users} onBack={() => navigate('/')} onReportOwnedPetAsLost={(ownedPet) => {
+                    <Route path="perfil" element={<ProtectedRoute><ErrorBoundary name="Profile"><ProfilePage user={currentUser!} reportedPets={pets.filter(p => {
+                        const petOwner = users.find(u => u.id === p.user_id);
+                        return petOwner?.email === currentUser?.email;
+                    })} allPets={pets} users={users} onBack={() => navigate('/')} onReportOwnedPetAsLost={(ownedPet) => {
                         setReportStatus(PET_STATUS.PERDIDO);
-                        const prefill: Partial<Pet> = {
+                        const prefill: Partial<PetRow> = {
                             name: ownedPet.name,
-                            animalType: ownedPet.animalType as any,
+                            animal_type: ownedPet.animalType as any,
                             breed: ownedPet.breed,
                             color: ownedPet.colors.join(', '),
                             description: ownedPet.description || '',
-                            imageUrls: ownedPet.imageUrls || [],
+                            image_urls: ownedPet.imageUrls || [],
                             contact: currentUser?.phone || ''
                         };
                         setPetToPrefill(prefill);
                         setIsReportModalOpen(true);
                     }} onNavigate={(path) => navigate(path)} onViewUser={handleViewPublicProfile} onRenewPet={(pet) => setPetToRenew(pet)} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="setup-profile" element={<ProfileSetupPage />} />
-                    <Route path="mensajes" element={<ProtectedRoute><ErrorBoundary name="Messages"><MessagesPage chats={chats.filter(c => c.participantEmails.includes(currentUser!.email)).map(c => ({ ...c, isUnread: false })).sort((a, b) => new Date(b.messages[b.messages.length-1]?.timestamp || 0).getTime() - new Date(a.messages[a.messages.length-1]?.timestamp || 0).getTime())} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="mensajes" element={<ProtectedRoute><ErrorBoundary name="Messages"><MessagesPage chats={chats.filter(c => c.participant_emails?.includes(currentUser!.email)).map(c => ({ ...c, isUnread: false })).sort((a, b) => {
+                        const aMessages = (a.messages as any) || [];
+                        const bMessages = (b.messages as any) || [];
+                        const aMsg = aMessages.length > 0 ? aMessages[aMessages.length - 1] : null;
+                        const bMsg = bMessages.length > 0 ? bMessages[bMessages.length - 1] : null;
+                        const aTime = aMsg?.created_at ? new Date(aMsg.created_at).getTime() : 0;
+                        const bTime = bMsg?.created_at ? new Date(bMsg.created_at).getTime() : 0;
+                        return bTime - aTime;
+                    })} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.userEmail === currentUser?.email)} userReports={reports.filter(r => r.reporterEmail === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.user_email === currentUser?.email)} userReports={reports.filter(r => r.reporter_email === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="campanas" element={<ErrorBoundary name="Campaigns"><CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="mapa" element={<ErrorBoundary name="Map"><MapPage onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="servicios" element={<ErrorBoundary name="Services"><ServicesMapPage /></ErrorBoundary>} />

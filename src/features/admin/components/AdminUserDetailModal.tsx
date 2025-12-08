@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { User, Pet, Chat, UserStatus, UserRole } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { USER_ROLES, USER_STATUS } from '@/constants';
 import { InfoIcon, EditIcon } from '@/shared/components/icons';
 import { ContactRequestersModal } from '@/shared';

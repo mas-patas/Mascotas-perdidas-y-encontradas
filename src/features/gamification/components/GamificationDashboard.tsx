@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { User, Pet, Mission, ActivityLog, LeaderboardEntry } from '@/types';
+import { useAuth } from '@/contexts/auth';
+import type { User, Pet, Mission, ActivityLog, LeaderboardEntry } from '@/types';
 import { TargetIcon, HistoryIcon, CoinIcon, XCircleIcon, CheckIcon, PlusIcon, ChatBubbleIcon, HeartIcon, MegaphoneIcon, TrophyIcon, CrownIcon } from '@/shared/components/icons';
 import { GamificationBadge, getLevelFromPoints } from '@/features/gamification';
 import { getUserHistory, getWeeklyLeaderboard } from '@/services/gamificationService';

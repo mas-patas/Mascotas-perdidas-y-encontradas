@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { businessService } from '@/services/businessService';
-import { Business } from '@/types';
+import { useBusinesses } from '@/api';
+import type { BusinessRow } from '@/types';
 import { SearchIcon, CrosshairIcon, StoreIcon, MedicalIcon, ShoppingBagIcon, ScissorsIcon, StarIcon } from '@/shared/components/icons';
 import { BUSINESS_TYPES } from '@/constants';
 
@@ -12,28 +12,16 @@ const ServicesMapPage: React.FC = () => {
     const markerClusterGroupRef = useRef<any>(null);
     const navigate = useNavigate();
     
-    const [businesses, setBusinesses] = useState<Business[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: businesses = [], isLoading: loading } = useBusinesses();
     const [activeTab, setActiveTab] = useState<string>('ALL');
     const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Fetch Businesses
-    useEffect(() => {
-        const fetch = async () => {
-            setLoading(true);
-            const data = await businessService.getAllBusinesses();
-            setBusinesses(data);
-            setLoading(false);
-        };
-        fetch();
-    }, []);
-
-    const filteredBusinesses = businesses.filter(b => {
+    const filteredBusinesses = businesses.filter((b: BusinessRow) => {
         const matchesTab = activeTab === 'ALL' || b.type === activeTab;
         const matchesSearch = searchQuery === '' || 
                               b.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              b.address.toLowerCase().includes(searchQuery.toLowerCase());
+                              (b.address && b.address.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchesTab && matchesSearch;
     });
 
@@ -81,7 +69,7 @@ const ServicesMapPage: React.FC = () => {
 
         const markersToAdd: any[] = [];
 
-        filteredBusinesses.forEach(biz => {
+        filteredBusinesses.forEach((biz: BusinessRow) => {
             if (!biz.lat || !biz.lng) return;
 
             const isVet = biz.type === BUSINESS_TYPES.VETERINARIA;
@@ -112,42 +100,19 @@ const ServicesMapPage: React.FC = () => {
             `;
 
             const marker = L.marker([biz.lat, biz.lng], { icon })
-                .bindPopup(popupContent, {
-                    maxWidth: 250,
-                    className: 'custom-popup',
-                    closeButton: true,
-                    autoPan: true,
-                    autoPanPadding: [50, 50],
-                    autoPanPaddingTopLeft: [50, 50],
-                    autoPanPaddingBottomRight: [50, 50]
-                });
-            
-            // Update popup size when it opens and after image loads
-            marker.on('popupopen', function() {
-                const popup = marker.getPopup();
-                if (popup) {
-                    // Update immediately
-                    popup.update();
-                    
-                    // Update again after a short delay to ensure images are loaded
-                    setTimeout(() => {
-                        popup.update();
-                    }, 100);
-                    
-                    // Also update when images inside the popup load
-                    const popupElement = popup.getElement();
-                    if (popupElement) {
-                        const images = popupElement.querySelectorAll('img');
-                        images.forEach((img: HTMLImageElement) => {
-                            if (!img.complete) {
-                                img.addEventListener('load', () => {
-                                    popup.update();
-                                }, { once: true });
-                            }
-                        });
-                    }
-                }
-            });
+                .bindPopup(`
+                    <div class="text-center min-w-[180px]">
+                        ${biz.logo_url ? `<img src="${biz.logo_url}" class="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-gray-200" />` : ''}
+                        <strong class="block text-lg font-bold text-gray-900">${biz.name}</strong>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white inline-block mb-2 ${isVet ? 'bg-red-500' : 'bg-blue-500'}">
+                            ${biz.type}
+                        </span>
+                        <p class="text-xs text-gray-600 mb-2">${biz.address || ''}</p>
+                        <button onclick="window.location.hash = '#/negocio/${biz.id}'" class="block w-full bg-gray-900 text-white text-sm py-1.5 px-3 rounded hover:bg-gray-700 transition-colors">
+                            Ver Tienda
+                        </button>
+                    </div>
+                `);
             
             markersToAdd.push(marker);
         });
@@ -252,16 +217,16 @@ const ServicesMapPage: React.FC = () => {
                         {viewMode === 'list' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10 px-1">
                                 {filteredBusinesses.length > 0 ? (
-                                    filteredBusinesses.map(biz => (
+                                    filteredBusinesses.map((biz: BusinessRow) => (
                                         <div key={biz.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all group flex flex-col">
                                             <div className="h-40 bg-gray-200 relative overflow-hidden">
                                                 <img 
-                                                    src={biz.coverUrl || 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Negocio'} 
+                                                    src={biz.cover_url || 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Negocio'} 
                                                     alt={biz.name} 
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                                 />
                                                 <div className="absolute top-3 right-3 bg-white p-1 rounded-full shadow-md">
-                                                    <img src={biz.logoUrl || 'https://placehold.co/100?text=L'} className="w-10 h-10 rounded-full object-cover" alt="logo" />
+                                                    <img src={biz.logo_url || 'https://placehold.co/100?text=L'} className="w-10 h-10 rounded-full object-cover" alt="logo" />
                                                 </div>
                                                 <span className={`absolute top-3 left-3 text-[10px] font-bold px-2 py-1 rounded-full text-white ${biz.type === BUSINESS_TYPES.VETERINARIA ? 'bg-red-500' : 'bg-blue-500'}`}>
                                                     {biz.type}
@@ -270,10 +235,10 @@ const ServicesMapPage: React.FC = () => {
                                             <div className="p-5 flex flex-col flex-grow">
                                                 <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight">{biz.name}</h3>
                                                 <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                                                    <CrosshairIcon className="h-3 w-3" /> {biz.address}
+                                                    <CrosshairIcon className="h-3 w-3" /> {biz.address || 'Sin dirección'}
                                                 </p>
                                                 <p className="text-sm text-gray-600 line-clamp-2 mb-4 flex-grow">
-                                                    {biz.description}
+                                                    {biz.description || ''}
                                                 </p>
                                                 <button 
                                                     onClick={() => navigate(`/negocio/${biz.id}`)}

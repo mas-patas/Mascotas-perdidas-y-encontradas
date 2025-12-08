@@ -8,7 +8,7 @@
 - **Siempre usar TypeScript** con tipos explícitos
 - **Mantener componentes pequeños y enfocados** (máximo ~300 líneas)
 - **No mezclar lógica de negocio y UI** en el mismo archivo
-- Usar `React.FC` o tipado explícito de props
+- **Usar `JSX.Element` como tipo de retorno** en lugar de `React.FC`
 
 ```typescript
 // ✅ Correcto
@@ -18,6 +18,11 @@ interface PetCardProps {
     onViewUser?: (user: User) => void;
 }
 
+export const PetCard = ({ pet, owner, onViewUser }: PetCardProps): JSX.Element => {
+    // ...
+};
+
+// ❌ Incorrecto - React.FC
 export const PetCard: React.FC<PetCardProps> = ({ pet, owner, onViewUser }) => {
     // ...
 };
@@ -37,7 +42,7 @@ interface ComponentProps {
     // props
 }
 
-export const Component: React.FC<ComponentProps> = ({ prop1, prop2 }) => {
+export const Component = ({ prop1, prop2 }: ComponentProps): JSX.Element => {
     // 1. Hooks
     const { currentUser } = useAuth();
     const [state, setState] = useState();
@@ -132,6 +137,7 @@ const createPet = useMutation({
 - Usar interfaces para props de componentes
 - Props opcionales con `?`
 - Props de eventos con prefijo `on` (onClick, onSubmit)
+- **Usar `React.PropsWithChildren<T>` para componentes que requieren children** - incluye automáticamente `children?: ReactNode`
 
 ```typescript
 interface PetCardProps {
@@ -139,6 +145,25 @@ interface PetCardProps {
     owner?: User;                 // opcional
     onViewUser?: (user: User) => void;  // callback opcional
 }
+
+// ✅ Correcto - Componente con children
+export const ToastProvider = ({ children }: React.PropsWithChildren): JSX.Element => {
+    return <Context.Provider>{children}</Context.Provider>;
+};
+
+// ✅ Correcto - Componente con children y otras props
+interface LayoutProps {
+    title: string;
+}
+export const Layout = ({ children, title }: React.PropsWithChildren<LayoutProps>): JSX.Element => {
+    return <div><h1>{title}</h1>{children}</div>;
+};
+
+// ❌ Incorrecto - definir children manualmente
+interface ProviderProps {
+    children: ReactNode;  // No necesario
+}
+export const Provider = ({ children }: ProviderProps) => { ... };
 ```
 
 ## Manejo de Errores
@@ -205,6 +230,7 @@ const pet: any = { ... };
 - Agrupar imports: React, librerías externas, internas, tipos
 - Usar path aliases (`@/features/...`)
 - Imports de tipos con `import type`
+- **Siempre evitar `import *` - usar imports independientes**
 
 ```typescript
 // 1. React
@@ -219,6 +245,16 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // 4. Tipos
 import type { Pet, User } from '@/types';
+
+// ✅ Correcto - imports independientes
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { PetCard, PetList } from '@/features/pets';
+
+// ❌ Incorrecto - import all
+import * as React from 'react';
+import * as Query from '@tanstack/react-query';
+import * as Pets from '@/features/pets';
 ```
 
 ## Performance
@@ -227,6 +263,7 @@ import type { Pet, User } from '@/types';
 - Usar `useMemo` para cálculos costosos
 - Usar `useCallback` para funciones pasadas como props
 - Usar `React.memo` para componentes pesados (cuando sea necesario)
+- **Siempre memoizar valores pasados a providers** con `useMemo`
 - Lazy loading de imágenes con `LazyImage`
 - Paginación con `useInfiniteQuery`
 
@@ -240,8 +277,26 @@ const handleClick = useCallback(() => {
     // ...
 }, [deps]);
 
+// ✅ Correcto - Provider con valores memoizados
+const value = useMemo(() => ({
+    showToast,
+    removeToast,
+}), [showToast, removeToast]);
+
+return (
+    <Context.Provider value={value}>
+        {children}
+    </Context.Provider>
+);
+
 // ❌ Incorrecto - recalcula en cada render
 const expensiveValue = computeExpensiveValue(data);
+
+// ❌ Incorrecto - valor del provider no memoizado
+const value = {
+    showToast,
+    removeToast,
+};
 ```
 
 ## Comentarios y Documentación

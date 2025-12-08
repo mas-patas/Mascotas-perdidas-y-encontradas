@@ -1,12 +1,11 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { Pet, Campaign } from '@/types';
+import type { PetRow, CampaignRow } from '@/types';
 import { PET_STATUS } from '@/constants';
 import { locationCoordinates } from '@/data/locations';
 import { SearchIcon, CrosshairIcon, ChevronDownIcon } from '@/shared/components/icons';
 import { supabase } from '@/services/supabaseClient';
-import { mapPetFromDb } from '@/utils/mappers';
 
 interface MapPageProps {
     onNavigate: (path: string) => void;
@@ -35,23 +34,8 @@ const fetchMapData = async () => {
 
     if (campaignError) console.warn("Could not fetch campaigns for map", campaignError);
 
-    const mappedPets: Pet[] = (petData || []).map(p => mapPetFromDb(p, [], [], []));
-    
-    const mappedCampaigns: Campaign[] = (campaignData || []).map((c: any) => ({
-        id: c.id,
-        userEmail: c.user_email,
-        type: c.type,
-        title: c.title,
-        description: c.description,
-        location: c.location,
-        date: c.date,
-        imageUrls: c.image_urls || [],
-        contactPhone: c.contact_phone,
-        lat: c.lat,
-        lng: c.lng
-    }));
-
-    return { pets: mappedPets, campaigns: mappedCampaigns };
+    // Use database types directly (snake_case)
+    return { pets: (petData || []) as PetRow[], campaigns: (campaignData || []) as CampaignRow[] };
 };
 
 
@@ -237,29 +221,21 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
 
         mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses] || !pet.lat || !pet.lng) return;
-            const iconSVG = pet.animalType === 'Perro' ? dogIconSVG : (pet.animalType === 'Gato' ? catIconSVG : otherIconSVG);
+            const iconSVG = pet.animal_type === 'Perro' ? dogIconSVG : (pet.animal_type === 'Gato' ? catIconSVG : otherIconSVG);
             const popupContent = `
-                <div class="text-center min-w-[150px]">
-                    <img src="${pet.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
-                    <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
-                    <div class="flex flex-wrap justify-center gap-1 mb-2">
-                        <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-status-lost' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-status-found' : pet.status === PET_STATUS.AVISTADO ? 'bg-status-sighted' : 'bg-status-adoption'}">${pet.status}</span>
-                        ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
+                    <div class="text-center min-w-[150px]">
+                        <img src="${pet.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
+                        <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
+                        <div class="flex flex-wrap justify-center gap-1 mb-2">
+                            <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">${pet.status}</span>
+                            ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
+                        </div>
+                        <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
+                        <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
                     </div>
-                    <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
-                    <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
-                </div>
-            `;
+                `;
             const marker = L.marker([pet.lat, pet.lng], { icon: createCustomIcon(pet.status, iconSVG) })
-                .bindPopup(popupContent, {
-                    maxWidth: 250,
-                    className: 'custom-popup',
-                    closeButton: true,
-                    autoPan: true,
-                    autoPanPadding: [50, 50],
-                    autoPanPaddingTopLeft: [50, 50],
-                    autoPanPaddingBottomRight: [50, 50]
-                });
+                .bindPopup(popupContent);
             
             // Update popup size when it opens and after image loads
             marker.on('popupopen', function() {
@@ -296,52 +272,16 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                 if (!campaign.lat || !campaign.lng) return;
                 const popupContent = `
                     <div class="text-center min-w-[180px]">
-                        <img src="${campaign.imageUrls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
+                        <img src="${campaign.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${campaign.title}" class="w-full h-28 object-cover rounded-md mb-2" />
                         <strong class="block text-md font-bold text-indigo-900 leading-tight mb-1">${campaign.title}</strong>
                         <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white mb-2 inline-block bg-indigo-500">${campaign.type}</span>
-                        <p class="text-xs text-gray-600 mb-1">📅 ${new Date(campaign.date).toLocaleDateString()}</p>
+                        <p class="text-xs text-gray-600 mb-1">📅 ${campaign.date ? new Date(campaign.date).toLocaleDateString() : 'N/A'}</p>
                         <p class="text-xs text-gray-500 mb-2 truncate">${campaign.location}</p>
                         <button onclick="window.navigateToPath('/campanas/${campaign.id}')" class="block w-full bg-indigo-600 text-white text-sm py-1.5 px-3 rounded hover:bg-indigo-700 transition-colors">Ver Campaña</button>
                     </div>
                 `;
                 const marker = L.marker([campaign.lat, campaign.lng], { icon: createCustomIcon('campaign', megaphoneIconSVG, true) })
-                    .bindPopup(popupContent, {
-                        maxWidth: 250,
-                        className: 'custom-popup',
-                        closeButton: true,
-                        autoPan: true,
-                        autoPanPadding: [50, 50],
-                        autoPanPaddingTopLeft: [50, 50],
-                        autoPanPaddingBottomRight: [50, 50]
-                    });
-                
-                // Update popup size when it opens and after image loads
-                marker.on('popupopen', function() {
-                    const popup = marker.getPopup();
-                    if (popup) {
-                        // Update immediately
-                        popup.update();
-                        
-                        // Update again after a short delay to ensure images are loaded
-                        setTimeout(() => {
-                            popup.update();
-                        }, 100);
-                        
-                        // Also update when images inside the popup load
-                        const popupElement = popup.getElement();
-                        if (popupElement) {
-                            const images = popupElement.querySelectorAll('img');
-                            images.forEach((img: HTMLImageElement) => {
-                                if (!img.complete) {
-                                    img.addEventListener('load', () => {
-                                        popup.update();
-                                    }, { once: true });
-                                }
-                            });
-                        }
-                    }
-                });
-                
+                    .bindPopup(popupContent);
                 markersToAdd.push(marker);
             });
         }

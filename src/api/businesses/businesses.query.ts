@@ -51,6 +51,18 @@ export const useBusinessesForMap = () => {
 };
 
 /**
+ * Query hook to fetch products for a business
+ */
+export const useBusinessProducts = (businessId: string | undefined) => {
+  return useQuery({
+    queryKey: [...queryKeys.business(businessId!), 'products'],
+    queryFn: () => businessesApi.getBusinessProducts(businessId!),
+    enabled: !!businessId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+};
+
+/**
  * Hook to set up realtime subscriptions for businesses
  */
 export const useBusinessesRealtime = () => {
@@ -69,8 +81,14 @@ export const useBusinessesRealtime = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'business_products' },
-        () => {
+        (payload) => {
           queryClient.invalidateQueries({ queryKey: queryKeys.businesses });
+          // Invalidate products for the specific business
+          if (payload.new && 'business_id' in payload.new) {
+            queryClient.invalidateQueries({ 
+              queryKey: queryKeys.businessProducts(payload.new.business_id as string) 
+            });
+          }
         }
       )
       .subscribe();

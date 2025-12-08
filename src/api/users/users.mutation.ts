@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './users.keys';
 import * as usersApi from './users.api';
-import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Mutation hook to update user status
@@ -37,25 +36,26 @@ export const useUpdateUserRole = () => {
 
 /**
  * Mutation hook to update user profile
+ * Accepts userId as parameter to avoid circular dependency with auth context
  */
 export const useUpdateUserProfile = () => {
   const queryClient = useQueryClient();
-  const { currentUser } = useAuth();
 
   return useMutation({
-    mutationFn: async (data: {
-      username?: string;
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      dni?: string;
-      birthDate?: string;
-      country?: string;
-      avatarUrl?: string;
+    mutationFn: async ({ userId, data }: {
+      userId: string;
+      data: {
+        username?: string;
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        dni?: string;
+        birthDate?: string;
+        country?: string;
+        avatarUrl?: string;
+      };
     }) => {
-      if (!currentUser) throw new Error('User must be logged in');
-      
-      await usersApi.updateUserProfile(currentUser.id, {
+      await usersApi.updateUserProfile(userId, {
         username: data.username,
         first_name: data.firstName,
         last_name: data.lastName,
@@ -66,11 +66,9 @@ export const useUpdateUserProfile = () => {
         avatar_url: data.avatarUrl
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users });
-      if (currentUser) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.user(currentUser.id) });
-      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.user(variables.userId) });
     }
   });
 };

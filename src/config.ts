@@ -1,10 +1,19 @@
-
-export const SUPABASE_URL = 'https://bacpduvlvymxvcdmtsvr.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhY3BkdXZsdnlteHZjZG10c3ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1ODUwOTksImV4cCI6MjA3OTE2MTA5OX0.2t6S_dIexSjGpRaSFE1DkuazsIhF8dk57l8fVdZZgJk';
+// Supabase Configuration
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Storage Configuration
 // Options: 'supabase'
-export const STORAGE_PROVIDER = 'supabase'; 
+export const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'supabase';
 
 // Bucket name in Supabase Storage
-export const STORAGE_BUCKET = 'pet-images';
+export const STORAGE_BUCKET = import.meta.env.VITE_STORAGE_BUCKET || 'pet-images';
+
+// Validate required environment variables
+if (!SUPABASE_URL) {
+  throw new Error('VITE_SUPABASE_URL is required');
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error('VITE_SUPABASE_ANON_KEY is required');
+}

@@ -1,29 +1,18 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { businessService } from '@/services/businessService';
-import { Business } from '@/types';
+import { useBusiness } from '@/api/businesses/businesses.query';
+import type { BusinessRow } from '@/types';
 import { PhoneIcon, LocationMarkerIcon, FacebookIcon, InstagramIcon, ExternalLinkIcon, ChevronLeftIcon, WhatsAppIcon, GoogleMapsIcon, WazeIcon } from '@/shared/components/icons';
 
 const BusinessDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [business, setBusiness] = useState<Business | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: business, isLoading: loading } = useBusiness(id);
     
     // Map refs
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
-
-    useEffect(() => {
-        if (id) {
-            setLoading(true);
-            businessService.getBusinessById(id).then(data => {
-                setBusiness(data);
-                setLoading(false);
-            });
-        }
-    }, [id]);
 
     // Initialize Map for specific business location
     useEffect(() => {

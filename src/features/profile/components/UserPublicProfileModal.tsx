@@ -5,7 +5,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { User, UserRating } from '@/types';
 import { XCircleIcon, TrashIcon, UserIcon, WarningIcon, AdminIcon } from '@/shared/components/icons';
 import { StarRating } from '@/shared';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { USER_ROLES } from '@/constants';
 import { generateUUID } from '@/utils/uuid';
 import { GamificationBadge, getLevelFromPoints } from '@/features/gamification';
