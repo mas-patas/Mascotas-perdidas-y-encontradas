@@ -257,3 +257,16 @@ export interface Comment {
   parentId?: string | null;
   likes: string[];
 }
+
+/**
+ * Notification type with camelCase fields (used in UI)
+ * Note: NotificationRow uses snake_case (user_id, created_at, is_read, etc.)
+ */
+export interface Notification {
+  id: string;
+  userId: string;
+  message: string;
+  link: NotificationRow['link'];
+  isRead: boolean;
+  timestamp: string;
+}

@@ -31,7 +31,7 @@ import type { TourStep } from '@/shared';
 import { AboutPage, TipsPage, TermsPage } from '@/pages';
 
 // Types & Constants
-import type { PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow } from './types';
+import type { PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
 import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
 
 // Services & Utils
@@ -210,8 +210,22 @@ const App: React.FC = () => {
             const existingNotifs = notifications || [];
             let newNotificationAdded = false;
             for (const pet of userPetsData) {
-                let expirationDate = pet.expires_at ? new Date(pet.expires_at) : new Date(new Date(pet.created_at || 0).getTime() + (60 * 24 * 60 * 60 * 1000));
-                const isExpired = now > expirationDate;
+                // Use camelCase properties (Pet type, not PetRow)
+                let expirationDate: Date;
+                if (pet.expiresAt) {
+                    expirationDate = new Date(pet.expiresAt);
+                } else if (pet.createdAt) {
+                    // If expiresAt is missing, calculate it from createdAt (60 days)
+                    expirationDate = new Date(new Date(pet.createdAt).getTime() + (60 * 24 * 60 * 60 * 1000));
+                } else {
+                    // Skip if we don't have enough data to determine expiration
+                    continue;
+                }
+                
+                // Only mark as expired if the expiration date is in the past
+                // Add a small buffer (1 minute) to avoid timezone/rounding issues
+                const isExpired = now.getTime() > (expirationDate.getTime() + 60000);
+                
                 if (isExpired) {
                     const alreadyNotified = existingNotifs.some((n: any) => (typeof n.link === 'object' && n.link?.type === 'pet-renew' && n.link?.id === pet.id));
                     if (!alreadyNotified) {
@@ -319,12 +333,8 @@ const App: React.FC = () => {
                 });
             }
 
-            await createNotification.mutateAsync({
-                id: generateUUID(),
-                userId: currentUser.id || '',
-                message: `Has publicado exitosamente el reporte de "${petData.name}".`,
-                link: { type: 'pet', id: newPetId }
-            });
+            // Notification is already created in pets.mutation.ts useCreatePet hook
+            // No need to create it again here to avoid duplicates
             
             setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null); setPetToPrefill(null);
         } catch (err: any) { 
@@ -597,11 +607,11 @@ const App: React.FC = () => {
 
     const handleMarkNotificationAsRead = async (id: string) => { 
         await markNotificationAsRead.mutateAsync(id);
-        setNotifications((prev: NotificationRow[]) => prev.map((n: NotificationRow) => n.id === id ? { ...n, is_read: true } : n)); 
+        setNotifications((prev: Notification[]) => prev.map((n: Notification) => n.id === id ? { ...n, isRead: true } : n)); 
     };
     const handleMarkAllNotificationsAsRead = async () => {
         if (!currentUser) return;
-        setNotifications((prev: NotificationRow[]) => prev.map((n: NotificationRow) => ({ ...n, is_read: true })));
+        setNotifications((prev: Notification[]) => prev.map((n: Notification) => ({ ...n, isRead: true })));
         await markAllNotificationsAsRead.mutateAsync();
     };
     

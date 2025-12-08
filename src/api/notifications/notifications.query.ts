@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './notifications.keys';
 import * as notificationsApi from './notifications.api';
+import { transformNotificationRows, transformNotificationRow } from './notifications.transform';
 import { useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useToast } from '../../contexts/toast';
@@ -35,11 +36,15 @@ const sendSystemNotification = (title: string, body: string, link?: string) => {
 
 /**
  * Query hook to fetch all notifications for a user
+ * Returns transformed notifications with camelCase fields
  */
 export const useNotifications = (userId: string | undefined) => {
   return useQuery({
     queryKey: queryKeys.notifications(userId!),
-    queryFn: () => notificationsApi.getNotifications(userId!),
+    queryFn: async () => {
+      const rows = await notificationsApi.getNotifications(userId!);
+      return transformNotificationRows(rows);
+    },
     enabled: !!userId,
     staleTime: 1000 * 60, // 1 minute
   });
@@ -87,14 +92,7 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
         (payload) => {
           if (payload.new.user_id === userId) {
             queryClient.setQueryData(queryKeys.notifications(userId), (old: any) => {
-              const newNotif = {
-                id: payload.new.id,
-                userId: payload.new.user_id,
-                message: payload.new.message,
-                link: payload.new.link,
-                isRead: payload.new.is_read,
-                timestamp: payload.new.created_at
-              };
+              const newNotif = transformNotificationRow(payload.new as any);
               return [newNotif, ...(old || [])];
             });
             
