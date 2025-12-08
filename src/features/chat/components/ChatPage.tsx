@@ -1,15 +1,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Chat, Pet, User } from '@/types';
+import type { ChatRow, PetRow, User, MessageRow } from '@/types';
 import { SendIcon } from '@/shared/components/icons';
 import { formatTime } from '@/utils/formatters';
 import { useAppData } from '@/hooks/useAppData';
 import { usePets } from '@/hooks/usePets';
 
 interface ChatPageProps {
-    chat?: Chat; // Optional, we'll find it if missing
-    pet?: Pet;
+    chat?: ChatRow; // Optional, we'll find it if missing
+    pet?: PetRow;
     users: User[];
     currentUser: User;
     onSendMessage: (chatId: string, text: string) => void;
@@ -27,13 +27,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
 
     const chat = propChat || chats.find(c => c.id === id);
-    const pet = propPet || (chat && chat.petId ? pets.find(p => p.id === chat.petId) : undefined);
+    const pet = propPet || (chat && chat.pet_id ? pets.find(p => p.id === chat.pet_id) : undefined);
 
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastProcessedReadTimeRef = useRef<string>('');
     
-    const otherUserEmail = chat?.participantEmails.find(email => email !== currentUser.email);
+    const participantEmails = chat?.participant_emails || [];
+    const otherUserEmail = participantEmails.find(email => email !== currentUser.email);
     const otherUser = users.find(u => u.email === otherUserEmail);
 
     const scrollToBottom = () => {
@@ -43,22 +44,23 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     useEffect(() => {
         if (!chat || !currentUser) return;
         
-        const messages = chat.messages || [];
+        const messages = (chat.messages as MessageRow[] | null) || [];
         if (messages.length === 0) return;
 
         const lastMessage = messages[messages.length - 1];
-        const myLastRead = chat.lastReadTimestamps?.[currentUser.email];
+        const lastReadTimestamps = (chat.last_read_timestamps as Record<string, string> | null) || {};
+        const myLastRead = lastReadTimestamps[currentUser.email];
         
         if (lastProcessedReadTimeRef.current === myLastRead && lastProcessedReadTimeRef.current !== '') {
-             const lastMsgTime = new Date(lastMessage.timestamp).getTime();
+             const lastMsgTime = new Date(lastMessage.created_at).getTime();
              const processedTime = new Date(lastProcessedReadTimeRef.current).getTime();
              if (lastMsgTime <= processedTime) return;
         }
 
-        const lastMsgTime = new Date(lastMessage.timestamp).getTime();
+        const lastMsgTime = new Date(lastMessage.created_at).getTime();
         const myReadTime = myLastRead ? new Date(myLastRead).getTime() : 0;
 
-        if (lastMessage.senderEmail !== currentUser.email && lastMsgTime > myReadTime) {
+        if (lastMessage.sender_email !== currentUser.email && lastMsgTime > myReadTime) {
             lastProcessedReadTimeRef.current = new Date().toISOString();
             onMarkAsRead(chat.id);
         }
@@ -93,7 +95,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                 >
                     &larr; Volver
                 </button>
-                <img src={pet?.imageUrls[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-10 w-10 rounded-full object-cover mr-3 border border-gray-300" />
+                <img src={pet?.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-10 w-10 rounded-full object-cover mr-3 border border-gray-300" />
                 <div>
                     <p className="font-bold text-brand-dark text-sm">{pet ? `Conversación sobre ${pet.name}` : 'Mensaje de Administración'}</p>
                     <p className="text-xs text-gray-500">con @{otherUser?.username || 'usuario'}</p>
@@ -102,19 +104,22 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
 
             {/* Messages Area */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-white">
-                {chat.messages.map((message, index) => {
-                    const isCurrentUser = message.senderEmail === currentUser.email;
-                    return (
-                        <div key={index} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${isCurrentUser ? 'bg-brand-primary text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
-                                <p className="text-sm">{message.text}</p>
-                                <p className={`text-[10px] mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-gray-400'} text-right`}>
-                                    {formatTime(message.timestamp)}
-                                </p>
+                {(() => {
+                    const messages = (chat.messages as MessageRow[] | null) || [];
+                    return messages.map((message: MessageRow, index: number) => {
+                        const isCurrentUser = message.sender_email === currentUser.email;
+                        return (
+                            <div key={message.id || index} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${isCurrentUser ? 'bg-brand-primary text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
+                                    <p className="text-sm">{message.text}</p>
+                                    <p className={`text-[10px] mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-gray-400'} text-right`}>
+                                        {formatTime(message.created_at)}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    });
+                })()}
                  <div ref={messagesEndRef} />
             </div>
 

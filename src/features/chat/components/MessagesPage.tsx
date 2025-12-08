@@ -1,11 +1,11 @@
 
 import React from 'react';
-import type { Chat, Pet, User } from '@/types';
+import type { ChatRow, PetRow, User, MessageRow } from '@/types';
 import { formatTime } from '@/utils/formatters';
 
 interface MessagesPageProps {
-    chats: (Chat & { isUnread: boolean })[];
-    pets: Pet[];
+    chats: (ChatRow & { isUnread: boolean })[];
+    pets: PetRow[];
     users: User[];
     currentUser: User;
     onSelectChat: (chatId: string) => void;
@@ -14,11 +14,13 @@ interface MessagesPageProps {
 
 const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, currentUser, onSelectChat, onBack }) => {
 
-    const getChatDetails = (chat: Chat) => {
-        const pet = chat.petId ? pets.find(p => p.id === chat.petId) : null;
-        const otherUserEmail = chat.participantEmails.find(email => email !== currentUser.email);
+    const getChatDetails = (chat: ChatRow) => {
+        const pet = chat.pet_id ? pets.find(p => p.id === chat.pet_id) : null;
+        const participantEmails = chat.participant_emails || [];
+        const otherUserEmail = participantEmails.find(email => email !== currentUser.email);
         const otherUser = otherUserEmail ? users.find(u => u.email === otherUserEmail) : null;
-        const lastMessage = chat.messages[chat.messages.length - 1];
+        const messages = (chat.messages as MessageRow[] | null) || [];
+        const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
         return { pet, otherUser, lastMessage };
     };
 
@@ -44,18 +46,18 @@ const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, current
                                             <span className="h-2.5 w-2.5 rounded-full bg-brand-primary"></span>
                                         )}
                                     </div>
-                                    <img src={pet?.imageUrls[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-14 w-14 rounded-full object-cover mr-4 border border-gray-200" />
+                                    <img src={pet?.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Admin'} alt={pet?.name || 'Admin'} className="h-14 w-14 rounded-full object-cover mr-4 border border-gray-200" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-center mb-1">
                                             <p className="font-semibold text-brand-dark truncate">{pet ? `Sobre: ${pet.name}` : 'Soporte / Admin'}</p>
                                             {lastMessage && (
-                                                <p className="text-xs text-gray-400 whitespace-nowrap ml-2">{formatTime(lastMessage.timestamp)}</p>
+                                                <p className="text-xs text-gray-400 whitespace-nowrap ml-2">{formatTime(lastMessage.created_at)}</p>
                                             )}
                                         </div>
                                         <p className="text-xs text-gray-500 mb-1 font-medium">@{otherUser.username || 'usuario'}</p>
                                         {lastMessage ? (
                                             <p className={`text-sm truncate ${chat.isUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
-                                                <span className="font-normal text-gray-400">{lastMessage.senderEmail === currentUser.email ? 'Tú: ' : ''}</span>
+                                                <span className="font-normal text-gray-400">{lastMessage.sender_email === currentUser.email ? 'Tú: ' : ''}</span>
                                                 {lastMessage.text}
                                             </p>
                                         ) : (

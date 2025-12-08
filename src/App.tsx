@@ -648,10 +648,12 @@ const App: React.FC = () => {
                     }} onNavigate={(path) => navigate(path)} onViewUser={handleViewPublicProfile} onRenewPet={(pet) => setPetToRenew(pet)} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="setup-profile" element={<ProfileSetupPage />} />
                     <Route path="mensajes" element={<ProtectedRoute><ErrorBoundary name="Messages"><MessagesPage chats={chats.filter(c => c.participant_emails?.includes(currentUser!.email)).map(c => ({ ...c, isUnread: false })).sort((a, b) => {
-                        const aMsg = a.messages?.[a.messages.length - 1];
-                        const bMsg = b.messages?.[b.messages.length - 1];
-                        const aTime = aMsg?.timestamp ? new Date(aMsg.timestamp).getTime() : 0;
-                        const bTime = bMsg?.timestamp ? new Date(bMsg.timestamp).getTime() : 0;
+                        const aMessages = (a.messages as any) || [];
+                        const bMessages = (b.messages as any) || [];
+                        const aMsg = aMessages.length > 0 ? aMessages[aMessages.length - 1] : null;
+                        const bMsg = bMessages.length > 0 ? bMessages[bMessages.length - 1] : null;
+                        const aTime = aMsg?.created_at ? new Date(aMsg.created_at).getTime() : 0;
+                        const bTime = bMsg?.created_at ? new Date(bMsg.created_at).getTime() : 0;
                         return bTime - aTime;
                     })} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ErrorBoundary></ProtectedRoute>} />
