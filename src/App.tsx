@@ -148,7 +148,17 @@ const App: React.FC = () => {
     // --- Platform Settings State ---
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(() => {
         const stored = localStorage.getItem('platform_aiSearchEnabled');
-        return stored !== null ? JSON.parse(stored) : true;
+        // Si existe un valor guardado, lo usamos, pero por defecto es false
+        if (stored !== null) {
+            const parsed = JSON.parse(stored);
+            // Si está guardado como true, lo cambiamos a false (nuevo comportamiento por defecto)
+            if (parsed === true) {
+                localStorage.setItem('platform_aiSearchEnabled', JSON.stringify(false));
+                return false;
+            }
+            return parsed;
+        }
+        return false;
     });
     const [isLocationAlertsEnabled, setIsLocationAlertsEnabled] = useState(() => {
         const stored = localStorage.getItem('platform_locationAlertsEnabled');
