@@ -138,7 +138,22 @@ export const Header: React.FC<HeaderProps> = ({
                         className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-0.5 sm:gap-1 md:gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-0.5 sm:mr-1 md:mr-2 lg:mr-4 flex-shrink-0" 
                         onClick={handleHomeClick}
                      >
-                        <span className="whitespace-nowrap">MAS PATAS</span><span className="text-[#FF4F4F]">.</span>
+                        <img 
+                            src="/assets/images/logo.png" 
+                            alt="Mas Patas Logo" 
+                            className="object-contain flex-shrink-0"
+                            style={{ 
+                                height: '85%',
+                                width: 'auto',
+                                maxHeight: '4rem',
+                                minHeight: '2.5rem'
+                            }}
+                            onError={(e) => {
+                                // Fallback si la imagen no existe
+                                (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                        />
+                        <span className="hidden sm:inline whitespace-nowrap">MAS PATAS</span><span className="hidden sm:inline text-[#FF4F4F]">.</span>
                     </div>
                     
                     <button onClick={handleHomeClick} className="hidden md:flex items-center gap-2 text-gray-600 hover:text-brand-primary font-bold text-sm px-3 py-2 rounded-full hover:bg-gray-100 transition-colors">

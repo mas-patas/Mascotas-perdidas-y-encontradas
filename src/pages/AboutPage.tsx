@@ -46,7 +46,7 @@ const AboutPage: React.FC = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="bg-white font-sans">
+        <div className="bg-brand-light font-sans">
             {/* Hero Section */}
             <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden">
                 <img 
@@ -73,7 +73,7 @@ const AboutPage: React.FC = () => {
                             <FadeInWhenVisible delay={400}>
                                 <button 
                                     onClick={() => navigate('/login')}
-                                    className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full shadow-xl hover:bg-brand-light transition-all transform hover:scale-105 text-lg"
+                                    className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full shadow-card hover:shadow-card-hover transition-all transform hover:scale-105 text-lg"
                                 >
                                     Únete a la Causa
                                 </button>
@@ -120,7 +120,7 @@ const AboutPage: React.FC = () => {
             </div>
 
             {/* Mission Section */}
-            <section className="py-20 bg-white">
+            <section className="py-20 bg-white border-t border-card-border">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="flex flex-col lg:flex-row items-center gap-16">
                         <div className="lg:w-1/2 space-y-6">
@@ -156,7 +156,7 @@ const AboutPage: React.FC = () => {
                                 <img 
                                     src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1469&q=80" 
                                     alt="Owner hugging dog" 
-                                    className="rounded-3xl shadow-2xl relative z-10 w-full h-auto object-cover"
+                                    className="rounded-3xl shadow-card-hover relative z-10 w-full h-auto object-cover border border-card-border"
                                 />
                             </FadeInWhenVisible>
                         </div>
@@ -178,7 +178,7 @@ const AboutPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <FadeInWhenVisible delay={100}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-brand-primary h-full">
+                            <div className="bg-white rounded-2xl p-8 shadow-card hover:shadow-card-hover transition-shadow duration-300 border-t-4 border-brand-primary border border-card-border h-full">
                                 <div className="w-16 h-16 bg-brand-light rounded-2xl flex items-center justify-center mb-6 text-brand-primary">
                                     <SparklesIcon className="w-8 h-8" />
                                 </div>
@@ -190,7 +190,7 @@ const AboutPage: React.FC = () => {
                         </FadeInWhenVisible>
 
                         <FadeInWhenVisible delay={200}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-brand-secondary h-full">
+                            <div className="bg-white rounded-2xl p-8 shadow-card hover:shadow-card-hover transition-shadow duration-300 border-t-4 border-brand-secondary border border-card-border h-full">
                                 <div className="w-16 h-16 bg-yellow-50 rounded-2xl flex items-center justify-center mb-6 text-brand-secondary">
                                     <UsersIcon className="w-8 h-8" />
                                 </div>
@@ -202,7 +202,7 @@ const AboutPage: React.FC = () => {
                         </FadeInWhenVisible>
 
                         <FadeInWhenVisible delay={300}>
-                            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border-t-4 border-status-lost h-full">
+                            <div className="bg-white rounded-2xl p-8 shadow-card hover:shadow-card-hover transition-shadow duration-300 border-t-4 border-status-lost border border-card-border h-full">
                                 <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6 text-status-lost">
                                     <HeartIcon className="w-8 h-8" />
                                 </div>
@@ -217,24 +217,24 @@ const AboutPage: React.FC = () => {
             </section>
 
             {/* Bottom CTA */}
-            <section className="relative py-24 bg-gray-900 text-white overflow-hidden">
+            <section className="relative py-24 bg-brand-dark text-white overflow-hidden">
                 <img 
                     src="https://images.unsplash.com/photo-1518717758536-85ae29035b6d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
                     alt="Dog looking up" 
                     className="absolute inset-0 w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-black/60"></div>
+                <div className="absolute inset-0 bg-brand-dark/70"></div>
                 
                 <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
                     <FadeInWhenVisible>
                         <h2 className="text-4xl md:text-5xl font-bold mb-6">¿Listo para hacer la diferencia?</h2>
-                        <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto">
+                        <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
                             Ya sea que hayas perdido una mascota, encontrado una, o simplemente quieras ayudar a tus vecinos. Tu participación cuenta.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button 
                                 onClick={() => navigate('/login')}
-                                className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full text-lg shadow-lg hover:bg-brand-light transition-colors"
+                                className="bg-white text-brand-dark font-bold py-4 px-10 rounded-full text-lg shadow-card hover:shadow-card-hover hover:bg-brand-light transition-colors"
                             >
                                 Crear Cuenta Gratis
                             </button>

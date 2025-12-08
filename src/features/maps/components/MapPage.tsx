@@ -60,7 +60,13 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     const mapInstance = useRef<any>(null);
     const markerClusterGroupRef = useRef<any>(null);
     const boundaryLayerRef = useRef<any>(null);
-    const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+    // Inicializar según el tamaño de pantalla: cerrado en mobile, abierto en desktop
+    const [isFiltersOpen, setIsFiltersOpen] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth >= 640; // sm breakpoint de Tailwind
+        }
+        return true; // Default para SSR
+    });
     const [visibleStatuses, setVisibleStatuses] = useState({
         [PET_STATUS.PERDIDO]: true,
         [PET_STATUS.ENCONTRADO]: true,
