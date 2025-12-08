@@ -27,10 +27,16 @@ export const useCreatePet = () => {
         embedding = await generatePetEmbedding(contentToEmbed);
       }
 
+      // Ensure embedding is either a valid array with elements or null
+      // Supabase rejects empty arrays for vector columns
+      const finalEmbedding = (embedding && Array.isArray(embedding) && embedding.length > 0) 
+        ? embedding 
+        : null;
+
       const petId = await petsApi.createPet({
         ...data,
         userId: currentUser.id,
-        embedding: embedding || null
+        embedding: finalEmbedding
       });
 
       // Create notification
