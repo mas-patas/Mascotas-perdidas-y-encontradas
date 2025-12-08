@@ -240,6 +240,11 @@ const App: React.FC = () => {
         setIsReportModalOpen(true);
     };
 
+    const handleOpenAdoptionModal = () => {
+        if (!currentUser) return navigate('/login');
+        setIsAdoptionModalOpen(true);
+    };
+
     const updatePet = useUpdatePet();
     const createPet = useCreatePet();
     const createSavedSearch = useCreateSavedSearch();
@@ -682,7 +687,7 @@ const App: React.FC = () => {
             )}
 
             <Routes>
-                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
+                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={handleOpenAdoptionModal} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={
                         <ErrorBoundary name="PetList">
                             <PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} setFilters={setFilters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />

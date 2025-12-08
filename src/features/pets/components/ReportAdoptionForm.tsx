@@ -44,7 +44,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     const markerInstance = useRef<any>(null);
     const isUpdatingFromMapRef = useRef(false);
     
-    // Safety guard against unmounted state updates
+    // Safety guard against unmounted state updates (for image uploads and other async operations)
     const isMounted = useRef(true);
     
     // AbortController for cancelling stale requests
@@ -90,183 +90,269 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
         }
     }, []);
 
-    // Initialize Map
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!isMounted.current) return;
-            if (!mapRef.current) return;
+    // Helper function to parse and set location hierarchy
+    const parseAndSetHierarchy = (addr: any) => {
+        if (!addr) {
+            return;
+        }
+
+        // 1. Find Department
+        const apiState = normalizeLocationName(addr.state || addr.region || '');
+        const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
+        
+        if (deptMatch) {
+            const newProvs = getProvinces(deptMatch);
+            setProvinces(newProvs);
+
+            // 2. Find Province
+            const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
+            const provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
+
+            // 3. Find District
+            let distMatch = null;
+            if (provMatch) {
+                const newDists = getDistricts(deptMatch, provMatch);
+                setDistricts(newDists);
+                const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
+                distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
+            }
+
+            // Update all at once to avoid state batching issues
+            setFormData(prev => ({
+                ...prev,
+                department: deptMatch,
+                province: provMatch || prev.province,
+                district: distMatch || (provMatch ? prev.district : '')
+            }));
+        }
+    };
+
+    // Reverse geocoding function
+    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+        // Don't set isUpdatingFromMapRef here - it will be set after we get the response
+        
+        if (reverseGeocodingAbortController.current) reverseGeocodingAbortController.current.abort();
+        reverseGeocodingAbortController.current = new AbortController();
+
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+                {
+                    headers: { 'Accept-Language': 'es-ES,es;q=0.9' },
+                    signal: reverseGeocodingAbortController.current.signal
+                }
+            );
             
-            const L = (window as any).L;
-            if (!L || mapInstance.current) return;
-
-            const initialLat = -12.046374;
-            const initialLng = -77.042793;
-
-            mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(mapInstance.current);
-
-            const icon = L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div class='marker-pin adoption'></div><i class='material-icons'></i>`,
-                iconSize: [30, 42],
-                iconAnchor: [15, 42]
-            });
-
-            const updateAddressFromCoords = async (lat: number, lng: number) => {
-                if (!isMounted.current) return;
+            if (!response.ok) {
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (!data || !data.address) {
+                return;
+            }
+            
+            const addr = data.address;
+            
+            // Construct basic street address
+            let addressText = addr.road || addr.pedestrian || addr.footway || addr.path || '';
+            if (addr.house_number) addressText += ` ${addr.house_number}`;
+            
+            // Fallbacks
+            if (!addressText) {
+                addressText = addr.amenity || addr.building || addr.park || addr.leisure || '';
+            }
+            
+            // Parse hierarchy first to get the values
+            const apiState = normalizeLocationName(addr.state || addr.region || '');
+            const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
+            
+            let provMatch = null;
+            let distMatch = null;
+            let newProvs: string[] = [];
+            let newDists: string[] = [];
+            
+            if (deptMatch) {
+                newProvs = getProvinces(deptMatch);
+                const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
+                provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
                 
-                // Cancel previous request
-                if (reverseGeocodingAbortController.current) {
-                    reverseGeocodingAbortController.current.abort();
+                if (provMatch) {
+                    newDists = getDistricts(deptMatch, provMatch);
+                    const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
+                    distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
                 }
-                reverseGeocodingAbortController.current = new AbortController();
-
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-                        headers: {
-                            'Accept-Language': 'es-ES,es;q=0.9',
-                        },
-                        signal: reverseGeocodingAbortController.current.signal
-                    });
-                    
-                    if (!response.ok) return;
-
-                    const data = await response.json();
-                    
-                    if (data && data.address && isMounted.current) {
-                         const addr = data.address;
-                         const road = addr.road || '';
-                        const number = addr.house_number || '';
-                        const newAddress = `${road} ${number}`.trim();
-                        
-                        // Logic to auto-detect Department, Province, District
-                        let newDept = '';
-                        let newProv = '';
-                        let newDist = '';
-                        let newProvincesList: string[] = [];
-                        let newDistrictsList: string[] = [];
-
-                        // 1. Identify Department
-                        const apiState = addr.state || addr.region;
-                        if (apiState) {
-                            const normalizedApiState = normalizeLocationName(apiState);
-                            newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || 
-                                      departments.find(d => normalizedApiState.includes(normalizeLocationName(d))) || '';
-                        }
-
-                        // 2. Identify Province
-                        if (newDept) {
-                            newProvincesList = getProvinces(newDept);
-                            const apiProv = addr.province || addr.region || addr.city || addr.county;
-                            if (apiProv) {
-                                const normalizedApiProv = normalizeLocationName(apiProv);
-                                newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || 
-                                          newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
-                            }
-                             // Fallback for city
-                            if (!newProv && addr.city) {
-                                const normalizedCity = normalizeLocationName(addr.city);
-                                newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
-                            }
-                        }
-
-                        // 3. Identify District
-                        if (newDept && newProv) {
-                            newDistrictsList = getDistricts(newDept, newProv);
-                            const apiDist = addr.district || addr.town || addr.city_district || addr.suburb || addr.village || addr.neighbourhood;
-                            if (apiDist) {
-                                const normalizedApiDist = normalizeLocationName(apiDist);
-                                newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) ||
-                                          newDistrictsList.find(d => normalizedApiDist.includes(normalizeLocationName(d))) || '';
-                            }
-                        }
-
-                        isUpdatingFromMapRef.current = true;
-
-                        // Update lists if found
-                        if (newProvincesList.length > 0) setProvinces(newProvincesList);
-                        if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
-
-                        setFormData(prev => ({ 
-                            ...prev, 
-                            address: newAddress || prev.address,
-                            department: newDept || prev.department,
-                            province: newProv || (newDept ? '' : prev.province),
-                            district: newDist || (newProv ? '' : prev.district)
-                        }));
-
-                        setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
-                    }
-                } catch (err: any) {
-                    if (err.name === 'AbortError') return;
-                    console.warn("Reverse geocoding error (ignoring):", err);
-                }
-            };
-
-            const onDragEnd = (event: any) => {
-                if (!isMounted.current) return;
-                const position = event.target.getLatLng();
-                setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
-                updateAddressFromCoords(position.lat, position.lng);
-            };
-
-            mapInstance.current.on('click', (e: any) => {
-                if (!isMounted.current) return;
-                const { lat, lng } = e.latlng;
-                if (markerInstance.current) {
-                    markerInstance.current.setLatLng([lat, lng]);
-                } else {
-                    markerInstance.current = L.marker([lat, lng], { icon, draggable: true }).addTo(mapInstance.current);
-                     markerInstance.current.on('dragend', onDragEnd);
-                }
-                setFormData(prev => ({ ...prev, lat, lng }));
-                updateAddressFromCoords(lat, lng);
-            });
+            }
             
-             setTimeout(() => {
-                if (isMounted.current && mapInstance.current) mapInstance.current.invalidateSize();
-            }, 200);
+            // Update provinces and districts lists first
+            if (newProvs.length > 0) {
+                setProvinces(newProvs);
+            }
+            if (newDists.length > 0) {
+                setDistricts(newDists);
+            }
+            
+            // Set flag to prevent forward geocoding from interfering
+            isUpdatingFromMapRef.current = true;
+            
+            // Update form data with all changes at once
+            // Use a function to ensure we get the latest state
+            // React will safely handle state updates even if component unmounts
+            setFormData(prev => {
+                const updated: AdoptionFormData = {
+                    ...prev,
+                    address: addressText || prev.address,
+                    department: deptMatch || prev.department,
+                    province: provMatch || (deptMatch && !provMatch ? '' : prev.province),
+                    district: distMatch || (provMatch && !distMatch ? '' : prev.district)
+                };
+                return updated;
+            });
+        } catch (err: any) { 
+            // Ignore aborts
+            if (err.name !== 'AbortError') {
+                // Silent error handling
+            }
+        } finally {
+            // Release lock after delay
+            setTimeout(() => { 
+                isUpdatingFromMapRef.current = false; 
+            }, 2000);
+        }
+    };
+
+    // Update marker function
+    const updateMarker = (latitude: number, longitude: number, shouldReverseGeocode = true) => {
+        const L = (window as any).L;
+        if (!mapInstance.current || !L) {
+            return;
+        }
+
+        // Visual update
+        const icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class='marker-pin adoption'></div><i class='material-icons'></i>`,
+            iconSize: [30, 42],
+            iconAnchor: [15, 42]
+        });
+
+        if (markerInstance.current) {
+            markerInstance.current.setLatLng([latitude, longitude]);
+            markerInstance.current.setIcon(icon);
+        } else {
+            markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
+            
+            // Drag Event
+            markerInstance.current.on('dragstart', () => {
+                isUpdatingFromMapRef.current = true;
+            });
+            markerInstance.current.on('dragend', (event: any) => {
+                const pos = event.target.getLatLng();
+                setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }));
+                performReverseGeocoding(pos.lat, pos.lng);
+            });
+        }
+        
+        // Invalidate map size to ensure marker is visible
+        setTimeout(() => {
+            if (mapInstance.current) {
+                mapInstance.current.invalidateSize();
+            }
         }, 100);
 
-        return () => {
-            clearTimeout(timer);
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
+        if (shouldReverseGeocode) {
+            performReverseGeocoding(latitude, longitude);
+        }
+    };
+
+    // Initialize Map
+    useEffect(() => {
+        if (!mapRef.current || mapInstance.current) return;
+
+        const timer = setTimeout(() => {
+            if (typeof (window as any).L === 'undefined') {
+                return;
             }
+
+            const L = (window as any).L;
+            if (!L || !mapRef.current) return;
+
+            // Default to Lima or existing coords
+            const initialLat = formData.lat || -12.046374;
+            const initialLng = formData.lng || -77.042793;
+
+            mapInstance.current = L.map(mapRef.current).setView([initialLat, initialLng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance.current);
+
+            // Map Click Event - simple and direct like in ReportPetForm
+            mapInstance.current.on('click', (e: any) => {
+                const { lat, lng } = e.latlng;
+                setFormData(prev => ({ ...prev, lat, lng }));
+                updateMarker(lat, lng, true);
+            });
+
+            // Add initial marker if coordinates exist
+            if (formData.lat && formData.lng) {
+                updateMarker(formData.lat, formData.lng, false);
+            }
+            
+            mapInstance.current.invalidateSize();
+        }, 100);
+        
+        return () => { 
+            clearTimeout(timer); 
+            if(mapInstance.current) { 
+                mapInstance.current.remove(); 
+                mapInstance.current = null;
+                markerInstance.current = null;
+            } 
         };
     }, []);
 
-    // Center map when Dept/Prov changes
+    // Center map when Dept/Prov changes manually (NOT from map click)
     useEffect(() => {
-        // If the update is coming from the map interaction (isUpdatingFromMapRef), do NOT re-center the map.
-        if (!mapInstance.current || isUpdatingFromMapRef.current) return;
-
+        if (isUpdatingFromMapRef.current || !mapInstance.current) return;
+        
         const coords = locationCoordinates[formData.province] || locationCoordinates[formData.department];
         if (coords) {
-             mapInstance.current.invalidateSize();
-             mapInstance.current.setView([coords.lat, coords.lng], 11);
+            mapInstance.current.setView([coords.lat, coords.lng], 12);
         }
     }, [formData.department, formData.province]);
-    
-    // Forward Geocoding
+
+    // Forward Geocoding (when user types address)
     useEffect(() => {
-        if (!formData.address || isUpdatingFromMapRef.current) return;
+        // Skip search if:
+        // 1. The update came from a map click (reverse geo)
+        // 2. Address is too short
+        // 3. No address
+        if (isUpdatingFromMapRef.current || !formData.address || formData.address.length < 4) {
+            return;
+        }
 
         const timeoutId = setTimeout(async () => {
             if (!isMounted.current) return;
             try {
-                const queryParts = [formData.address, formData.district, formData.province, formData.department, 'Peru'].filter(part => part && part.trim() !== '');
-                const query = queryParts.join(', ');
+                // CONTEXTUAL SEARCH: Prioritize selected location
+                let searchQuery = formData.address;
                 
-                if (!query) return;
+                // Append context if available to narrow down search
+                const contextParts = [];
+                if (formData.district && formData.district !== 'Todos') contextParts.push(formData.district);
+                if (formData.province && formData.province !== 'Todos') contextParts.push(formData.province);
+                if (formData.department && formData.department !== 'Todos') contextParts.push(formData.department);
+                contextParts.push('Peru');
 
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
-                    headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
-                });
+                if (contextParts.length > 0) {
+                    searchQuery += `, ${contextParts.join(', ')}`;
+                }
+
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=pe&limit=1&addressdetails=1`,
+                    {
+                        headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
+                    }
+                );
                 
                 if (!response.ok) return;
 
@@ -280,37 +366,15 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                     setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
 
                     if (mapInstance.current) {
-                        mapInstance.current.invalidateSize(); // Force map update
+                        mapInstance.current.invalidateSize();
                         mapInstance.current.setView([newLat, newLng], 16);
-                        
-                        const L = (window as any).L;
-                        const icon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div class='marker-pin adoption'></div><i class='material-icons'></i>`,
-                            iconSize: [30, 42],
-                            iconAnchor: [15, 42]
-                        });
-
-                        if (markerInstance.current) {
-                            markerInstance.current.setLatLng([newLat, newLng]);
-                        } else {
-                            markerInstance.current = L.marker([newLat, newLng], { 
-                                icon: icon,
-                                draggable: true 
-                            }).addTo(mapInstance.current);
-                            
-                            markerInstance.current.on('dragend', (event: any) => {
-                                if (!isMounted.current) return;
-                                const position = event.target.getLatLng();
-                                setFormData(prev => ({ ...prev, lat: position.lat, lng: position.lng }));
-                            });
-                        }
+                        updateMarker(newLat, newLng, false); // false = don't trigger recursive update
                     }
                 }
             } catch (error) {
-                console.warn("Geocoding fetch error:", error);
+                // Silent error handling
             }
-        }, 1000); // 1000ms debounce
+        }, 800); // 800ms debounce
 
         return () => clearTimeout(timeoutId);
     }, [formData.address, formData.district, formData.province, formData.department]);
@@ -393,7 +457,6 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                     setImagePreviews(prev => [...prev, ...newImages]);
                 }
             } catch (err: any) {
-                console.error("Error uploading image:", err);
                 if (isMounted.current) {
                     setError("Error al subir la imagen. Intenta de nuevo.");
                 }
@@ -412,114 +475,30 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             alert("La geolocalización no es soportada por este navegador.");
             return;
         }
-
+        
         navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                if (!isMounted.current) return;
+            (position) => {
                 const { latitude, longitude } = position.coords;
                 
-                setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
-
-                if (mapInstance.current) {
-                    mapInstance.current.invalidateSize();
-                    mapInstance.current.setView([latitude, longitude], 16);
-
-                    const L = (window as any).L;
-                    if (markerInstance.current) {
-                        markerInstance.current.setLatLng([latitude, longitude]);
-                    } else {
-                        const icon = L.divIcon({
-                             className: 'custom-div-icon',
-                             html: `<div class='marker-pin adoption'></div><i class='material-icons'></i>`,
-                             iconSize: [30, 42],
-                             iconAnchor: [15, 42]
-                         });
-                        markerInstance.current = L.marker([latitude, longitude], { icon, draggable: true }).addTo(mapInstance.current);
-                         markerInstance.current.on('dragend', (event: any) => {
-                             if (!isMounted.current) return;
-                             const pos = event.target.getLatLng();
-                             setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }));
-                         });
-                    }
+                if (!mapInstance.current) {
+                    return;
                 }
-
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
-                        headers: { 'Accept-Language': 'es-ES,es;q=0.9' }
-                    });
-                    const data = await response.json();
-                    if (data && data.address && isMounted.current) {
-                        const addr = data.address;
-                        const road = addr.road || '';
-                        const number = addr.house_number || '';
-                        const newAddress = `${road} ${number}`.trim();
-                        
-                        if (newAddress) {
-                             // Reuse logic for finding dept/prov/dist here if needed, or let the map click/drag handler handle it
-                             // Since handleGetCurrentLocation mimics user placement, we might want to call the same logic
-                             // For simplicity, we trigger a fetch similar to the map handler logic but inside here
-                             
-                             // Copied logic for consistency
-                             let newDept = '';
-                             let newProv = '';
-                             let newDist = '';
-                             let newProvincesList: string[] = [];
-                             let newDistrictsList: string[] = [];
-
-                             const apiState = addr.state || addr.region;
-                             if (apiState) {
-                                const normalizedApiState = normalizeLocationName(apiState);
-                                newDept = departments.find(d => normalizeLocationName(d) === normalizedApiState) || 
-                                          departments.find(d => normalizedApiState.includes(normalizeLocationName(d))) || '';
-                             }
-
-                             if (newDept) {
-                                newProvincesList = getProvinces(newDept);
-                                const apiProv = addr.province || addr.region || addr.city || addr.county;
-                                if (apiProv) {
-                                    const normalizedApiProv = normalizeLocationName(apiProv);
-                                    newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedApiProv) || 
-                                              newProvincesList.find(p => normalizedApiProv.includes(normalizeLocationName(p))) || '';
-                                }
-                                // Fallback for city
-                                if (!newProv && addr.city) {
-                                    const normalizedCity = normalizeLocationName(addr.city);
-                                    newProv = newProvincesList.find(p => normalizeLocationName(p) === normalizedCity) || '';
-                                }
-                             }
-
-                             if (newDept && newProv) {
-                                newDistrictsList = getDistricts(newDept, newProv);
-                                const apiDist = addr.district || addr.town || addr.city_district || addr.suburb || addr.village || addr.neighbourhood;
-                                if (apiDist) {
-                                    const normalizedApiDist = normalizeLocationName(apiDist);
-                                    newDist = newDistrictsList.find(d => normalizeLocationName(d) === normalizedApiDist) ||
-                                              newDistrictsList.find(d => normalizedApiDist.includes(normalizeLocationName(d))) || '';
-                                }
-                             }
-
-                             isUpdatingFromMapRef.current = true;
-                             
-                             if (newProvincesList.length > 0) setProvinces(newProvincesList);
-                             if (newDistrictsList.length > 0) setDistricts(newDistrictsList);
-
-                             setFormData(prev => ({ 
-                                 ...prev, 
-                                 address: newAddress,
-                                 department: newDept || prev.department,
-                                 province: newProv || (newDept ? '' : prev.province),
-                                 district: newDist || (newProv ? '' : prev.district)
-                             }));
-                             
-                             setTimeout(() => { if (isMounted.current) isUpdatingFromMapRef.current = false; }, 2000);
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error reversing location", error);
-                }
+                
+                // Center map on new location first
+                mapInstance.current.setView([latitude, longitude], 16);
+                
+                // Small delay to ensure map has moved before updating marker
+                setTimeout(() => {
+                    if (!mapInstance.current) return;
+                    
+                    // Update form data
+                    setFormData(prev => ({ ...prev, lat: latitude, lng: longitude }));
+                    
+                    // Update marker - this will also trigger reverse geocoding
+                    updateMarker(latitude, longitude, true);
+                }, 100);
             },
             (error: GeolocationPositionError) => {
-                console.error("Error getting location", error.message);
                 alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos.");
             }
         );
@@ -750,8 +729,8 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                                     <CrosshairIcon /> Usar mi ubicación actual
                                 </button>
                             </div>
-                            <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 relative">
-                                <div ref={mapRef} className="w-full h-full z-0" />
+                            <div className="w-full rounded-lg overflow-hidden border border-gray-300 relative" style={{ height: '300px' }}>
+                                <div ref={mapRef} className="w-full h-full" style={{ height: '100%' }}></div>
                             </div>
                              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                 <LocationMarkerIcon /> Mueve el pin para ajustar. La dirección se actualizará automáticamente.
