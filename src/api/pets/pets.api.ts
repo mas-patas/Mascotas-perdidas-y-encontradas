@@ -186,6 +186,20 @@ export const getPetById = async (id: string): Promise<Pet | null> => {
 };
 
 /**
+ * Get basic pet information by ID (for notifications and other use cases)
+ */
+export const getPetBasicInfo = async (id: string): Promise<{ user_id: string; animal_type: string; status: string; name: string } | null> => {
+  const { data, error } = await supabase
+    .from('pets')
+    .select('user_id, animal_type, status, name')
+    .eq('id', id)
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+/**
  * Fetch pets by user ID
  */
 export const getPetsByUserId = async (userId: string): Promise<Pet[]> => {
