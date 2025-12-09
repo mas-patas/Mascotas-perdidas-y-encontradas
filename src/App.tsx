@@ -148,7 +148,17 @@ const App: React.FC = () => {
     // --- Platform Settings State ---
     const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(() => {
         const stored = localStorage.getItem('platform_aiSearchEnabled');
-        return stored !== null ? JSON.parse(stored) : true;
+        // Si existe un valor guardado, lo usamos, pero por defecto es false
+        if (stored !== null) {
+            const parsed = JSON.parse(stored);
+            // Si está guardado como true, lo cambiamos a false (nuevo comportamiento por defecto)
+            if (parsed === true) {
+                localStorage.setItem('platform_aiSearchEnabled', JSON.stringify(false));
+                return false;
+            }
+            return parsed;
+        }
+        return false;
     });
     const [isLocationAlertsEnabled, setIsLocationAlertsEnabled] = useState(() => {
         const stored = localStorage.getItem('platform_locationAlertsEnabled');
@@ -252,6 +262,11 @@ const App: React.FC = () => {
         if (!currentUser) return navigate('/login');
         setReportStatus(status);
         setIsReportModalOpen(true);
+    };
+
+    const handleOpenAdoptionModal = () => {
+        if (!currentUser) return navigate('/login');
+        setIsAdoptionModalOpen(true);
     };
 
     const updatePet = useUpdatePet();
@@ -692,7 +707,7 @@ const App: React.FC = () => {
             )}
 
             <Routes>
-                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={() => setIsAdoptionModalOpen(true)} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
+                <Route path="/" element={<Layout onReportPet={handleReportPet} onOpenAdoptionModal={handleOpenAdoptionModal} isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onCloseSidebar={() => setIsSidebarOpen(false)} hasUnreadMessages={hasUnreadMessages} notifications={notifications} onMarkNotificationAsRead={handleMarkNotificationAsRead} onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead} filters={filters} setFilters={setFilters} onResetFilters={resetFilters} />}>
                     <Route index element={
                         <ErrorBoundary name="PetList">
                             <PetList pets={pets} users={users} onViewUser={handleViewPublicProfile} filters={filters} setFilters={setFilters} onNavigate={(path) => navigate(path)} onSelectStatus={(status) => setFilters(prev => ({ ...prev, status }))} onReset={() => { resetFilters(); navigate('/'); }} loadMore={loadMore} hasMore={hasMore} isLoading={petsLoading} isError={petsError} onRetry={() => refetchPets()} />

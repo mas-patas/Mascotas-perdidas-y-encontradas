@@ -46,7 +46,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
     return (
         <Link 
             to={`/mascota/${pet.id}`}
-            className="group block relative h-full flex flex-col bg-white rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-100"
+            className="group block relative h-full flex flex-col bg-white rounded-xl overflow-hidden transition-all duration-200 hover:bg-sky-50/30 hover:shadow-lg hover:shadow-gray-900/60 border border-gray-100"
         >
             {/* Image Container - Aspect 3:2 */}
             <div className="relative w-full aspect-[3/2] bg-gray-100 overflow-hidden">
