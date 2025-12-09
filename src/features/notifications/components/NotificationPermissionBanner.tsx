@@ -31,8 +31,16 @@ const NotificationPermissionBanner: React.FC = () => {
     useEffect(() => {
         // Only show if supported, permission is default (not granted/denied), and user is logged in
         if ('Notification' in window && Notification.permission === 'default' && currentUser) {
-            const timer = setTimeout(() => setShowBanner(true), 3000);
-            return () => clearTimeout(timer);
+            // Check if banner has already been shown (only show once)
+            const hasShownBanner = localStorage.getItem('notificationBannerShown');
+            
+            if (!hasShownBanner) {
+                // Show banner after 30 seconds
+                const timer = setTimeout(() => {
+                    setShowBanner(true);
+                }, 30000);
+                return () => clearTimeout(timer);
+            }
         }
     }, [currentUser]);
 
@@ -93,6 +101,8 @@ const NotificationPermissionBanner: React.FC = () => {
             }
             
             setShowBanner(false);
+            // Mark as shown so it doesn't appear again
+            localStorage.setItem('notificationBannerShown', 'true');
         } catch (error) {
             console.error("Error requesting notification permission", error);
         }
@@ -114,7 +124,11 @@ const NotificationPermissionBanner: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button 
-                        onClick={() => setShowBanner(false)}
+                        onClick={() => {
+                            setShowBanner(false);
+                            // Mark as shown so it doesn't appear again
+                            localStorage.setItem('notificationBannerShown', 'true');
+                        }}
                         className="text-sm text-blue-200 hover:text-white underline"
                     >
                         Ahora no
@@ -128,7 +142,11 @@ const NotificationPermissionBanner: React.FC = () => {
                 </div>
             </div>
             <button 
-                onClick={() => setShowBanner(false)}
+                onClick={() => {
+                    setShowBanner(false);
+                    // Mark as shown so it doesn't appear again
+                    localStorage.setItem('notificationBannerShown', 'true');
+                }}
                 className="absolute top-2 right-2 text-white/50 hover:text-white"
             >
                 <XCircleIcon className="h-5 w-5" />

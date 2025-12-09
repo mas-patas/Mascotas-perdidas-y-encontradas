@@ -14,8 +14,34 @@ export const useMarkNotificationAsRead = () => {
     mutationFn: async (id: string) => {
       await notificationsApi.markNotificationAsRead(id);
     },
+    onMutate: async (id: string) => {
+      if (!currentUser?.id) return;
+      
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications(currentUser.id) });
+
+      // Snapshot the previous value
+      const previousNotifications = queryClient.getQueryData(queryKeys.notifications(currentUser.id));
+
+      // Optimistically update the cache
+      queryClient.setQueryData(queryKeys.notifications(currentUser.id), (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return old.map((notification: any) => 
+          notification.id === id ? { ...notification, isRead: true } : notification
+        );
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousNotifications };
+    },
+    onError: (err, id, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousNotifications && currentUser?.id) {
+        queryClient.setQueryData(queryKeys.notifications(currentUser.id), context.previousNotifications);
+      }
+    },
     onSuccess: () => {
-      if (currentUser) {
+      if (currentUser?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.notifications(currentUser.id) });
       }
     }
@@ -31,11 +57,35 @@ export const useMarkAllNotificationsAsRead = () => {
 
   return useMutation({
     mutationFn: async () => {
-      if (!currentUser) throw new Error('User must be logged in');
+      if (!currentUser?.id) throw new Error('User must be logged in');
       await notificationsApi.markAllNotificationsAsRead(currentUser.id);
     },
+    onMutate: async () => {
+      if (!currentUser?.id) return;
+      
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications(currentUser.id) });
+
+      // Snapshot the previous value
+      const previousNotifications = queryClient.getQueryData(queryKeys.notifications(currentUser.id));
+
+      // Optimistically update the cache
+      queryClient.setQueryData(queryKeys.notifications(currentUser.id), (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return old.map((notification: any) => ({ ...notification, isRead: true }));
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousNotifications };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousNotifications && currentUser?.id) {
+        queryClient.setQueryData(queryKeys.notifications(currentUser.id), context.previousNotifications);
+      }
+    },
     onSuccess: () => {
-      if (currentUser) {
+      if (currentUser?.id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.notifications(currentUser.id) });
       }
     }

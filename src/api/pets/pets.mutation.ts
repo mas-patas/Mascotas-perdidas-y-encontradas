@@ -7,7 +7,7 @@ import { trackReportPet, trackPetReunited } from '@/services/analytics';
 import { logActivity, POINTS_CONFIG } from '@/services/gamificationService';
 import { generatePetEmbedding } from '@/services/geminiService';
 import { generateUUID } from '@/utils/uuid';
-import { PET_STATUS } from '@/constants';
+import { PET_STATUS, ANIMAL_TYPES } from '@/constants';
 import * as notificationsApi from '../notifications/notifications.api';
 
 /**
@@ -39,11 +39,23 @@ export const useCreatePet = () => {
         embedding: finalEmbedding
       });
 
-      // Create notification
+      // Create notification with animal type + report type
+      const animalType = data.animalType || ANIMAL_TYPES.OTRO;
+      const reportType = data.status || PET_STATUS.PERDIDO;
+      
+      // Check if name is valid (not empty, not "Desconocido", and not just whitespace)
+      const isValidName = data.name && 
+                          data.name.trim() && 
+                          data.name.trim().toLowerCase() !== 'desconocido';
+      
+      const notificationMessage = isValidName
+        ? `Has publicado exitosamente el reporte de "${data.name}".`
+        : `Has publicado exitosamente: ${animalType} ${reportType.toLowerCase()}.`;
+      
       await notificationsApi.createNotification({
         id: generateUUID(),
         userId: currentUser.id,
-        message: `Has publicado exitosamente el reporte de "${data.name}".`,
+        message: notificationMessage,
         link: { type: 'pet', id: petId }
       });
 
