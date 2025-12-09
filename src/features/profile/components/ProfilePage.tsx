@@ -9,6 +9,7 @@ import { AddPetModal } from '@/features/pets';
 import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
+import { mapPetFromDb } from '@/utils/mappers';
 import { StarRating } from '@/shared';
 import { useDeleteSavedSearch, useBusinessByOwner } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
@@ -125,7 +126,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             
             if (error) throw error;
             
-            const pets = (data || []) as PetRow[];
+            // Transform PetRow[] to Pet[] using mapPetFromDb to ensure image URLs are public
+            // Create a profile-like object for mapPetFromDb to find the owner email
+            const profileLike = user.id && user.email ? [{ id: user.id, email: user.email }] : [];
+            const pets = (data || []).map((p: PetRow) => mapPetFromDb(p, profileLike));
             return { pets, count: count || 0 };
         },
         placeholderData: keepPreviousData
@@ -483,7 +487,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         </button>
                     </div>
                      {user.ownedPets && user.ownedPets.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                             {user.ownedPets.map(pet => (
                                <div key={pet.id} className="bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg overflow-hidden flex flex-col relative transition-transform transform hover:-translate-y-1 hover:shadow-xl">
                                     <button onClick={(e) => { e.stopPropagation(); setPetToDelete(pet); }} className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 z-10 p-1 sm:p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"><TrashIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
@@ -510,7 +514,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 <div className="space-y-3 sm:space-y-4" data-tour="saved-pets-section">
                     <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main">Publicaciones guardadas</h3>
                     {savedPets.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                             {savedPets.map(pet => {
                                 const petOwner = users.find(u => u.email === pet.userEmail);
                                 return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
@@ -570,7 +574,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         <div className="text-center py-8 sm:py-10"><div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                     ) : myReportedPets.length > 0 ? (
                         <>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                                 {myReportedPets.filter(p => p).map(pet => {
                                     const expired = isPetExpired(pet);
                                     return (
