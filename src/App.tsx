@@ -575,7 +575,9 @@ const App: React.FC = () => {
                 response: ticket.response || undefined, 
                 assignedTo: ticket.assigned_to || undefined 
             } 
-        }); 
+        });
+        // Invalidate queries to refresh the list
+        queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
     };
     
     const createCampaign = useCreateCampaign();

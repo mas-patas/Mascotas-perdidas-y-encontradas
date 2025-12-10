@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicket, SupportTicketStatus, SupportTicketCategory, Campaign, BannedIP } from '@/types';
+import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicketRow, SupportTicketStatus, SupportTicketCategory, Campaign, BannedIP } from '@/types';
 import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from '@/constants';
 import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon, EyeIcon, BellIcon, LocationMarkerIcon, XCircleIcon, PlusIcon, StoreIcon, CheckCircleIcon, CalendarIcon } from '@/shared/components/icons';
 import { ReportDetailModal } from '@/features/reports';
@@ -19,10 +19,10 @@ interface AdminDashboardProps {
     pets: Pet[];
     chats: Chat[];
     reports: Report[];
-    supportTickets: SupportTicket[];
+    supportTickets: SupportTicketRow[];
     onUpdateReportStatus: (reportId: string, status: ReportStatusType) => void;
     onDeletePet: (petId: string) => void;
-    onUpdateSupportTicket: (ticket: SupportTicket) => void;
+    onUpdateSupportTicket: (ticket: SupportTicketRow) => void;
     isAiSearchEnabled: boolean;
     onToggleAiSearch: () => void;
     isLocationAlertsEnabled: boolean;
@@ -285,7 +285,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 const categoryMatch = ticketCategoryFilter === 'all' || ticket.category === ticketCategoryFilter;
                 return statusMatch && categoryMatch;
             })
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            .sort((a, b) => {
+                const aTime = new Date(a.timestamp || a.created_at || 0).getTime();
+                const bTime = new Date(b.timestamp || b.created_at || 0).getTime();
+                return bTime - aTime;
+            });
     }, [supportTickets, ticketStatusFilter, ticketCategoryFilter]);
 
     const handlePrint = () => window.print();
@@ -698,15 +702,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {paginatedTickets.map(ticket => (
-                                <tr key={ticket.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setViewingTicket(ticket)}>
-                                    <td className="py-4 px-4 text-sm text-gray-900">{formatDateTimeSafe(ticket.timestamp)}</td>
-                                    <td className="py-4 px-4 text-sm text-gray-900">{ticket.userEmail}</td>
-                                    <td className="py-4 px-4 text-sm text-gray-500 font-medium">{ticket.category}</td>
-                                    <td className="py-4 px-4 text-sm font-bold text-gray-800">{ticket.subject}</td>
-                                    <td className="py-4 px-4 text-sm text-gray-900"><span className={`px-2 py-1 rounded-full text-xs font-bold ${getSupportTicketStatusClass(ticket.status)}`}>{ticket.status}</span></td>
-                                </tr>
-                            ))}
+                            {paginatedTickets.map(ticket => {
+                                const ticketUser = users.find(u => u.email === ticket.user_email);
+                                return (
+                                    <tr key={ticket.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setViewingTicket(ticket)}>
+                                        <td className="py-4 px-4 text-sm text-gray-900">{formatDateTimeSafe(ticket.timestamp || ticket.created_at)}</td>
+                                        <td className="py-4 px-4 text-sm text-gray-900">
+                                            {ticketUser ? (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onViewUser(ticketUser);
+                                                    }}
+                                                    className="text-brand-primary hover:underline font-medium bg-transparent border-none p-0 cursor-pointer"
+                                                >
+                                                    @{ticketUser.username || ticketUser.email}
+                                                </button>
+                                            ) : (
+                                                ticket.user_email || 'N/A'
+                                            )}
+                                        </td>
+                                        <td className="py-4 px-4 text-sm text-gray-500 font-medium">{ticket.category || 'N/A'}</td>
+                                        <td className="py-4 px-4 text-sm font-bold text-gray-800">{ticket.subject || 'Sin asunto'}</td>
+                                        <td className="py-4 px-4 text-sm text-gray-900"><span className={`px-2 py-1 rounded-full text-xs font-bold ${getSupportTicketStatusClass(ticket.status as SupportTicketStatus)}`}>{ticket.status || 'Pendiente'}</span></td>
+                                    </tr>
+                                );
+                            })}
                             {paginatedTickets.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="py-8 text-center text-gray-500">No hay tickets pendientes.</td>
@@ -934,7 +955,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                          <button onClick={() => setActiveTab('dashboard')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Dashboard</button>
                          <button onClick={() => setActiveTab('users')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'users' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Usuarios</button>
                         <button onClick={() => setActiveTab('reports')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'reports' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Reportes <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-1 ${reports.filter(r => r.status === 'Pendiente').length > 0 ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'}`}>{reports.filter(r => r.status === 'Pendiente').length}</span></button>
-                        <button onClick={() => setActiveTab('support')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'support' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Soporte <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-1 ${supportTickets.filter(t => t.status === 'Pendiente').length > 0 ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'}`}>{supportTickets.filter(t => t.status === 'Pendiente').length}</span></button>
+                        <button onClick={() => setActiveTab('support')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'support' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Soporte <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-1 ${supportTickets.filter(t => t.status === SUPPORT_TICKET_STATUS.PENDING).length > 0 ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-700'}`}>{supportTickets.filter(t => t.status === SUPPORT_TICKET_STATUS.PENDING).length}</span></button>
                         <button onClick={() => setActiveTab('campaigns')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'campaigns' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Campañas</button>
                         <button onClick={() => setActiveTab('businesses')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'businesses' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Negocios</button>
                         <button onClick={() => setActiveTab('security')} className={`flex-shrink-0 whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === 'security' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Seguridad</button>
@@ -960,7 +981,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* Modals */}
             {viewingReportDetail && <ReportDetailModal isOpen={!!viewingReportDetail} onClose={() => setViewingReportDetail(null)} report={viewingReportDetail.report} pet={viewingReportDetail.pet as Pet} isDeleted={viewingReportDetail.isDeleted} onDeletePet={onDeletePet} onUpdateReportStatus={onUpdateReportStatus} allUsers={users} onViewUser={onViewUser} onDeleteComment={onDeleteComment} />}
-            {viewingTicket && <SupportTicketModal isOpen={!!viewingTicket} onClose={() => setViewingTicket(null)} ticket={viewingTicket} onUpdate={onUpdateSupportTicket} allUsers={users} />}
+            {viewingTicket && <SupportTicketModal isOpen={!!viewingTicket} onClose={() => setViewingTicket(null)} ticket={viewingTicket} onUpdate={(ticket) => { onUpdateSupportTicket(ticket); setViewingTicket(null); }} allUsers={users} />}
             {isCampaignModalOpen && <CampaignFormModal isOpen={isCampaignModalOpen} onClose={() => setIsCampaignModalOpen(false)} onSave={(data, id) => { onSaveCampaign(data, id); setIsCampaignModalOpen(false); }} campaignToEdit={campaignToEdit} />}
             {campaignToDelete && <ConfirmationModal isOpen={!!campaignToDelete} onClose={() => setCampaignToDelete(null)} onConfirm={() => { onDeleteCampaign(campaignToDelete.id); setCampaignToDelete(null); }} title="Eliminar Campaña" message={`¿Estás seguro de que quieres eliminar la campaña "${campaignToDelete.title}"?`} />}
             
