@@ -47,9 +47,10 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
     .from('pets')
     .select(PET_COLUMNS, { count: 'exact' })
     .eq('status', filters.status)
-    .gt('expires_at', nowIso)
-    // Exclude permanently deactivated pets (expires_at before 2000)
-    .gt('expires_at', '2000-01-01');
+    // Filter: expires_at > nowIso
+    // This excludes both expired pets (expires_at < now) and permanently deactivated pets (expires_at = '2000-01-01')
+    // Since nowIso is always > '2000-01-01', this single condition handles both cases
+    .gt('expires_at', nowIso);
   
   if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
   if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
@@ -108,6 +109,7 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       .from('pets')
       .select(PET_COLUMNS)
       .eq('status', status)
+      // Filter: expires_at > nowIso (excludes expired and deactivated pets)
       .gt('expires_at', nowIso);
     
     if (filters.department && filters.department !== 'Todos') {
@@ -246,9 +248,8 @@ export const getPetsForMap = async (): Promise<Pet[]> => {
     .select(PET_COLUMNS)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
-    .gt('expires_at', nowIso)
-    // Exclude permanently deactivated pets
-    .gt('expires_at', '2000-01-01');
+    // Filter: expires_at > nowIso (excludes expired and deactivated pets)
+    .gt('expires_at', nowIso);
   
   if (error) throw error;
   if (!data) return [];

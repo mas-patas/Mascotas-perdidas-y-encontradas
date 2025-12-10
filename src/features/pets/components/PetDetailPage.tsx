@@ -347,12 +347,12 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             return now.getTime() > (expirationDate.getTime() + 60000);
         };
         
-        // Check if pet is permanently deactivated (expires_at before 2000)
+        // Check if pet is permanently deactivated (expires_at <= 2000-01-01)
         const checkIfDeactivated = () => {
             if (!pet.expiresAt) return false;
             const deactivatedDate = new Date('2000-01-01');
             const expirationDate = new Date(pet.expiresAt);
-            return expirationDate.getTime() < deactivatedDate.getTime();
+            return expirationDate.getTime() <= deactivatedDate.getTime();
         };
         
         const isExpired = checkIfExpired();

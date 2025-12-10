@@ -20,9 +20,8 @@ const fetchMapData = async () => {
         .select('id, status, name, animal_type, breed, color, location, lat, lng, image_urls, created_at, expires_at, reward, currency, user_id')
         .not('lat', 'is', null)
         .not('lng', 'is', null)
-        .gt('expires_at', nowIso)
-        // Exclude permanently deactivated pets
-        .gt('expires_at', '2000-01-01');
+        // Filter: expires_at > nowIso (excludes expired and deactivated pets)
+        .gt('expires_at', nowIso);
     
     if (petError) throw new Error(petError.message);
 

@@ -88,9 +88,8 @@ const PetSection: React.FC<{
                 .from('pets')
                 .select('id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date')
                 .eq('status', status)
+                // Filter: expires_at > now (excludes expired and deactivated pets)
                 .gt('expires_at', new Date().toISOString())
-                // Exclude permanently deactivated pets
-                .gt('expires_at', '2000-01-01')
                 .order('created_at', { ascending: false })
                 .range(currentCount, currentCount + BATCH_SIZE - 1);
 
