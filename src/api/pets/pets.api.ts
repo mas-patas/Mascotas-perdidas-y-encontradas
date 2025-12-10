@@ -53,6 +53,8 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
   if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
   if (filters.size !== 'Todos') query = query.eq('size', filters.size);
   if (filters.color1 !== 'Todos') query = query.ilike('color', `%${filters.color1}%`);
+  if (filters.color2 !== 'Todos') query = query.ilike('color', `%${filters.color2}%`);
+  if (filters.color3 !== 'Todos') query = query.ilike('color', `%${filters.color3}%`);
   if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
   
   const { data, count, error } = await query
@@ -108,11 +110,27 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       .eq('status', status)
       .gt('expires_at', nowIso);
     
-    if (filters.department && filters.department !== 'Todos') {
-      query = query.ilike('location', `%${filters.department}%`);
-    }
+    // Apply all filters consistently with getPets
     if (filters.type && filters.type !== 'Todos') {
       query = query.eq('animal_type', filters.type);
+    }
+    if (filters.breed && filters.breed !== 'Todos') {
+      query = query.eq('breed', filters.breed);
+    }
+    if (filters.size && filters.size !== 'Todos') {
+      query = query.eq('size', filters.size);
+    }
+    if (filters.color1 && filters.color1 !== 'Todos') {
+      query = query.ilike('color', `%${filters.color1}%`);
+    }
+    if (filters.color2 && filters.color2 !== 'Todos') {
+      query = query.ilike('color', `%${filters.color2}%`);
+    }
+    if (filters.color3 && filters.color3 !== 'Todos') {
+      query = query.ilike('color', `%${filters.color3}%`);
+    }
+    if (filters.department && filters.department !== 'Todos') {
+      query = query.ilike('location', `%${filters.department}%`);
     }
 
     const { data, error } = await query

@@ -33,7 +33,8 @@ const PetSection: React.FC<{
     accentColor: string;
     icon: React.ReactNode;
     onViewAll: () => void;
-}> = ({ title, status, initialPets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
+    filters: any; // Filters from sidebar
+}> = ({ title, status, initialPets, users, onViewUser, onNavigate, accentColor, icon, onViewAll, filters }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [additionalPets, setAdditionalPets] = useState<PetRow[]>([]);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -68,11 +69,11 @@ const PetSection: React.FC<{
         return Array.from(allPetsMap.values());
     }, [deduplicatedInitialPets, additionalPets]);
 
-    // Reset when initialPets changes (e.g. refresh) - use a stable reference
+    // Reset when initialPets or filters change (e.g. refresh or filter change) - use a stable reference
     useEffect(() => {
         setAdditionalPets([]);
         setHasMoreHorizontal(true);
-    }, [deduplicatedInitialPets]);
+    }, [deduplicatedInitialPets, filters]);
 
     const fetchMoreHorizontal = async () => {
         if (isLoadingMore || !hasMoreHorizontal) return;
@@ -84,11 +85,37 @@ const PetSection: React.FC<{
             const BATCH_SIZE = 7;
             
             // Basic query similar to usePets but specific for this row
-            const { data, error } = await supabase
+            // Apply filters from sidebar
+            let query = supabase
                 .from('pets')
                 .select('id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date')
                 .eq('status', status)
-                .gt('expires_at', new Date().toISOString())
+                .gt('expires_at', new Date().toISOString());
+            
+            // Apply all filters consistently with getPets
+            if (filters?.type && filters.type !== 'Todos') {
+                query = query.eq('animal_type', filters.type);
+            }
+            if (filters?.breed && filters.breed !== 'Todos') {
+                query = query.eq('breed', filters.breed);
+            }
+            if (filters?.size && filters.size !== 'Todos') {
+                query = query.eq('size', filters.size);
+            }
+            if (filters?.color1 && filters.color1 !== 'Todos') {
+                query = query.ilike('color', `%${filters.color1}%`);
+            }
+            if (filters?.color2 && filters.color2 !== 'Todos') {
+                query = query.ilike('color', `%${filters.color2}%`);
+            }
+            if (filters?.color3 && filters.color3 !== 'Todos') {
+                query = query.ilike('color', `%${filters.color3}%`);
+            }
+            if (filters?.department && filters.department !== 'Todos') {
+                query = query.ilike('location', `%${filters.department}%`);
+            }
+            
+            const { data, error } = await query
                 .order('created_at', { ascending: false })
                 .range(currentCount, currentCount + BATCH_SIZE - 1);
 
@@ -409,6 +436,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 accentColor="red"
                                 icon={<WarningIcon className="h-5 w-5 text-red-500" />}
                                 onViewAll={() => handleTabChange(PET_STATUS.PERDIDO)}
+                                filters={filters}
                             />
                             
                             <PetSection 
@@ -421,6 +449,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 accentColor="blue"
                                 icon={<MapIcon className="h-5 w-5 text-blue-500" />}
                                 onViewAll={() => handleTabChange(PET_STATUS.AVISTADO)}
+                                filters={filters}
                             />
 
                             <PetSection 
@@ -433,6 +462,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 accentColor="green"
                                 icon={<HeartIcon className="h-5 w-5 text-green-500" />}
                                 onViewAll={() => handleTabChange(PET_STATUS.ENCONTRADO)}
+                                filters={filters}
                             />
 
                             <PetSection 
@@ -445,6 +475,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 accentColor="purple"
                                 icon={<HeartIcon className="h-5 w-5 text-purple-500" filled />}
                                 onViewAll={() => handleTabChange(PET_STATUS.EN_ADOPCION)}
+                                filters={filters}
                             />
                         </div>
                     ) : (

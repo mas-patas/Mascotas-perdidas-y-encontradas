@@ -8,6 +8,7 @@ export interface PetFilters {
   breed: string;
   color1: string;
   color2: string;
+  color3: string;
   size: string;
   department: string;
 }
