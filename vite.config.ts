@@ -1,6 +1,31 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import type { Plugin } from 'vite';
+
+// Plugin para reemplazar variables de entorno en index.html
+function htmlEnvPlugin(mode: string): Plugin {
+  return {
+    name: 'html-env-replace',
+    transformIndexHtml(html: string) {
+      // Cargar variables de entorno
+      const env = loadEnv(mode, (process as any).cwd(), '');
+      const gaId = env.VITE_GA_MEASUREMENT_ID || '';
+      
+      // Reemplazar el placeholder con el ID real o eliminar el script si no hay ID
+      if (gaId) {
+        const replaced = html.replace(/G-XXXXXXXXXX/g, gaId);
+        return replaced;
+      } else {
+        // Si no hay ID, comentar el código de Google Analytics
+        return html.replace(
+          /<!-- Google Analytics 4 -->[\s\S]*?<\/script>/,
+          '<!-- Google Analytics 4 - Disabled: VITE_GA_MEASUREMENT_ID not set -->'
+        );
+      }
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,7 +34,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
 
   return {
-    plugins: [react()],
+    plugins: [react(), htmlEnvPlugin(mode)],
     // Aseguramos que el build busque el index.html en la raíz
     root: '.',
     resolve: {
