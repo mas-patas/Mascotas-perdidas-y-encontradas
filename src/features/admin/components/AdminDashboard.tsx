@@ -6,10 +6,11 @@ import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, Ed
 import { ReportDetailModal } from '@/features/reports';
 import { SupportTicketModal } from '@/features/support';
 import { CampaignFormModal } from '@/features/campaigns';
-import { ConfirmationModal } from '@/shared';
+import { ConfirmationModal, InfoModal } from '@/shared';
 import { useAppData } from '@/hooks/useAppData';
 import { AdminBusinessPanel } from '@/features/admin';
-import { useAdminStats, useCreateBannedIp, useDeleteBannedIp } from '@/api';
+import { useAdminStats, useCreateBannedIp, useDeleteBannedIp, useDeleteReport } from '@/api';
+import { supabase } from '@/services/supabaseClient';
 
 interface AdminDashboardProps {
     onBack: () => void;
@@ -49,7 +50,9 @@ const formatDateTimeSafe = (dateString: string) => {
     try {
          const d = new Date(dateString);
          if (isNaN(d.getTime())) return 'N/A';
-         return d.toLocaleString('es-ES');
+         const date = d.toLocaleDateString('es-ES');
+         const time = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+         return `${date} ${time}`;
     } catch {
         return 'N/A';
     }
@@ -173,7 +176,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
     const queryClient = useQueryClient();
     const { bannedIps } = useAppData();
+    const deleteReport = useDeleteReport();
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings' | 'security' | 'businesses'>('dashboard');
+    const [infoModal, setInfoModal] = useState<{ isOpen: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ isOpen: false, message: '', type: 'info' });
     const [statusFilter, setStatusFilter] = useState<PetStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<AnimalType | 'all'>('all');
     const [dateRangeFilter, setDateRangeFilter] = useState<'7d' | '30d' | '1y' | 'all'>('30d');
@@ -311,21 +316,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         setIsBulkDeleting(true);
         try {
-            const { error } = await supabase
-                .from('reports')
-                .delete()
-                .in('id', Array.from(selectedReportIds));
+            // Delete reports in parallel
+            await Promise.all(
+                Array.from(selectedReportIds).map(id => deleteReport.mutateAsync(id))
+            );
             
-            if (error) throw error;
-            
-            // Invalidate queries via props if possible or just let realtime handle it. 
-            // Since we rely on useAppData in parent, we might need to manually trigger refetch or wait for subscription.
-            // For immediate feedback, we clear selection.
-            queryClient.invalidateQueries({ queryKey: ['reports'] });
             setSelectedReportIds(new Set());
-            alert('Reportes eliminados correctamente.');
+            setInfoModal({ isOpen: true, message: 'Reportes eliminados correctamente.', type: 'success' });
         } catch (err: any) {
-            alert('Error al eliminar reportes: ' + err.message);
+            setInfoModal({ isOpen: true, message: 'Error al eliminar reportes: ' + (err.message || 'Error desconocido'), type: 'error' });
         } finally {
             setIsBulkDeleting(false);
         }
@@ -375,9 +374,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             });
             setNewIpAddress('');
             setBanReason('');
-            alert('IP baneada exitosamente.');
+            setInfoModal({ isOpen: true, message: 'IP baneada exitosamente.', type: 'success' });
         } catch (err: any) {
-            alert('Error al banear IP: ' + err.message);
+            setInfoModal({ isOpen: true, message: 'Error al banear IP: ' + err.message, type: 'error' });
         } finally {
             setIsAddingIp(false);
         }
@@ -388,7 +387,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         try {
             await deleteBannedIp.mutateAsync(ipId);
         } catch (err: any) {
-            alert('Error al eliminar ban: ' + err.message);
+            setInfoModal({ isOpen: true, message: 'Error al eliminar ban: ' + err.message, type: 'error' });
         }
     };
 
@@ -964,6 +963,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {viewingTicket && <SupportTicketModal isOpen={!!viewingTicket} onClose={() => setViewingTicket(null)} ticket={viewingTicket} onUpdate={onUpdateSupportTicket} allUsers={users} />}
             {isCampaignModalOpen && <CampaignFormModal isOpen={isCampaignModalOpen} onClose={() => setIsCampaignModalOpen(false)} onSave={(data, id) => { onSaveCampaign(data, id); setIsCampaignModalOpen(false); }} campaignToEdit={campaignToEdit} />}
             {campaignToDelete && <ConfirmationModal isOpen={!!campaignToDelete} onClose={() => setCampaignToDelete(null)} onConfirm={() => { onDeleteCampaign(campaignToDelete.id); setCampaignToDelete(null); }} title="Eliminar Campaña" message={`¿Estás seguro de que quieres eliminar la campaña "${campaignToDelete.title}"?`} />}
+            
+            <InfoModal 
+                isOpen={infoModal.isOpen} 
+                onClose={() => setInfoModal({ isOpen: false, message: '', type: 'info' })} 
+                title={infoModal.type === 'success' ? 'Éxito' : infoModal.type === 'error' ? 'Error' : 'Información'}
+                message={infoModal.message}
+                type={infoModal.type || 'info'}
+            />
         </div>
     );
 };

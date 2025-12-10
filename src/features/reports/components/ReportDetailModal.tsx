@@ -1,9 +1,14 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Pet, Report, ReportPostSnapshot, ReportStatus, User } from '@/types';
 import { CalendarIcon, LocationMarkerIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, ChatBubbleIcon } from '@/shared/components/icons';
 import { REPORT_STATUS } from '@/constants';
-import { ConfirmationModal } from '@/shared';
+import { ConfirmationModal, InfoModal } from '@/shared';
+import { useComment, useDeleteReport } from '@/api';
+import * as notificationsApi from '@/api/notifications/notifications.api';
+import * as usersApi from '@/api/users/users.api';
+import { generateUUID } from '@/utils/uuid';
 
 interface ReportDetailModalProps {
     isOpen: boolean;
@@ -15,13 +20,33 @@ interface ReportDetailModalProps {
     onUpdateReportStatus: (reportId: string, status: ReportStatus) => void;
     allUsers: User[];
     onViewUser: (user: User) => void;
-    onDeleteComment: (commentId: string) => Promise<void>;
+    onDeleteComment: (commentId: string, petId?: string) => Promise<void>;
 }
 
 const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, report, pet, isDeleted, onDeletePet, onUpdateReportStatus, allUsers, onViewUser, onDeleteComment }) => {
+    const navigate = useNavigate();
+    const deleteReport = useDeleteReport();
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [isConfirmingDeleteReport, setIsConfirmingDeleteReport] = useState(false);
     const [newStatus, setNewStatus] = useState<ReportStatus>(report.status);
+    const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
+    
+    // Fetch comment data if this is a comment report
+    const isCommentReport = report.type === 'comment';
+    const commentId = isCommentReport ? report.targetId : undefined;
+    const { data: commentDataFromApi, isLoading: isLoadingComment, error: commentError } = useComment(commentId);
+    
+    // Debug: Log comment ID and data
+    if (isCommentReport && commentId) {
+        console.log('Comment Report Debug:', {
+            commentId,
+            commentDataFromApi,
+            isLoadingComment,
+            commentError,
+            reportTargetId: report.targetId
+        });
+    }
 
     const nextImage = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -62,20 +87,91 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
             if (report.type === 'post' && !isDeleted && 'id' in pet && typeof pet.id === 'string') {
                 onDeletePet(pet.id);
             } else if (report.type === 'comment' && !isDeleted) {
-                await onDeleteComment(report.targetId);
+                // Get petId from comment data or postSnapshot
+                const petIdForDeletion = commentDataFromApi?.pet_id || 
+                    (postSnapshot as any)?.pet_id || 
+                    (pet as any)?.id || 
+                    null;
+                
+                if (petIdForDeletion) {
+                    // onDeleteComment expects (commentId: string, petId?: string)
+                    await onDeleteComment(report.targetId, petIdForDeletion);
+                } else {
+                    // Fallback: try to delete without petId (will log warning)
+                    await onDeleteComment(report.targetId);
+                }
             }
         }
         
         onUpdateReportStatus(report.id, newStatus);
+        
+        // Create notification for the reporter about the action taken
+        try {
+            const reporterUser = allUsers.find(u => u.email === report.reporterEmail);
+            let reporterUserId = reporterUser?.id;
+            
+            // If user not found in allUsers, fetch from API
+            if (!reporterUserId) {
+                const fetchedUser = await usersApi.getUserByEmail(report.reporterEmail);
+                reporterUserId = fetchedUser?.id;
+            }
+            
+            if (reporterUserId) {
+                // Determine the action message based on status
+                let actionMessage = '';
+                const reportTypeLabel = report.type === 'post' ? 'publicación' : report.type === 'comment' ? 'comentario' : 'usuario';
+                
+                switch (newStatus) {
+                    case REPORT_STATUS.ELIMINATED:
+                        actionMessage = `Tu reporte sobre un ${reportTypeLabel} ha sido revisado. El contenido ha sido eliminado.`;
+                        break;
+                    case REPORT_STATUS.INVALID:
+                        actionMessage = `Tu reporte sobre un ${reportTypeLabel} ha sido revisado. El reporte fue desestimado.`;
+                        break;
+                    case REPORT_STATUS.NO_ACTION:
+                        actionMessage = `Tu reporte sobre un ${reportTypeLabel} ha sido revisado. No se requirió acción adicional.`;
+                        break;
+                    default:
+                        actionMessage = `El estado de tu reporte sobre un ${reportTypeLabel} ha sido actualizado a: ${newStatus}.`;
+                }
+                
+                await notificationsApi.createNotification({
+                    id: generateUUID(),
+                    userId: reporterUserId,
+                    message: actionMessage,
+                    link: 'support'
+                });
+            }
+        } catch (error) {
+            // Silently fail notification creation - don't block the status update
+            console.error('Error creating notification for reporter:', error);
+        }
+        
         onClose();
     };
 
-    const isCommentReport = report.type === 'comment';
     const isPostReport = report.type === 'post';
 
     // Helper to safely access Pet properties if it's a pet
     const petData = isPostReport ? (pet as Pet) : null;
-    const commentData = isCommentReport ? (pet as { text: string }) : null;
+    
+    // Get comment data from API if available
+    const commentData = isCommentReport && commentDataFromApi ? {
+        text: commentDataFromApi.text || '',
+        userName: commentDataFromApi.user_name || '',
+        userEmail: commentDataFromApi.user_email || ''
+    } : null;
+    
+    // Get pet_id for comment reports: from comment API data, or from postSnapshot, or from pet prop
+    // Note: report.post_snapshot is snake_case in ReportRow, but we access it as postSnapshot if transformed
+    const postSnapshot = (report as any).postSnapshot || (report as any).post_snapshot;
+    const petIdForComment = isCommentReport ? (
+        commentDataFromApi?.pet_id || 
+        (postSnapshot as any)?.pet_id ||
+        (pet as any)?.id || 
+        (postSnapshot as any)?.id || 
+        null
+    ) : null;
 
     return (
         <div
@@ -175,11 +271,43 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
                                         <ChatBubbleIcon />
                                         <span>Comentario:</span>
                                     </div>
-                                    <p className="text-gray-800 italic text-lg">
-                                        "{commentData ? commentData.text : (isDeleted ? 'Comentario eliminado' : 'Texto no disponible')}"
-                                    </p>
+                                    {isLoadingComment ? (
+                                        <p className="text-gray-600 italic">Cargando comentario...</p>
+                                    ) : commentDataFromApi?.text ? (
+                                        <p className="text-gray-800 italic text-lg">
+                                            "{commentDataFromApi.text}"
+                                        </p>
+                                    ) : (postSnapshot as any)?.text ? (
+                                        <div>
+                                            <p className="text-gray-800 italic text-lg mb-2">
+                                                "{(postSnapshot as any).text}"
+                                            </p>
+                                            <p className="text-gray-500 italic text-xs">(Texto desde snapshot - comentario puede haber sido eliminado)</p>
+                                        </div>
+                                    ) : commentError || (!commentDataFromApi && !isLoadingComment) ? (
+                                        <div>
+                                            <p className="text-gray-600 italic mb-2">Comentario no encontrado</p>
+                                            <p className="text-gray-500 italic text-sm">El comentario pudo haber sido eliminado.</p>
+                                        </div>
+                                    ) : isDeleted ? (
+                                        <p className="text-gray-600 italic">Comentario eliminado</p>
+                                    ) : (
+                                        <p className="text-gray-600 italic">Texto no disponible</p>
+                                    )}
                                 </div>
-                                <div className="mt-auto pt-4">
+                                <div className="mt-auto pt-4 space-y-3">
+                                    {petIdForComment && (
+                                        <button
+                                            onClick={() => {
+                                                onClose();
+                                                navigate(`/mascota/${petIdForComment}`);
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-dark transition-colors"
+                                        >
+                                            <LocationMarkerIcon className="h-4 w-4" />
+                                            Ir a Publicación
+                                        </button>
+                                    )}
                                     <p className="text-sm text-gray-500">
                                         Si seleccionas "Eliminado" en el estado, el comentario se borrará automáticamente.
                                     </p>
@@ -254,6 +382,12 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
                                 >
                                     Actualizar Estado y Cerrar
                                 </button>
+                                <button
+                                    onClick={() => setIsConfirmingDeleteReport(true)}
+                                    className="w-full py-2 px-4 bg-red-500 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <TrashIcon /> Eliminar Reporte
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -272,6 +406,31 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
                     confirmText="Sí, eliminar"
                 />
             )}
+            {isConfirmingDeleteReport && (
+                <ConfirmationModal
+                    isOpen={isConfirmingDeleteReport}
+                    onClose={() => setIsConfirmingDeleteReport(false)}
+                    onConfirm={async () => {
+                        try {
+                            await deleteReport.mutateAsync(report.id);
+                            setIsConfirmingDeleteReport(false);
+                            onClose();
+                        } catch (error: any) {
+                            setErrorModal({ isOpen: true, message: 'Error al eliminar el reporte: ' + (error.message || 'Error desconocido') });
+                        }
+                    }}
+                    title="Eliminar Reporte"
+                    message="¿Estás seguro de que quieres eliminar este reporte? Esta acción no se puede deshacer."
+                    confirmText="Sí, eliminar"
+                />
+            )}
+            <InfoModal 
+                isOpen={errorModal.isOpen} 
+                onClose={() => setErrorModal({ isOpen: false, message: '' })} 
+                title="Error"
+                message={errorModal.message}
+                type="error"
+            />
         </div>
     );
 };

@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { User, SupportTicket, SupportTicketCategory, SupportTicketStatus, Report, ReportStatus } from '@/types';
 import { SUPPORT_TICKET_CATEGORIES, SUPPORT_TICKET_STATUS, REPORT_STATUS } from '@/constants';
 import { FlagIcon, ChatBubbleIcon, UserIcon, CheckCircleIcon, XCircleIcon, InfoIcon, TrashIcon, WarningIcon } from '@/shared/components/icons';
@@ -13,12 +14,23 @@ interface SupportPageProps {
 }
 
 const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, userReports, onAddTicket, onBack }) => {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<'tickets' | 'reports'>('tickets');
     const [category, setCategory] = useState<SupportTicketCategory>(SUPPORT_TICKET_CATEGORIES.GENERAL_INQUIRY);
     const [subject, setSubject] = useState('');
     const [description, setDescription] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Check URL parameter to set active tab
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'reports') {
+            setActiveTab('reports');
+            // Clean up URL parameter after reading it
+            setSearchParams({}, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     // Filter tickets to only show direct inquiries in the "Tickets" tab (exclude report follow-ups)
     const directTickets = userTickets.filter(t => t.category !== SUPPORT_TICKET_CATEGORIES.REPORT_FOLLOWUP);

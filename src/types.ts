@@ -35,6 +35,9 @@ export type ReportRow = Database['public']['Tables']['reports']['Row'];
 export type ReportInsert = Database['public']['Tables']['reports']['Insert'];
 export type ReportUpdate = Database['public']['Tables']['reports']['Update'];
 
+// Re-export Report type from reports.transform
+export type { Report } from './api/reports/reports.transform';
+
 export type SupportTicketRow = Database['public']['Tables']['support_tickets']['Row'];
 export type SupportTicketInsert = Database['public']['Tables']['support_tickets']['Insert'];
 export type SupportTicketUpdate = Database['public']['Tables']['support_tickets']['Update'];

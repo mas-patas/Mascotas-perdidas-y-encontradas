@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -6,11 +6,11 @@ import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment 
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { useAuth } from '@/contexts/auth';
-import { ConfirmationModal } from '@/shared';
+import { ConfirmationModal, InfoModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
-import { usePet, useDeleteComment } from '@/api';
+import { usePet, useDeleteComment, useCommentsByPetId } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
 import { ReunionSuccessModal } from '@/features/pets';
@@ -27,7 +27,7 @@ interface PetDetailPageProps {
     onUpdateStatus: (petId: string, status: PetStatus) => void;
     users: User[];
     onViewUser: (user: User) => void;
-    onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string) => void;
+    onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string, postSnapshot?: any) => void;
     onRecordContactRequest: (petId: string) => Promise<void>;
     onAddComment: (petId: string, text: string, parentId?: string) => Promise<void>;
     onLikeComment: (petId: string, commentId: string) => void;
@@ -68,7 +68,7 @@ const CommentItem: React.FC<{
 
     const handleAction = (action: () => void) => {
         if (!currentUser) {
-            alert("Debes iniciar sesión para realizar esta acción.");
+            setInfoModal({ isOpen: true, message: "Debes iniciar sesión para realizar esta acción.", type: 'info' });
             return;
         }
         action();
@@ -305,6 +305,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
     const pet = propPet || fetchedPet;
     
+    // FETCH COMMENTS INDEPENDENTLY - Use petId from propPet or fetchedPet or id param
+    // Always call hook in same order to avoid React Hook order violations
+    const petIdForComments = propPet?.id || fetchedPet?.id || id;
+    const { data: commentsFromHook } = useCommentsByPetId(petIdForComments);
+    
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     
     // Reset image index when pet or imageUrls change
@@ -315,11 +320,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     }, [pet?.id, pet?.imageUrls?.length]);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isCommentReportModalOpen, setIsCommentReportModalOpen] = useState(false);
+    const [commentToReport, setCommentToReport] = useState<string | null>(null);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isReunionModalOpen, setIsReunionModalOpen] = useState(false);
     const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
+    const [infoModal, setInfoModal] = useState<{ isOpen: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ isOpen: false, message: '', type: 'info' });
     const [newCommentPreview, setNewCommentPreview] = useState('');
 
     const mapRef = useRef<HTMLDivElement>(null);
@@ -366,6 +374,26 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
         return () => clearTimeout(timer);
     }, [pet]);
+
+    // Transform and combine comments: prioritize hook comments, fallback to pet.comments
+    // IMPORTANT: This useMemo must be called before any conditional returns to follow React Hook rules
+    const allComments = useMemo(() => {
+        // Transform comments from hook (snake_case) to camelCase
+        const transformedHookComments: Comment[] = (commentsFromHook || []).map((c: any) => ({
+            id: c.id,
+            userId: c.user_id,
+            userEmail: c.user_email,
+            userName: c.user_name,
+            text: c.text,
+            timestamp: c.created_at,
+            parentId: c.parent_id || null,
+            likes: c.likes || []
+        }));
+        
+        // Use hook comments if available, otherwise fallback to pet.comments
+        const pet = propPet || fetchedPet;
+        return transformedHookComments.length > 0 ? transformedHookComments : (pet?.comments || []);
+    }, [commentsFromHook, propPet, fetchedPet]);
 
     if (isLoadingSingle && !pet) return <div className="p-16 text-center text-gray-500 font-bold"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-brand-primary mx-auto mb-4"></div>Cargando detalles...</div>;
     
@@ -418,7 +446,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             
         } catch (error: any) {
             console.error("Error updating reunion status:", error);
-            alert("Hubo un error al guardar.");
+            setInfoModal({ isOpen: true, message: "Hubo un error al guardar.", type: 'error' });
         }
     };
 
@@ -441,6 +469,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
+    const handleReportComment = (commentId: string) => {
+        setCommentToReport(commentId);
+        setIsCommentReportModalOpen(true);
+    };
+
     const getStatusBadge = () => {
         switch (pet.status) {
             case PET_STATUS.PERDIDO: return 'bg-red-600 text-white';
@@ -452,14 +485,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
-    const previewComments = pet.comments ? pet.comments.filter(c => !c.parentId).slice(-2) : [];
-    const totalComments = pet.comments ? pet.comments.length : 0;
+    const previewComments = allComments.filter(c => !c.parentId).slice(-2);
+    const totalComments = allComments.length;
 
     const handleQuickComment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCommentPreview.trim()) return;
         if (!currentUser) {
-            alert("Inicia sesión para comentar");
+            setInfoModal({ isOpen: true, message: "Inicia sesión para comentar", type: 'info' });
             return;
         }
         await onAddComment(pet.id, newCommentPreview);
@@ -701,12 +734,10 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             <CommentItem 
                                 key={comment.id} 
                                 comment={comment} 
-                                allComments={pet.comments || []} 
+                                allComments={allComments} 
                                 onReply={() => setIsCommentsModalOpen(true)}
                                 onLike={(cid) => onLikeComment(pet.id, cid)}
-                                onReportComment={(cid) => {
-                                    // TODO: Implement comment reporting modal
-                                }} 
+                                onReportComment={handleReportComment} 
                                 currentUser={currentUser}
                                 postOwnerEmail={pet.userEmail}
                             />
@@ -922,6 +953,30 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 targetIdentifier={pet.name}
             />
 
+            {commentToReport && (
+                <ReportModal
+                    isOpen={isCommentReportModalOpen}
+                    onClose={() => {
+                        setIsCommentReportModalOpen(false);
+                        setCommentToReport(null);
+                    }}
+                    onSubmit={(r, d) => {
+                        const comment = allComments.find(c => c.id === commentToReport);
+                        const commentText = comment?.text?.substring(0, 50) || 'comentario';
+                        // Create postSnapshot with comment text and pet_id for admin review
+                        const postSnapshot = comment ? {
+                            text: comment.text,
+                            pet_id: pet.id
+                        } : { text: 'comentario eliminado', pet_id: pet.id };
+                        onReport('comment', commentToReport, r, d, postSnapshot);
+                        setIsCommentReportModalOpen(false);
+                        setCommentToReport(null);
+                    }}
+                    reportType="comment"
+                    targetIdentifier={commentToReport ? (allComments.find(c => c.id === commentToReport)?.text?.substring(0, 50) || 'comentario') : 'comentario'}
+                />
+            )}
+
             <ShareModal 
                 pet={pet} 
                 isOpen={isShareModalOpen} 
@@ -940,12 +995,10 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 onClose={() => setIsCommentsModalOpen(false)}
                 petId={pet.id} 
                 postOwnerEmail={pet.userEmail}
-                comments={pet.comments} 
+                comments={allComments} 
                 onAddComment={onAddComment}
                 onLikeComment={onLikeComment}
-                onReportComment={(cid: string) => {
-                    // TODO: Implement comment reporting modal
-                }}
+                onReportComment={handleReportComment}
                 onDeleteComment={handleDeleteComment}
                 currentUser={currentUser} 
             />
@@ -958,6 +1011,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     onViewAdminProfile={onViewUser} 
                 />
             )}
+            
+            <InfoModal 
+                isOpen={infoModal.isOpen} 
+                onClose={() => setInfoModal({ isOpen: false, message: '', type: 'info' })} 
+                title={infoModal.type === 'success' ? 'Éxito' : infoModal.type === 'error' ? 'Error' : 'Información'}
+                message={infoModal.message}
+                type={infoModal.type || 'info'}
+            />
         </div>
     );
 };
