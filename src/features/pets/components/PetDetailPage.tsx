@@ -43,7 +43,8 @@ const CommentItem: React.FC<{
     currentUser: User | null;
     depth?: number;
     postOwnerEmail?: string;
-}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail }) => {
+    onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail, onShowInfo }) => {
     const replies = allComments.filter(c => c.parentId === comment.id).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
     const isLiked = currentUser && comment.likes?.includes(currentUser.id || '');
@@ -68,7 +69,9 @@ const CommentItem: React.FC<{
 
     const handleAction = (action: () => void) => {
         if (!currentUser) {
-            setInfoModal({ isOpen: true, message: "Debes iniciar sesión para realizar esta acción.", type: 'info' });
+            if (onShowInfo) {
+                onShowInfo("Debes iniciar sesión para realizar esta acción.", 'info');
+            }
             return;
         }
         action();
@@ -153,6 +156,7 @@ const CommentItem: React.FC<{
                         currentUser={currentUser}
                         depth={depth + 1}
                         postOwnerEmail={postOwnerEmail}
+                        onShowInfo={onShowInfo}
                     />
                 ))}
             </div>
@@ -168,8 +172,9 @@ const CommentListAndInput: React.FC<{
     onLikeComment: (petId: string, commentId: string) => void,
     onReportComment: (commentId: string) => void,
     onDeleteComment?: (commentId: string) => void,
-    currentUser: User | null 
-}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser }) => {
+    currentUser: User | null;
+    onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser, onShowInfo }) => {
     const [newComment, setNewComment] = useState('');
     const [replyTo, setReplyTo] = useState<{ id: string, userName: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,6 +224,7 @@ const CommentListAndInput: React.FC<{
                             onDeleteComment={onDeleteComment}
                             currentUser={currentUser}
                             postOwnerEmail={postOwnerEmail}
+                            onShowInfo={onShowInfo}
                         />
                     ))
                 ) : (
@@ -740,6 +746,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 onReportComment={handleReportComment} 
                                 currentUser={currentUser}
                                 postOwnerEmail={pet.userEmail}
+                                onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
                             />
                         ))}
                     </div>
@@ -1000,7 +1007,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 onLikeComment={onLikeComment}
                 onReportComment={handleReportComment}
                 onDeleteComment={handleDeleteComment}
-                currentUser={currentUser} 
+                currentUser={currentUser}
+                onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
             />
 
             {publicProfileUser && (

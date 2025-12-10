@@ -29,7 +29,7 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [isConfirmingDeleteReport, setIsConfirmingDeleteReport] = useState(false);
-    const [newStatus, setNewStatus] = useState<ReportStatus>(report.status);
+    const [newStatus, setNewStatus] = useState<ReportStatus>(report.status as ReportStatus);
     const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
     
     // Fetch comment data if this is a comment report
@@ -70,6 +70,10 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
 
     const reporterDisplayName = reporterUser?.username || report.reporterEmail;
     const reportedDisplayName = reportedUserObj?.username || report.reportedEmail;
+    
+    // Get postSnapshot early - used in handleUpdateStatus
+    // Note: report.post_snapshot is snake_case in ReportRow, but we access it as postSnapshot if transformed
+    const postSnapshot = (report as any).postSnapshot || (report as any).post_snapshot;
     
     const handleConfirmDelete = () => {
         if ('id' in pet && typeof pet.id === 'string') {
@@ -163,8 +167,6 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
     } : null;
     
     // Get pet_id for comment reports: from comment API data, or from postSnapshot, or from pet prop
-    // Note: report.post_snapshot is snake_case in ReportRow, but we access it as postSnapshot if transformed
-    const postSnapshot = (report as any).postSnapshot || (report as any).post_snapshot;
     const petIdForComment = isCommentReport ? (
         commentDataFromApi?.pet_id || 
         (postSnapshot as any)?.pet_id ||
