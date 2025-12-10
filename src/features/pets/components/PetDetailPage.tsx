@@ -16,6 +16,8 @@ import { ShareModal } from '@/shared';
 import { ReunionSuccessModal } from '@/features/pets';
 import { ErrorBoundary } from '@/shared';
 import { supabase } from '@/services/supabaseClient';
+import { CelebrationEffect } from '@/shared/components/CelebrationEffect';
+import { hasCelebrated, markAsCelebrated } from '@/utils/celebrationTracker';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -321,6 +323,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
     const [newCommentPreview, setNewCommentPreview] = useState('');
+    const [showCelebration, setShowCelebration] = useState(false);
 
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
@@ -366,6 +369,33 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
         return () => clearTimeout(timer);
     }, [pet]);
+
+    // Celebration effect for reunited pets
+    useEffect(() => {
+        if (!pet) return;
+        
+        // Only show celebration if pet is reunited
+        if (pet.status === PET_STATUS.REUNIDO) {
+            const userId = currentUser?.id || null;
+            
+            // Check if user has already seen the celebration for this pet
+            if (!hasCelebrated(pet.id, userId)) {
+                // Show celebration and mark as seen
+                setShowCelebration(true);
+                markAsCelebrated(pet.id, userId);
+                
+                // Hide celebration after duration
+                const timer = setTimeout(() => {
+                    setShowCelebration(false);
+                }, 1000);
+                
+                return () => clearTimeout(timer);
+            }
+        } else {
+            // Hide celebration if pet is not reunited
+            setShowCelebration(false);
+        }
+    }, [pet?.id, pet?.status, currentUser?.id]);
 
     if (isLoadingSingle && !pet) return <div className="p-16 text-center text-gray-500 font-bold"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-brand-primary mx-auto mb-4"></div>Cargando detalles...</div>;
     
@@ -928,6 +958,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 <title>{displayName} - {pet.status} | Mas Patas</title>
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
+
+            {/* Celebration Effect */}
+            {showCelebration && <CelebrationEffect duration={1000} />}
 
             <button onClick={onClose} className="mb-3 sm:mb-4 flex items-center text-icon-gray hover:text-brand-primary font-bold transition-colors text-sm sm:text-base">
                 <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1" /> Volver al listado
