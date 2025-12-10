@@ -422,6 +422,58 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
+    const handleSaveForLater = async () => {
+        try {
+            const updateData: any = {
+                status: PET_STATUS.REUNIDO,
+                reunion_date: new Date().toISOString().split('T')[0]
+            };
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            trackPetReunited(pet.id);
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion status:", error);
+            alert("Hubo un error al guardar.");
+            throw error;
+        }
+    };
+
+    const handleUpdateReunionStory = async (story: string, date: string, image?: string) => {
+        try {
+            const updateData: any = {
+                reunion_story: story,
+                reunion_date: date
+            };
+
+            if (image) {
+                updateData.image_urls = [image, ...(pet.imageUrls || [])];
+            }
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion story:", error);
+            alert("Hubo un error al guardar la historia.");
+        }
+    };
+
     const handleRevealContact = () => {
         if (!currentUser) {
             navigate('/login');
@@ -631,6 +683,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
                 </div>
 
+                {pet.status === PET_STATUS.REUNIDO && pet.reunionDate && (
+                    <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="p-1.5 sm:p-2 bg-green-100 text-green-600 rounded-full mt-1 flex-shrink-0">
+                            <HeartIcon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" filled />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] sm:text-xs text-green-600 font-bold uppercase tracking-wider">Fecha de Reencuentro</p>
+                            <p className="text-green-700 font-bold text-sm sm:text-base lg:text-lg capitalize break-words">
+                                {new Date(pet.reunionDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="border-t border-card-border pt-3 sm:pt-4"></div>
+
                 <div className="flex items-start gap-3 sm:gap-4">
                     <div className="p-1.5 sm:p-2 bg-gray-100 text-icon-gray rounded-full mt-1 flex-shrink-0">
                         <LocationMarkerIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -775,6 +843,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 >
                                     <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-brand-secondary" />
                                     ¡Ya encontré a mi mascota!
+                                </button>
+                            )}
+                            {pet.status === PET_STATUS.REUNIDO && (
+                                <button 
+                                    onClick={() => setIsReunionModalOpen(true)}
+                                    className="w-full bg-purple-100 text-purple-700 font-bold py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center gap-2 shadow-sm mb-2 sm:mb-3 text-sm sm:text-base"
+                                >
+                                    <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" filled />
+                                    Contar mi experiencia de cómo me reuní con mi mascota
                                 </button>
                             )}
                             <div className="flex gap-2 sm:gap-3">
@@ -932,7 +1009,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 isOpen={isReunionModalOpen}
                 onClose={() => setIsReunionModalOpen(false)}
                 pet={pet}
-                onSubmit={handleReunionSubmit}
+                onSubmit={pet.status === PET_STATUS.REUNIDO ? handleUpdateReunionStory : handleReunionSubmit}
+                onSaveForLater={pet.status === PET_STATUS.REUNIDO ? undefined : handleSaveForLater}
             />
 
             <CommentsModal 

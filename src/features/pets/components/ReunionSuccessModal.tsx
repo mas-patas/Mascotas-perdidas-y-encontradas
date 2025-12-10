@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Pet } from '@/types';
 import { uploadImage } from '@/utils/imageUtils';
 import { SparklesIcon, HeartIcon, XCircleIcon } from '@/shared/components/icons';
@@ -9,14 +9,24 @@ interface ReunionSuccessModalProps {
     onClose: () => void;
     pet: Pet;
     onSubmit: (story: string, date: string, image?: string) => Promise<void>;
+    onSaveForLater?: () => Promise<void>;
 }
 
-const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClose, pet, onSubmit }) => {
-    const [story, setStory] = useState('');
-    const [reunionDate, setReunionDate] = useState(new Date().toISOString().split('T')[0]);
+const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClose, pet, onSubmit, onSaveForLater }) => {
+    const [story, setStory] = useState(pet.reunionStory || '');
+    const [reunionDate, setReunionDate] = useState(pet.reunionDate || new Date().toISOString().split('T')[0]);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Reset form when modal opens/closes or pet changes
+    useEffect(() => {
+        if (isOpen) {
+            setStory(pet.reunionStory || '');
+            setReunionDate(pet.reunionDate || new Date().toISOString().split('T')[0]);
+            setImagePreview(null);
+        }
+    }, [isOpen, pet.reunionStory, pet.reunionDate]);
 
     if (!isOpen) return null;
 
@@ -38,7 +48,8 @@ const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClo
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!story.trim()) {
+        // Only require story if pet is not already reunited (updating existing story)
+        if (!story.trim() && !pet.reunionStory) {
             alert("Por favor cuéntanos brevemente cómo fue el reencuentro.");
             return;
         }
@@ -137,11 +148,30 @@ const ReunionSuccessModal: React.FC<ReunionSuccessModalProps> = ({ isOpen, onClo
                     >
                         {isSubmitting ? 'Guardando...' : (
                             <>
-                                <SparklesIcon className="h-6 w-6" />
+                                <HeartIcon className="h-6 w-6" filled />
                                 <span>Celebrar Reencuentro</span>
                             </>
                         )}
                     </button>
+                    
+                    {onSaveForLater && (
+                        <button 
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await onSaveForLater();
+                                    onClose();
+                                } catch (error) {
+                                    console.error(error);
+                                    alert("Hubo un problema al guardar.");
+                                }
+                            }}
+                            disabled={isSubmitting || isUploading}
+                            className="w-full py-3 bg-gray-100 text-gray-700 font-bold text-base rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            Lo haré en otro momento
+                        </button>
+                    )}
                 </form>
             </div>
         </div>

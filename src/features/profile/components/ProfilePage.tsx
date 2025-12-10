@@ -274,6 +274,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             }
         }
     };
+
     
     const profileTourSteps: TourStep[] = [
         { target: '[data-tour="gamification-card"]', title: 'Tu Progreso', content: 'Aquí verás tu nivel como héroe de mascotas.', position: 'left' },
