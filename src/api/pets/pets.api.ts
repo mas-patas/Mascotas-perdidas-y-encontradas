@@ -47,7 +47,9 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
     .from('pets')
     .select(PET_COLUMNS, { count: 'exact' })
     .eq('status', filters.status)
-    .gt('expires_at', nowIso);
+    .gt('expires_at', nowIso)
+    // Exclude permanently deactivated pets (expires_at before 2000)
+    .gt('expires_at', '2000-01-01');
   
   if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
   if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
@@ -157,6 +159,7 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
 
 /**
  * Fetch a single pet by ID
+ * Note: This doesn't filter by expiration so owners and admins can see expired pets
  */
 export const getPetById = async (id: string): Promise<Pet | null> => {
   const { data, error } = await supabase
@@ -243,7 +246,9 @@ export const getPetsForMap = async (): Promise<Pet[]> => {
     .select(PET_COLUMNS)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
-    .gt('expires_at', nowIso);
+    .gt('expires_at', nowIso)
+    // Exclude permanently deactivated pets
+    .gt('expires_at', '2000-01-01');
   
   if (error) throw error;
   if (!data) return [];
@@ -380,6 +385,26 @@ export const renewPet = async (id: string): Promise<void> => {
     .update({
       expires_at: newExpirationDate.toISOString(),
       created_at: now.toISOString()
+    })
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+/**
+ * Deactivate a pet (mark as permanently deactivated)
+ * This uses a special status or we can add an is_deactivated field
+ * For now, we'll set expires_at to a very old date to mark it as deactivated
+ */
+export const deactivatePet = async (id: string): Promise<void> => {
+  // Set expires_at to a very old date to mark as permanently deactivated
+  // This way it won't appear in any queries that filter by expires_at
+  const deactivatedDate = new Date('2000-01-01');
+  
+  const { error } = await supabase
+    .from('pets')
+    .update({
+      expires_at: deactivatedDate.toISOString()
     })
     .eq('id', id);
 
