@@ -8,7 +8,7 @@ import { useGhosting } from '@/hooks/auth/useGhosting';
 
 export const AuthProvider = ({ children }: React.PropsWithChildren): React.ReactElement => {
   const { currentUser, setCurrentUser, loading } = useAuthSession();
-  const { login, register, logout, loginWithGoogle, resetPassword } = useAuthOperations();
+  const { login, register, logout, loginWithGoogle, loginWithFacebook, resetPassword } = useAuthOperations();
   const {
     updateUserProfile,
     updatePassword,
@@ -28,6 +28,7 @@ export const AuthProvider = ({ children }: React.PropsWithChildren): React.React
       register,
       logout,
       loginWithGoogle,
+      loginWithFacebook,
       resetPassword,
       updateUserProfile,
       updatePassword,
@@ -47,6 +48,7 @@ export const AuthProvider = ({ children }: React.PropsWithChildren): React.React
       register,
       logout,
       loginWithGoogle,
+      loginWithFacebook,
       resetPassword,
       updateUserProfile,
       updatePassword,
