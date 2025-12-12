@@ -142,6 +142,26 @@ export const useRenewPet = () => {
 };
 
 /**
+ * Mutation hook to deactivate a pet permanently
+ */
+export const useDeactivatePet = () => {
+  const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await petsApi.deactivatePet(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pets });
+      if (currentUser) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.myPets(currentUser.id) });
+      }
+    }
+  });
+};
+
+/**
  * Mutation hook to update pet status
  */
 export const useUpdatePetStatus = () => {
