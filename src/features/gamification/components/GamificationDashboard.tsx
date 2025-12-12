@@ -4,8 +4,8 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/auth';
 import type { User, Pet, Mission, ActivityLog, LeaderboardEntry } from '@/types';
 import { TargetIcon, HistoryIcon, CoinIcon, XCircleIcon, CheckIcon, PlusIcon, ChatBubbleIcon, HeartIcon, MegaphoneIcon, TrophyIcon, CrownIcon } from '@/shared/components/icons';
-import { GamificationBadge, getLevelFromPoints } from '@/features/gamification';
-import { getUserHistory, getWeeklyLeaderboard } from '@/services/gamificationService';
+import { GamificationBadge, getLevelFromPoints, LEVELS } from '@/features/gamification';
+import { getUserHistory, getWeeklyLeaderboard, POINTS_CONFIG } from '@/services/gamificationService';
 import { UserPublicProfileModal } from '@/features/profile';
 
 interface GamificationDashboardProps {
@@ -24,6 +24,7 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
     const [selectedLeaderboardUser, setSelectedLeaderboardUser] = useState<LeaderboardEntry | null>(null);
     const [viewingPublicProfile, setViewingPublicProfile] = useState<User | null>(null);
+    const [showPointsSystem, setShowPointsSystem] = useState(false);
 
     // Define Missions
     const dailyMissions: Mission[] = [
@@ -84,6 +85,20 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
         setViewingPublicProfile(partialUser);
     };
 
+    // Calculate level progress
+    const currentLevel = getLevelFromPoints(currentPoints);
+    const nextLevel = LEVELS.find(l => l.min > currentLevel.max);
+    
+    // Calculate progress to next level
+    let progressPercentage = 100;
+    let pointsNeeded = 0;
+    if (nextLevel) {
+        const range = currentLevel.max - currentLevel.min;
+        const progressPoints = currentPoints - currentLevel.min;
+        progressPercentage = Math.min(100, Math.max(0, (progressPoints / range) * 100));
+        pointsNeeded = nextLevel.min - currentPoints;
+    }
+
     const getActionConfig = (type: ActivityLog['actionType']) => {
         switch (type) {
             case 'report_pet':
@@ -127,9 +142,33 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                             <div className="bg-white/10 p-3 md:p-4 rounded-2xl backdrop-blur-md border border-white/20">
                                 <GamificationBadge points={currentPoints} size="sm" />
                             </div>
-                            <div>
+                            <div className="flex-1">
                                 <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">Mi Progreso</h2>
-                                <p className="opacity-80 text-xs md:text-sm font-medium">Sigue completando misiones para subir de rango.</p>
+                                <p className="opacity-80 text-xs md:text-sm font-medium mb-3">Sigue completando misiones para subir de rango.</p>
+                                
+                                {/* Progress Bar */}
+                                {nextLevel && (
+                                    <div className="w-full max-w-md space-y-1.5">
+                                        <div className="flex justify-between items-center text-[10px] md:text-xs font-bold text-white/90">
+                                            <span>{currentPoints} / {nextLevel.min} pts</span>
+                                            <span className="text-yellow-300">Faltan {pointsNeeded} pts</span>
+                                        </div>
+                                        <div className="w-full bg-white/20 rounded-full h-2.5 md:h-3 overflow-hidden shadow-inner border border-white/10">
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-yellow-400 to-yellow-500 shadow-lg`}
+                                                style={{ width: `${progressPercentage}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Ver Sistema de Puntos Button */}
+                                <button
+                                    onClick={() => setShowPointsSystem(true)}
+                                    className="mt-3 text-[10px] md:text-xs font-bold text-white/90 hover:text-white underline transition-colors"
+                                >
+                                    Ver sistema de puntos
+                                </button>
                             </div>
                         </div>
 
@@ -377,6 +416,180 @@ const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ user, cur
                     onClose={() => setViewingPublicProfile(null)}
                     targetUser={viewingPublicProfile}
                 />
+            )}
+
+            {/* Points System Modal */}
+            {showPointsSystem && (
+                <div className="fixed inset-0 z-[10000] flex justify-center items-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black bg-opacity-60 backdrop-blur-sm" onClick={() => setShowPointsSystem(false)}></div>
+                    
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden relative z-10">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-6 text-white relative overflow-hidden shrink-0">
+                            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                            <div className="relative z-10 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">Sistema de Puntos</h2>
+                                    <p className="opacity-80 text-xs md:text-sm font-medium mt-1">Descubre cómo ganar Doggy Points</p>
+                                </div>
+                                <button 
+                                    onClick={() => setShowPointsSystem(false)}
+                                    className="bg-white/20 hover:bg-white/40 text-white rounded-full p-2 transition-colors"
+                                >
+                                    <XCircleIcon className="h-6 w-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-grow overflow-y-auto p-6 bg-gray-50">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-indigo-200">
+                                        <tr>
+                                            <th className="px-4 py-4 font-black text-gray-800 uppercase text-xs md:text-sm tracking-wider">Acción</th>
+                                            <th className="px-4 py-4 font-black text-gray-800 uppercase text-xs md:text-sm tracking-wider text-right">Puntos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-blue-100 text-blue-600 p-2 rounded-lg shadow-sm">
+                                                        <PlusIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Reportar Mascota</p>
+                                                        <p className="text-xs text-gray-500">Publicar una mascota perdida o encontrada</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +{POINTS_CONFIG.REPORT_PET} <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-purple-100 text-purple-600 p-2 rounded-lg shadow-sm">
+                                                        <ChatBubbleIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Comentar en Publicación</p>
+                                                        <p className="text-xs text-gray-500">Ayudar a otros con comentarios útiles</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +{POINTS_CONFIG.COMMENT_ADDED} <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-green-100 text-green-600 p-2 rounded-lg shadow-sm">
+                                                        <HeartIcon className="h-5 w-5" filled />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Mascota Reunida</p>
+                                                        <p className="text-xs text-gray-500">Ayudar a reunir una mascota con su familia</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +{POINTS_CONFIG.PET_REUNITED} <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-orange-100 text-orange-600 p-2 rounded-lg shadow-sm">
+                                                        <MegaphoneIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Compartir Publicación</p>
+                                                        <p className="text-xs text-gray-500">Difundir publicaciones en redes sociales</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +{POINTS_CONFIG.SHARE_POST} <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-gray-100 text-gray-600 p-2 rounded-lg shadow-sm">
+                                                        <TargetIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Login Diario</p>
+                                                        <p className="text-xs text-gray-500">Iniciar sesión una vez al día</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +{POINTS_CONFIG.DAILY_LOGIN} <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors bg-indigo-50/50">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-indigo-100 text-indigo-600 p-2 rounded-lg shadow-sm">
+                                                        <TrophyIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Calificaciones Recibidas</p>
+                                                        <p className="text-xs text-gray-500">Por cada calificación positiva que recibas</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    +10 <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 transition-colors bg-amber-50/50">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-amber-100 text-amber-600 p-2 rounded-lg shadow-sm">
+                                                        <CrownIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-sm md:text-base">Calidad de Ayuda</p>
+                                                        <p className="text-xs text-gray-500">Puntos basados en tu promedio de calificaciones (×20)</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="font-black text-yellow-500 text-lg md:text-xl flex items-center justify-end gap-1">
+                                                    ×20 <CoinIcon className="h-5 w-5" />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200">
+                                <p className="text-xs md:text-sm text-gray-700 font-medium">
+                                    <span className="font-black text-yellow-600">💡 Tip:</span> Cuantas más acciones realices, más puntos ganarás y más rápido subirás de nivel. ¡Sigue ayudando a la comunidad!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>,
         document.body

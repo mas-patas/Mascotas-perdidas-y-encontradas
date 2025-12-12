@@ -1,14 +1,16 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { User, Pet, OwnedPet, UserRating, SavedSearchRow, PetStatus, PetRow } from '@/types';
 import { PetCard } from '@/features/pets';
 import { useAuth } from '@/contexts/auth';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@/shared/components/icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, EyeIcon, EyeOffIcon, LockIcon } from '@/shared/components/icons';
 import { AddPetModal } from '@/features/pets';
 import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
+import { mapPetFromDb } from '@/utils/mappers';
 import { StarRating } from '@/shared';
 import { useDeleteSavedSearch, useBusinessByOwner } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
@@ -21,6 +23,8 @@ import { useGamification } from '@/hooks/useGamification';
 import { PET_STATUS } from '@/constants';
 import { PullToRefresh } from '@/shared';
 import { LazyImage } from '@/shared';
+import { signInWithPassword } from '@/api/auth/auth.api';
+import type { LoginCredentials } from '@/api/auth/auth.types';
 
 
 const countries = [
@@ -42,7 +46,7 @@ interface ProfilePageProps {
 }
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propReportedPets, allPets, users, onBack, onReportOwnedPetAsLost, onNavigate, onViewUser, onRenewPet }) => {
-    const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet } = useAuth();
+    const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet, updatePassword } = useAuth();
     const queryClient = useQueryClient();
     const { points: gamificationPoints } = useGamification(user.id);
     
@@ -51,12 +55,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
     const [isDashboardOpen, setIsDashboardOpen] = useState(false);
     const [isBusinessModalOpen, setIsBusinessModalOpen] = useState(false);
+    const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
     const [editingOwnedPet, setEditingOwnedPet] = useState<OwnedPet | null>(null);
     const [viewingOwnedPet, setViewingOwnedPet] = useState<OwnedPet | null>(null);
     const [petToDelete, setPetToDelete] = useState<OwnedPet | null>(null);
     const [reportPage, setReportPage] = useState(1);
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    
+    // Password change state
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
     
     const filterRef = useRef<HTMLDivElement>(null);
 
@@ -125,7 +140,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             
             if (error) throw error;
             
-            const pets = (data || []) as PetRow[];
+            // Transform PetRow[] to Pet[] using mapPetFromDb to ensure image URLs are public
+            // Create a profile-like object for mapPetFromDb to find the owner email
+            const profileLike = user.id && user.email ? [{ id: user.id, email: user.email }] : [];
+            const pets = (data || []).map((p: PetRow) => mapPetFromDb(p, profileLike));
             return { pets, count: count || 0 };
         },
         placeholderData: keepPreviousData
@@ -272,6 +290,58 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 alert(err.message || 'Error al eliminar la mascota.');
                 setPetToDelete(null);
             }
+        }
+    };
+
+    const handleChangePassword = async () => {
+        setPasswordError('');
+        
+        if (!oldPassword) {
+            setPasswordError('Por favor ingresa tu contraseña actual.');
+            return;
+        }
+        
+        if (!newPassword || newPassword.length < 8) {
+            setPasswordError('La nueva contraseña debe tener al menos 8 caracteres.');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            setPasswordError('Las contraseñas no coinciden.');
+            return;
+        }
+        
+        if (oldPassword === newPassword) {
+            setPasswordError('La nueva contraseña debe ser diferente a la actual.');
+            return;
+        }
+        
+        setIsChangingPassword(true);
+        try {
+            // Verify old password by attempting to sign in
+            if (!user.email) {
+                throw new Error('No se pudo obtener el email del usuario.');
+            }
+            
+            await signInWithPassword({ email: user.email, password: oldPassword });
+            
+            // If sign in succeeds, the old password is correct, proceed to update
+            await updatePassword(newPassword);
+            
+            setIsChangePasswordModalOpen(false);
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordError('');
+            alert('Contraseña actualizada exitosamente.');
+        } catch (err: any) {
+            if (err.message?.includes('Invalid login credentials') || err.message?.includes('incorrect')) {
+                setPasswordError('La contraseña actual es incorrecta.');
+            } else {
+                setPasswordError(err.message || 'Error al cambiar la contraseña.');
+            }
+        } finally {
+            setIsChangingPassword(false);
         }
     };
     
@@ -424,9 +494,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                     <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
                                     <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Usuario:</span> @{user.username}</p>
                                     <p className="w-full text-sm sm:text-base break-all"><span className="font-semibold text-text-main">Email:</span> {user.email}</p>
+                                    {user.dni && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">DNI:</span> {user.dni}</p>}
                                     {user.phone && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Teléfono:</span> {user.phone}</p>}
                                     {user.birthDate && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Fecha de Nacimiento:</span> {new Date(user.birthDate + 'T00:00:00').toLocaleDateString()}</p>}
                                     {user.country && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">País:</span> {user.country}</p>}
+                                    
+                                    {/* Change Password Button */}
+                                    <button 
+                                        onClick={() => setIsChangePasswordModalOpen(true)} 
+                                        className="w-full max-w-xs mx-auto mt-2 flex items-center justify-center gap-2 text-xs sm:text-sm py-2 px-4 bg-gray-100 text-text-main rounded-lg hover:bg-gray-200 transition-colors font-semibold"
+                                    >
+                                        <LockIcon className="h-4 w-4" /> Cambiar Contraseña
+                                    </button>
                                     
                                     {/* Mobile Edit Button */}
                                     <button 
@@ -483,7 +562,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         </button>
                     </div>
                      {user.ownedPets && user.ownedPets.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                             {user.ownedPets.map(pet => (
                                <div key={pet.id} className="bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg overflow-hidden flex flex-col relative transition-transform transform hover:-translate-y-1 hover:shadow-xl">
                                     <button onClick={(e) => { e.stopPropagation(); setPetToDelete(pet); }} className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 z-10 p-1 sm:p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"><TrashIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
@@ -510,7 +589,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 <div className="space-y-3 sm:space-y-4" data-tour="saved-pets-section">
                     <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-text-main">Publicaciones guardadas</h3>
                     {savedPets.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                             {savedPets.map(pet => {
                                 const petOwner = users.find(u => u.email === pet.userEmail);
                                 return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
@@ -570,7 +649,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                         <div className="text-center py-8 sm:py-10"><div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-brand-primary mx-auto"></div></div>
                     ) : myReportedPets.length > 0 ? (
                         <>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8">
                                 {myReportedPets.filter(p => p).map(pet => {
                                     const expired = isPetExpired(pet);
                                     return (
@@ -636,6 +715,151 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                 {petToDelete && <ConfirmationModal isOpen={!!petToDelete} onClose={() => setPetToDelete(null)} onConfirm={handleConfirmDelete} title="Eliminar Mascota" message={`¿Estás seguro de que quieres eliminar a ${petToDelete.name}?`} confirmText="Eliminar" cancelText="Cancelar" />}
                 {isDashboardOpen && <GamificationDashboard user={user} currentPoints={gamificationPoints} userReportedPets={myReportedPets} onClose={() => setIsDashboardOpen(false)} />}
                 {isBusinessModalOpen && myBusiness && <BusinessManagementModal isOpen={isBusinessModalOpen} onClose={() => setIsBusinessModalOpen(false)} businessId={myBusiness.id} />}
+                
+                {/* Change Password Modal */}
+                {isChangePasswordModalOpen && createPortal(
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4"
+                        onClick={() => {
+                            setIsChangePasswordModalOpen(false);
+                            setOldPassword('');
+                            setNewPassword('');
+                            setConfirmPassword('');
+                            setPasswordError('');
+                        }}
+                        aria-modal="true"
+                        role="dialog"
+                    >
+                        <div 
+                            className="bg-white rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-brand-dark">Cambiar Contraseña</h3>
+                                    <button 
+                                        onClick={() => {
+                                            setIsChangePasswordModalOpen(false);
+                                            setOldPassword('');
+                                            setNewPassword('');
+                                            setConfirmPassword('');
+                                            setPasswordError('');
+                                        }}
+                                        className="text-gray-400 hover:text-gray-700 text-2xl"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                                
+                                {passwordError && (
+                                    <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded-md mb-4 text-sm" role="alert">
+                                        {passwordError}
+                                    </div>
+                                )}
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="oldPassword" className="block text-sm font-medium text-text-main mb-1">
+                                            Contraseña Actual <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="oldPassword"
+                                                type={showOldPassword ? "text" : "password"}
+                                                value={oldPassword}
+                                                onChange={(e) => setOldPassword(e.target.value)}
+                                                className={inputClass}
+                                                placeholder="Ingresa tu contraseña actual"
+                                                required
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowOldPassword(!showOldPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                            >
+                                                {showOldPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label htmlFor="newPassword" className="block text-sm font-medium text-text-main mb-1">
+                                            Nueva Contraseña <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="newPassword"
+                                                type={showPassword ? "text" : "password"}
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                className={inputClass}
+                                                placeholder="Mínimo 8 caracteres"
+                                                required
+                                                minLength={8}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                            >
+                                                {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-main mb-1">
+                                            Confirmar Contraseña <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="confirmPassword"
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className={inputClass}
+                                                placeholder="Confirma tu nueva contraseña"
+                                                required
+                                                minLength={8}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                            >
+                                                {showConfirmPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-lg">
+                                <button
+                                    type="button"
+                                    onClick={handleChangePassword}
+                                    disabled={isChangingPassword}
+                                    className="px-4 py-2 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isChangingPassword ? 'Cambiando...' : 'Cambiar Contraseña'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsChangePasswordModalOpen(false);
+                                        setOldPassword('');
+                                        setNewPassword('');
+                                        setConfirmPassword('');
+                                        setPasswordError('');
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 text-text-sub rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
         </PullToRefresh>
     );
