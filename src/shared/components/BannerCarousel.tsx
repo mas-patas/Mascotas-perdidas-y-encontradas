@@ -9,6 +9,13 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ banners }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Reset currentIndex if it exceeds array bounds when banners array changes
+  useEffect(() => {
+    if (banners.length > 0 && currentIndex >= banners.length) {
+      setCurrentIndex(0);
+    }
+  }, [banners.length, currentIndex]);
+
   // Auto-advance every 3 seconds
   useEffect(() => {
     if (banners.length === 0 || isPaused) return;
@@ -21,17 +28,26 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({ banners }) => {
   }, [banners.length, isPaused]);
 
   const goToSlide = useCallback((index: number) => {
-    setCurrentIndex(index);
+    // Ensure index is within bounds
+    const safeIndex = Math.max(0, Math.min(index, banners.length - 1));
+    setCurrentIndex(safeIndex);
     setIsPaused(true);
     // Resume after 5 seconds of manual navigation
     setTimeout(() => setIsPaused(false), 5000);
-  }, []);
+  }, [banners.length]);
 
   if (banners.length === 0) {
     return null;
   }
 
-  const currentBanner = banners[currentIndex];
+  // Ensure currentIndex is always within bounds
+  const safeIndex = Math.max(0, Math.min(currentIndex, banners.length - 1));
+  const currentBanner = banners[safeIndex];
+
+  // If for some reason currentBanner is still undefined, return null
+  if (!currentBanner) {
+    return null;
+  }
 
   return (
     <div 
