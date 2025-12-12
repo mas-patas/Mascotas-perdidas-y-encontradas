@@ -7,7 +7,7 @@ import { bannerKeys } from './banners.keys';
  */
 export const useBanners = () => {
   return useQuery({
-    queryKey: bannerKeys.lists('all'),
+    queryKey: bannerKeys.list('all'),
     queryFn: getAllBanners,
     retry: 1,
     retryOnMount: false,
