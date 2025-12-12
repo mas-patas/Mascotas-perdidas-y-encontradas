@@ -19,4 +19,5 @@ export { default as OwnedPetDetailModal } from './components/OwnedPetDetailModal
 export { OnboardingTour } from './components/OnboardingTour';
 export type { TourStep } from './components/OnboardingTour';
 export { CelebrationEffect } from './components/CelebrationEffect';
+export { BannerCarousel } from './components/BannerCarousel';
 export * from './components/icons';

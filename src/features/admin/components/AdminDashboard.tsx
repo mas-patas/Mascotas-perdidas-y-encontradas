@@ -9,8 +9,9 @@ import { CampaignFormModal } from '@/features/campaigns';
 import { ConfirmationModal, InfoModal } from '@/shared';
 import { useAppData } from '@/hooks/useAppData';
 import { AdminBusinessPanel } from '@/features/admin';
-import { useAdminStats, useCreateBannedIp, useDeleteBannedIp, useDeleteReport } from '@/api';
+import { useAdminStats, useCreateBannedIp, useDeleteBannedIp, useDeleteReport, useBanners, useCreateBanner, useUpdateBanner, useDeleteBanner } from '@/api';
 import { supabase } from '@/services/supabaseClient';
+import BannerManagementModal from './BannerManagementModal';
 
 interface AdminDashboardProps {
     onBack: () => void;
@@ -208,6 +209,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const SUPPORT_PER_PAGE = 10;
     const [currentPage, setCurrentPage] = useState(1); // Users Page
     const ITEMS_PER_PAGE = 10;
+
+    // Banner Management Hooks (must be at component level)
+    const { data: banners = [], isLoading: bannersLoading } = useBanners();
+    const createBanner = useCreateBanner();
+    const deleteBanner = useDeleteBanner();
+    const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
 
     // Advanced User Filters
     const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -900,48 +907,91 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
     );
 
-    const renderSettingsManagement = () => (
-        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Configuración General</h3>
+    const handleCreateBanner = async (imageUrl: string) => {
+        try {
+            await createBanner.mutateAsync({
+                imageUrl,
+            });
+            setInfoModal({ isOpen: true, message: 'Banner creado exitosamente', type: 'success' });
+        } catch (err: any) {
+            setInfoModal({ isOpen: true, message: 'Error al crear banner: ' + (err.message || 'Error desconocido'), type: 'error' });
+        }
+    };
+
+    const handleDeleteBanner = async (id: string) => {
+        if (!confirm('¿Estás seguro de que quieres eliminar este banner?')) return;
+        try {
+            await deleteBanner.mutateAsync(id);
+            setInfoModal({ isOpen: true, message: 'Banner eliminado exitosamente', type: 'success' });
+        } catch (err: any) {
+            setInfoModal({ isOpen: true, message: 'Error al eliminar banner: ' + (err.message || 'Error desconocido'), type: 'error' });
+        }
+    };
+
+    const renderSettingsManagement = () => {
+
+        return (
             <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div>
-                        <h4 className="font-semibold text-gray-800">Búsqueda automática con IA</h4>
-                        <p className="text-sm text-gray-500">Buscar coincidencias automáticamente al reportar.</p>
-                    </div>
-                    <label htmlFor="ai-search-toggle" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="ai-search-toggle" className="sr-only peer" checked={isAiSearchEnabled} onChange={onToggleAiSearch} />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-primary peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                    </label>
-                </div>
-                <div className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-2 rounded-full text-blue-600"><BellIcon className="h-6 w-6" /></div>
+                <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">Configuración General</h3>
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                             <div>
-                                <h4 className="font-semibold text-gray-800">Alertas de Proximidad</h4>
-                                <p className="text-sm text-gray-500">Notificaciones Push a usuarios cercanos.</p>
+                                <h4 className="font-semibold text-gray-800">Búsqueda automática con IA</h4>
+                                <p className="text-sm text-gray-500">Buscar coincidencias automáticamente al reportar.</p>
                             </div>
+                            <label htmlFor="ai-search-toggle" className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ai-search-toggle" className="sr-only peer" checked={isAiSearchEnabled} onChange={onToggleAiSearch} />
+                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-primary peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
                         </div>
-                        <label htmlFor="location-alert-toggle" className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="location-alert-toggle" className="sr-only peer" checked={isLocationAlertsEnabled} onChange={onToggleLocationAlerts} />
-                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-primary peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                        </label>
+                        <div className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600"><BellIcon className="h-6 w-6" /></div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800">Alertas de Proximidad</h4>
+                                        <p className="text-sm text-gray-500">Notificaciones Push a usuarios cercanos.</p>
+                                    </div>
+                                </div>
+                                <label htmlFor="location-alert-toggle" className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="location-alert-toggle" className="sr-only peer" checked={isLocationAlertsEnabled} onChange={onToggleLocationAlerts} />
+                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-primary peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                                </label>
+                            </div>
+                            {isLocationAlertsEnabled && (
+                                <div className="pl-14 mt-2 animate-fade-in">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><LocationMarkerIcon className="h-4 w-4" /> Radio de Alerta (Km)</label>
+                                    <div className="flex gap-2">
+                                        {[1, 2, 3, 4, 5].map((km) => (
+                                            <button key={km} onClick={() => onSetLocationAlertRadius(km)} className={`px-4 py-2 rounded-md text-sm font-bold border transition-all ${locationAlertRadius === km ? 'bg-brand-primary text-white border-brand-primary shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}>{km} km</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    {isLocationAlertsEnabled && (
-                        <div className="pl-14 mt-2 animate-fade-in">
-                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"><LocationMarkerIcon className="h-4 w-4" /> Radio de Alerta (Km)</label>
-                            <div className="flex gap-2">
-                                {[1, 2, 3, 4, 5].map((km) => (
-                                    <button key={km} onClick={() => onSetLocationAlertRadius(km)} className={`px-4 py-2 rounded-md text-sm font-bold border transition-all ${locationAlertRadius === km ? 'bg-brand-primary text-white border-brand-primary shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}>{km} km</button>
-                                ))}
-                            </div>
+                </div>
+
+                {/* Banner Management Button */}
+                <div className="flex items-center justify-between p-4 bg-white border-2 border-purple-200 rounded-lg hover:border-purple-300 hover:shadow-md transition-all">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-purple-100 p-2 rounded-full text-purple-600 text-xl">🖼️</div>
+                        <div>
+                            <h4 className="font-semibold text-gray-800">Gestión de Banners</h4>
+                            <p className="text-sm text-gray-500">Administra el carrusel de banners del inicio</p>
                         </div>
-                    )}
+                    </div>
+                    <button
+                        onClick={() => setIsBannerModalOpen(true)}
+                        className="px-4 py-2 bg-brand-primary text-white rounded-lg font-bold hover:bg-brand-dark transition-colors shadow-sm"
+                    >
+                        Gestionar
+                    </button>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div id="admin-dashboard" className="space-y-6">
@@ -991,6 +1041,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 title={infoModal.type === 'success' ? 'Éxito' : infoModal.type === 'error' ? 'Error' : 'Información'}
                 message={infoModal.message}
                 type={infoModal.type || 'info'}
+            />
+
+            {/* Banner Management Modal */}
+            <BannerManagementModal
+                isOpen={isBannerModalOpen}
+                onClose={() => setIsBannerModalOpen(false)}
+                banners={banners}
+                isLoading={bannersLoading}
+                onCreateBanner={handleCreateBanner}
+                onDeleteBanner={handleDeleteBanner}
             />
         </div>
     );
