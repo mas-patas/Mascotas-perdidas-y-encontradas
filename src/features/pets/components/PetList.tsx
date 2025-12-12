@@ -5,6 +5,7 @@ import { PetCard } from '@/features/pets';
 import { PET_STATUS } from '@/constants';
 import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons';
 import { supabase } from '@/services/supabaseClient';
+import { applyPetFilters } from '@/api/pets/pets.filters';
 
 interface PetListProps {
     pets: PetRow[];
@@ -85,7 +86,7 @@ const PetSection: React.FC<{
             const BATCH_SIZE = 7;
             
             // Basic query similar to usePets but specific for this row
-            // Apply filters from sidebar
+            // Apply filters from sidebar using declarative approach
             let query = supabase
                 .from('pets')
                 .select('id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date')
@@ -93,27 +94,7 @@ const PetSection: React.FC<{
                 .gt('expires_at', new Date().toISOString());
             
             // Apply all filters consistently with getPets
-            if (filters?.type && filters.type !== 'Todos') {
-                query = query.eq('animal_type', filters.type);
-            }
-            if (filters?.breed && filters.breed !== 'Todos') {
-                query = query.eq('breed', filters.breed);
-            }
-            if (filters?.size && filters.size !== 'Todos') {
-                query = query.eq('size', filters.size);
-            }
-            if (filters?.color1 && filters.color1 !== 'Todos') {
-                query = query.ilike('color', `%${filters.color1}%`);
-            }
-            if (filters?.color2 && filters.color2 !== 'Todos') {
-                query = query.ilike('color', `%${filters.color2}%`);
-            }
-            if (filters?.color3 && filters.color3 !== 'Todos') {
-                query = query.ilike('color', `%${filters.color3}%`);
-            }
-            if (filters?.department && filters.department !== 'Todos') {
-                query = query.ilike('location', `%${filters.department}%`);
-            }
+            query = applyPetFilters(query, filters || {});
             
             const { data, error } = await query
                 .order('created_at', { ascending: false })

@@ -2,6 +2,7 @@ import { supabase } from '../../services/supabaseClient';
 import type { PetRow, CommentRow, ProfileRow, CommentLikeRow, Pet } from '../../types';
 import type { PetFilters, FetchPetsParams, CreatePetData, UpdatePetData, MarkReunionData } from './pets.types';
 import { mapPetFromDb } from '../../utils/mappers';
+import { applyPetFilters } from './pets.filters';
 
 const PET_COLUMNS = 'id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date';
 
@@ -49,13 +50,8 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
     .eq('status', filters.status)
     .gt('expires_at', nowIso);
   
-  if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
-  if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
-  if (filters.size !== 'Todos') query = query.eq('size', filters.size);
-  if (filters.color1 !== 'Todos') query = query.ilike('color', `%${filters.color1}%`);
-  if (filters.color2 !== 'Todos') query = query.ilike('color', `%${filters.color2}%`);
-  if (filters.color3 !== 'Todos') query = query.ilike('color', `%${filters.color3}%`);
-  if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
+  // Apply filters declaratively
+  query = applyPetFilters(query, filters);
   
   const { data, count, error } = await query
     .order('created_at', { ascending: false })
@@ -110,28 +106,8 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       .eq('status', status)
       .gt('expires_at', nowIso);
     
-    // Apply all filters consistently with getPets
-    if (filters.type && filters.type !== 'Todos') {
-      query = query.eq('animal_type', filters.type);
-    }
-    if (filters.breed && filters.breed !== 'Todos') {
-      query = query.eq('breed', filters.breed);
-    }
-    if (filters.size && filters.size !== 'Todos') {
-      query = query.eq('size', filters.size);
-    }
-    if (filters.color1 && filters.color1 !== 'Todos') {
-      query = query.ilike('color', `%${filters.color1}%`);
-    }
-    if (filters.color2 && filters.color2 !== 'Todos') {
-      query = query.ilike('color', `%${filters.color2}%`);
-    }
-    if (filters.color3 && filters.color3 !== 'Todos') {
-      query = query.ilike('color', `%${filters.color3}%`);
-    }
-    if (filters.department && filters.department !== 'Todos') {
-      query = query.ilike('location', `%${filters.department}%`);
-    }
+    // Apply all filters consistently with getPets using declarative approach
+    query = applyPetFilters(query, filters);
 
     const { data, error } = await query
       .order('created_at', { ascending: false })
