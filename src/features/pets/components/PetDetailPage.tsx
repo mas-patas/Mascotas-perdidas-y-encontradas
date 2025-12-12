@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -6,16 +6,18 @@ import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment 
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { useAuth } from '@/contexts/auth';
-import { ConfirmationModal } from '@/shared';
+import { ConfirmationModal, InfoModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
-import { usePet, useDeleteComment } from '@/api';
+import { usePet, useDeleteComment, useCommentsByPetId, useRenewPet } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
-import { ReunionSuccessModal } from '@/features/pets';
+import { ReunionSuccessModal, ExpiredPetModal } from '@/features/pets';
 import { ErrorBoundary } from '@/shared';
 import { supabase } from '@/services/supabaseClient';
+import { CelebrationEffect } from '@/shared/components/CelebrationEffect';
+import { hasCelebrated, markAsCelebrated } from '@/utils/celebrationTracker';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -27,7 +29,7 @@ interface PetDetailPageProps {
     onUpdateStatus: (petId: string, status: PetStatus) => void;
     users: User[];
     onViewUser: (user: User) => void;
-    onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string) => void;
+    onReport: (type: ReportType, targetId: string, reason: ReportReason, details: string, postSnapshot?: any) => void;
     onRecordContactRequest: (petId: string) => Promise<void>;
     onAddComment: (petId: string, text: string, parentId?: string) => Promise<void>;
     onLikeComment: (petId: string, commentId: string) => void;
@@ -43,7 +45,8 @@ const CommentItem: React.FC<{
     currentUser: User | null;
     depth?: number;
     postOwnerEmail?: string;
-}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail }) => {
+    onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail, onShowInfo }) => {
     const replies = allComments.filter(c => c.parentId === comment.id).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
     const isLiked = currentUser && comment.likes?.includes(currentUser.id || '');
@@ -68,7 +71,9 @@ const CommentItem: React.FC<{
 
     const handleAction = (action: () => void) => {
         if (!currentUser) {
-            alert("Debes iniciar sesión para realizar esta acción.");
+            if (onShowInfo) {
+                onShowInfo("Debes iniciar sesión para realizar esta acción.", 'info');
+            }
             return;
         }
         action();
@@ -153,6 +158,7 @@ const CommentItem: React.FC<{
                         currentUser={currentUser}
                         depth={depth + 1}
                         postOwnerEmail={postOwnerEmail}
+                        onShowInfo={onShowInfo}
                     />
                 ))}
             </div>
@@ -168,8 +174,9 @@ const CommentListAndInput: React.FC<{
     onLikeComment: (petId: string, commentId: string) => void,
     onReportComment: (commentId: string) => void,
     onDeleteComment?: (commentId: string) => void,
-    currentUser: User | null 
-}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser }) => {
+    currentUser: User | null;
+    onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser, onShowInfo }) => {
     const [newComment, setNewComment] = useState('');
     const [replyTo, setReplyTo] = useState<{ id: string, userName: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,6 +226,7 @@ const CommentListAndInput: React.FC<{
                             onDeleteComment={onDeleteComment}
                             currentUser={currentUser}
                             postOwnerEmail={postOwnerEmail}
+                            onShowInfo={onShowInfo}
                         />
                     ))
                 ) : (
@@ -299,11 +307,18 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const { currentUser } = useAuth();
     const queryClient = useQueryClient();
     const deleteComment = useDeleteComment();
+    const renewPet = useRenewPet();
+    const deactivatePet = useDeactivatePet();
     
     // FETCH SPECIFIC PET
     const { data: fetchedPet, isLoading: isLoadingSingle, isError } = usePet(id && !propPet ? id : undefined);
 
     const pet = propPet || fetchedPet;
+    
+    // FETCH COMMENTS INDEPENDENTLY - Use petId from propPet or fetchedPet or id param
+    // Always call hook in same order to avoid React Hook order violations
+    const petIdForComments = propPet?.id || fetchedPet?.id || id;
+    const { data: commentsFromHook } = useCommentsByPetId(petIdForComments);
     
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     
@@ -315,15 +330,55 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     }, [pet?.id, pet?.imageUrls?.length]);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isCommentReportModalOpen, setIsCommentReportModalOpen] = useState(false);
+    const [commentToReport, setCommentToReport] = useState<string | null>(null);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isReunionModalOpen, setIsReunionModalOpen] = useState(false);
     const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
+    const [isExpiredModalOpen, setIsExpiredModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
+    const [infoModal, setInfoModal] = useState<{ isOpen: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ isOpen: false, message: '', type: 'info' });
     const [newCommentPreview, setNewCommentPreview] = useState('');
+    const [showCelebration, setShowCelebration] = useState(false);
 
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
+
+    // Calculate owner status early (before early returns)
+    const isOwner = pet ? (currentUser?.email === pet.userEmail) : false;
+    
+    // Show expired modal when pet is loaded and expired (only for owner)
+    // This must be before early returns to maintain hook order
+    useEffect(() => {
+        if (!pet || !isOwner) {
+            return;
+        }
+        
+        // Check if pet is expired
+        const checkIfExpired = () => {
+            if (!pet.expiresAt) return false;
+            const now = new Date();
+            const expirationDate = new Date(pet.expiresAt);
+            // Check if expired (more than 1 minute past expiration)
+            return now.getTime() > (expirationDate.getTime() + 60000);
+        };
+        
+        // Check if pet is permanently deactivated (expires_at <= 2000-01-01)
+        const checkIfDeactivated = () => {
+            if (!pet.expiresAt) return false;
+            const deactivatedDate = new Date('2000-01-01');
+            const expirationDate = new Date(pet.expiresAt);
+            return expirationDate.getTime() <= deactivatedDate.getTime();
+        };
+        
+        const isExpired = checkIfExpired();
+        const isDeactivated = checkIfDeactivated();
+        
+        if (isExpired && !isDeactivated) {
+            setIsExpiredModalOpen(true);
+        }
+    }, [pet?.id, pet?.expiresAt, isOwner]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -367,6 +422,52 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         return () => clearTimeout(timer);
     }, [pet]);
 
+    // Transform and combine comments: prioritize hook comments, fallback to pet.comments
+    // IMPORTANT: This useMemo must be called before any conditional returns to follow React Hook rules
+    const allComments = useMemo(() => {
+        // Transform comments from hook (snake_case) to camelCase
+        const transformedHookComments: Comment[] = (commentsFromHook || []).map((c: any) => ({
+            id: c.id,
+            userId: c.user_id,
+            userEmail: c.user_email,
+            userName: c.user_name,
+            text: c.text,
+            timestamp: c.created_at,
+            parentId: c.parent_id || null,
+            likes: c.likes || []
+        }));
+        
+        // Use hook comments if available, otherwise fallback to pet.comments
+        const pet = propPet || fetchedPet;
+        return transformedHookComments.length > 0 ? transformedHookComments : (pet?.comments || []);
+    }, [commentsFromHook, propPet, fetchedPet]);
+    // Celebration effect for reunited pets
+    useEffect(() => {
+        if (!pet) return;
+        
+        // Only show celebration if pet is reunited
+        if (pet.status === PET_STATUS.REUNIDO) {
+            const userId = currentUser?.id || null;
+            
+            // Check if user has already seen the celebration for this pet
+            if (!hasCelebrated(pet.id, userId)) {
+                // Show celebration and mark as seen
+                setShowCelebration(true);
+                markAsCelebrated(pet.id, userId);
+                
+                // Hide celebration after duration
+                const timer = setTimeout(() => {
+                    setShowCelebration(false);
+                }, 1000);
+                
+                return () => clearTimeout(timer);
+            }
+        } else {
+            // Hide celebration if pet is not reunited
+            setShowCelebration(false);
+        }
+    }, [pet?.id, pet?.status, currentUser?.id]);
+
     if (isLoadingSingle && !pet) return <div className="p-16 text-center text-gray-500 font-bold"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-brand-primary mx-auto mb-4"></div>Cargando detalles...</div>;
     
     if (isError) return (
@@ -383,13 +484,34 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const petOwner = users.find(u => u.email === pet.userEmail);
     const ownerName = petOwner?.username || (fetchedPet?.userEmail ? fetchedPet.userEmail.split('@')[0] : 'Usuario');
     
-    const isOwner = currentUser?.email === pet.userEmail;
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
     const isLost = pet.status === PET_STATUS.PERDIDO;
     
     // Determine the display name: if 'Desconocido', show status instead
     const displayName = pet.name === 'Desconocido' ? pet.status : pet.name;
+    
+    const handleKeepActive = async (pet: Pet) => {
+        try {
+            await renewPet.mutateAsync(pet.id);
+            setIsExpiredModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            alert('✅ Publicación renovada por 60 días más.');
+        } catch (err: any) {
+            alert('Error al renovar: ' + err.message);
+        }
+    };
+    
+    const handleDeactivate = async (pet: Pet) => {
+        try {
+            await deactivatePet.mutateAsync(pet.id);
+            setIsExpiredModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            alert('✅ Publicación desactivada. Solo tú y los administradores podrán verla.');
+        } catch (err: any) {
+            alert('Error al desactivar: ' + err.message);
+        }
+    };
 
     const handleReunionSubmit = async (story: string, date: string, image?: string) => {
         try {
@@ -418,7 +540,59 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             
         } catch (error: any) {
             console.error("Error updating reunion status:", error);
+            setInfoModal({ isOpen: true, message: "Hubo un error al guardar.", type: 'error' });
+        }
+    };
+
+    const handleSaveForLater = async () => {
+        try {
+            const updateData: any = {
+                status: PET_STATUS.REUNIDO,
+                reunion_date: new Date().toISOString().split('T')[0]
+            };
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            trackPetReunited(pet.id);
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion status:", error);
             alert("Hubo un error al guardar.");
+            throw error;
+        }
+    };
+
+    const handleUpdateReunionStory = async (story: string, date: string, image?: string) => {
+        try {
+            const updateData: any = {
+                reunion_story: story,
+                reunion_date: date
+            };
+
+            if (image) {
+                updateData.image_urls = [image, ...(pet.imageUrls || [])];
+            }
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion story:", error);
+            alert("Hubo un error al guardar la historia.");
         }
     };
 
@@ -441,6 +615,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
+    const handleReportComment = (commentId: string) => {
+        setCommentToReport(commentId);
+        setIsCommentReportModalOpen(true);
+    };
+
     const getStatusBadge = () => {
         switch (pet.status) {
             case PET_STATUS.PERDIDO: return 'bg-red-600 text-white';
@@ -452,14 +631,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         }
     };
 
-    const previewComments = pet.comments ? pet.comments.filter(c => !c.parentId).slice(-2) : [];
-    const totalComments = pet.comments ? pet.comments.length : 0;
+    const previewComments = allComments.filter(c => !c.parentId).slice(-2);
+    const totalComments = allComments.length;
 
     const handleQuickComment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCommentPreview.trim()) return;
         if (!currentUser) {
-            alert("Inicia sesión para comentar");
+            setInfoModal({ isOpen: true, message: "Inicia sesión para comentar", type: 'info' });
             return;
         }
         await onAddComment(pet.id, newCommentPreview);
@@ -631,6 +810,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
                 </div>
 
+                {pet.status === PET_STATUS.REUNIDO && pet.reunionDate && (
+                    <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="p-1.5 sm:p-2 bg-green-100 text-green-600 rounded-full mt-1 flex-shrink-0">
+                            <HeartIcon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" filled />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] sm:text-xs text-green-600 font-bold uppercase tracking-wider">Fecha de Reencuentro</p>
+                            <p className="text-green-700 font-bold text-sm sm:text-base lg:text-lg capitalize break-words">
+                                {new Date(pet.reunionDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="border-t border-card-border pt-3 sm:pt-4"></div>
+
                 <div className="flex items-start gap-3 sm:gap-4">
                     <div className="p-1.5 sm:p-2 bg-gray-100 text-icon-gray rounded-full mt-1 flex-shrink-0">
                         <LocationMarkerIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -701,14 +896,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             <CommentItem 
                                 key={comment.id} 
                                 comment={comment} 
-                                allComments={pet.comments || []} 
+                                allComments={allComments} 
                                 onReply={() => setIsCommentsModalOpen(true)}
                                 onLike={(cid) => onLikeComment(pet.id, cid)}
-                                onReportComment={(cid) => {
-                                    // TODO: Implement comment reporting modal
-                                }} 
+                                onReportComment={handleReportComment} 
                                 currentUser={currentUser}
                                 postOwnerEmail={pet.userEmail}
+                                onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
                             />
                         ))}
                     </div>
@@ -775,6 +969,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 >
                                     <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-brand-secondary" />
                                     ¡Ya encontré a mi mascota!
+                                </button>
+                            )}
+                            {pet.status === PET_STATUS.REUNIDO && (
+                                <button 
+                                    onClick={() => setIsReunionModalOpen(true)}
+                                    className="w-full bg-purple-100 text-purple-700 font-bold py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center gap-2 shadow-sm mb-2 sm:mb-3 text-sm sm:text-base"
+                                >
+                                    <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" filled />
+                                    Contar mi experiencia de cómo me reuní con mi mascota
                                 </button>
                             )}
                             <div className="flex gap-2 sm:gap-3">
@@ -852,6 +1055,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
 
+            {/* Celebration Effect */}
+            {showCelebration && <CelebrationEffect duration={1000} />}
+
             <button onClick={onClose} className="mb-3 sm:mb-4 flex items-center text-icon-gray hover:text-brand-primary font-bold transition-colors text-sm sm:text-base">
                 <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1" /> Volver al listado
             </button>
@@ -922,6 +1128,30 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 targetIdentifier={pet.name}
             />
 
+            {commentToReport && (
+                <ReportModal
+                    isOpen={isCommentReportModalOpen}
+                    onClose={() => {
+                        setIsCommentReportModalOpen(false);
+                        setCommentToReport(null);
+                    }}
+                    onSubmit={(r, d) => {
+                        const comment = allComments.find(c => c.id === commentToReport);
+                        const commentText = comment?.text?.substring(0, 50) || 'comentario';
+                        // Create postSnapshot with comment text and pet_id for admin review
+                        const postSnapshot = comment ? {
+                            text: comment.text,
+                            pet_id: pet.id
+                        } : { text: 'comentario eliminado', pet_id: pet.id };
+                        onReport('comment', commentToReport, r, d, postSnapshot);
+                        setIsCommentReportModalOpen(false);
+                        setCommentToReport(null);
+                    }}
+                    reportType="comment"
+                    targetIdentifier={commentToReport ? (allComments.find(c => c.id === commentToReport)?.text?.substring(0, 50) || 'comentario') : 'comentario'}
+                />
+            )}
+
             <ShareModal 
                 pet={pet} 
                 isOpen={isShareModalOpen} 
@@ -932,7 +1162,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 isOpen={isReunionModalOpen}
                 onClose={() => setIsReunionModalOpen(false)}
                 pet={pet}
-                onSubmit={handleReunionSubmit}
+                onSubmit={pet.status === PET_STATUS.REUNIDO ? handleUpdateReunionStory : handleReunionSubmit}
+                onSaveForLater={pet.status === PET_STATUS.REUNIDO ? undefined : handleSaveForLater}
             />
 
             <CommentsModal 
@@ -940,14 +1171,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 onClose={() => setIsCommentsModalOpen(false)}
                 petId={pet.id} 
                 postOwnerEmail={pet.userEmail}
-                comments={pet.comments} 
+                comments={allComments} 
                 onAddComment={onAddComment}
                 onLikeComment={onLikeComment}
-                onReportComment={(cid: string) => {
-                    // TODO: Implement comment reporting modal
-                }}
+                onReportComment={handleReportComment}
                 onDeleteComment={handleDeleteComment}
-                currentUser={currentUser} 
+                currentUser={currentUser}
+                onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
             />
 
             {publicProfileUser && (
@@ -956,6 +1186,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     onClose={() => setPublicProfileUser(null)}
                     targetUser={publicProfileUser}
                     onViewAdminProfile={onViewUser} 
+                />
+            )}
+            
+            <InfoModal 
+                isOpen={infoModal.isOpen} 
+                onClose={() => setInfoModal({ isOpen: false, message: '', type: 'info' })} 
+                title={infoModal.type === 'success' ? 'Éxito' : infoModal.type === 'error' ? 'Error' : 'Información'}
+                message={infoModal.message}
+                type={infoModal.type || 'info'}
+            />
+            {isExpiredModalOpen && pet && (
+                <ExpiredPetModal
+                    pet={pet}
+                    onClose={() => setIsExpiredModalOpen(false)}
+                    onKeepActive={handleKeepActive}
+                    onDeactivate={handleDeactivate}
                 />
             )}
         </div>

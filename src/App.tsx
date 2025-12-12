@@ -24,14 +24,14 @@ import { ServicesMapPage } from '@/features/maps';
 import { BusinessDetailPage } from '@/features/businesses';
 
 // Shared
-import { Layout, FlyerModal, ErrorBoundary, WarningIcon, OnboardingTour } from '@/shared';
+import { Layout, FlyerModal, ErrorBoundary, WarningIcon, OnboardingTour, ReportSuccessModal, InfoModal } from '@/shared';
 import type { TourStep } from '@/shared';
 
 // Pages
 import { AboutPage, TipsPage, TermsPage } from '@/pages';
 
 // Types & Constants
-import type { PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
+import type { Pet, PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
 import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
 
 // Services & Utils
@@ -131,7 +131,7 @@ const App: React.FC = () => {
     const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
     const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
     const [selectedPetForModal, setSelectedPetForModal] = useState<PetRow | null>(null);
-    const [petToRenew, setPetToRenew] = useState<PetRow | null>(null);
+    const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
     const [petToStatusCheck, setPetToStatusCheck] = useState<PetRow | null>(null);
     const [isPublicProfileModalOpen, setIsPublicProfileModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
@@ -140,6 +140,8 @@ const App: React.FC = () => {
     const [pendingPetToSubmit, setPendingPetToSubmit] = useState<Omit<PetRow, 'id' | 'user_id'> | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [petToPrefill, setPetToPrefill] = useState<Partial<PetRow> | null>(null);
+    const [isReportSuccessModalOpen, setIsReportSuccessModalOpen] = useState(false);
+    const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ isOpen: false, message: '', type: 'error' });
     
     // IP Ban State
     const [isIpBanned, setIsIpBanned] = useState(false);
@@ -300,7 +302,7 @@ const App: React.FC = () => {
                     }
                 });
                 setIsReportModalOpen(false);
-             } catch (err: any) { alert('Error al actualizar: ' + err.message); }
+             } catch (err: any) { setErrorModal({ isOpen: true, message: 'Error al actualizar: ' + err.message }); }
             return;
         }
         
@@ -353,7 +355,7 @@ const App: React.FC = () => {
             
             setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null); setPetToPrefill(null);
         } catch (err: any) { 
-            alert("Error al publicar: " + err.message); 
+            setErrorModal({ isOpen: true, message: "Error al publicar: " + err.message }); 
         } finally {
             setIsSubmitting(false);
         }
@@ -363,34 +365,34 @@ const App: React.FC = () => {
     const updatePetStatus = useUpdatePetStatus();
     const deletePet = useDeletePet();
 
-    const handleRenewPet = async (pet: PetRow) => {
+    const handleRenewPet = async (pet: Pet) => {
         if (!currentUser) return;
         try {
             await renewPet.mutateAsync(pet.id);
             setPetToRenew(null);
-            alert(`Publicación renovada.`);
-        } catch (err: any) { alert("Error al renovar: " + err.message); }
+            setErrorModal({ isOpen: true, message: 'Publicación renovada.', type: 'success' });
+        } catch (err: any) { setErrorModal({ isOpen: true, message: "Error al renovar: " + err.message }); }
     };
 
-    const handleMarkAsFound = async (pet: PetRow) => {
+    const handleMarkAsFound = async (pet: Pet) => {
         try { 
             await updatePetStatus.mutateAsync({ id: pet.id, status: PET_STATUS.REUNIDO });
             trackPetReunited(pet.id);
             setPetToRenew(null); setPetToStatusCheck(null); 
-            alert("¡Felicidades!"); 
-        } catch(e:any){ alert(e.message); }
+            setErrorModal({ isOpen: true, message: "¡Felicidades! La mascota ha sido marcada como reunida.", type: 'success' }); 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); }
     };
     const handleKeepLooking = () => { setPetToStatusCheck(null); };
     const handleDeletePet = async (petId: string) => { 
         try { 
             await deletePet.mutateAsync(petId);
             navigate('/'); 
-        } catch(e:any){ alert(e.message); } 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); } 
     };
     const handleUpdatePetStatus = async (petId: string, status: PetStatus) => { 
         try { 
             await updatePetStatus.mutateAsync({ id: petId, status }); 
-        } catch(e:any){ alert(e.message); } 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); } 
     };
     
     const updateUserStatus = useUpdateUserStatus();
@@ -400,13 +402,13 @@ const App: React.FC = () => {
         try { 
             await updateUserStatus.mutateAsync({ email, status });
             setUsers((prev: User[]) => prev.map((u: User) => u.email === email ? { ...u, status } : u)); 
-        } catch(e:any){ alert(e.message); } 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); } 
     };
     const handleUpdateUserRole = async (email: string, role: UserRole) => { 
         try { 
             await updateUserRole.mutateAsync({ email, role });
             setUsers((prev: User[]) => prev.map((u: User) => u.email === email ? { ...u, role } : u)); 
-        } catch(e:any){ alert(e.message); } 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); } 
     };
     
     const createChat = useCreateChat();
@@ -457,7 +459,7 @@ const App: React.FC = () => {
             }
             
             if (!petOwnerEmail) {
-                alert('No se pudo encontrar el dueño de la mascota. Por favor, intenta nuevamente.');
+                setErrorModal({ isOpen: true, message: 'No se pudo encontrar el dueño de la mascota. Por favor, intenta nuevamente.' });
                 return;
             }
             
@@ -481,7 +483,7 @@ const App: React.FC = () => {
             } as ChatRow]);
             navigate(`/chat/${chatId}`);
         } catch(e:any){ 
-            alert(e.message); 
+            setErrorModal({ isOpen: true, message: e.message || 'Error al iniciar chat' }); 
         }
     };
 
@@ -515,7 +517,7 @@ const App: React.FC = () => {
             } as ChatRow]);
             navigate(`/chat/${chatId}`);
         } catch(e:any){ 
-            alert('Error starting chat'); 
+            setErrorModal({ isOpen: true, message: e.message || 'Error al iniciar chat' }); 
         }
     };
     
@@ -544,19 +546,21 @@ const App: React.FC = () => {
     const createSupportTicket = useCreateSupportTicket();
     const updateSupportTicket = useUpdateSupportTicket();
 
-    const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string) => {
+    const handleReport = async (type: ReportType, targetId: string, reason: ReportReason, details: string, postSnapshot?: any) => {
         if (!currentUser) return;
         try {
-            await createReport.mutateAsync({ type, targetId, reason, details, reportedEmail: '' });
-            alert('Reporte enviado.');
-        } catch(e:any){ alert(e.message); }
+            await createReport.mutateAsync({ type, targetId, reason, details, reportedEmail: '', postSnapshot });
+            setIsReportSuccessModalOpen(true);
+        } catch(e:any){ 
+            setErrorModal({ isOpen: true, message: e.message || 'Error al enviar el reporte' });
+        }
     };
 
     const handleUpdateReportStatus = async (reportId: string, status: ReportStatusType) => { 
         try { 
             await updateReportStatus.mutateAsync({ id: reportId, status });
             setReports((prev: ReportRow[]) => prev.map((r: ReportRow) => r.id === reportId ? { ...r, status } : r)); 
-        } catch(e:any){ alert(e.message); } 
+        } catch(e:any){ setErrorModal({ isOpen: true, message: e.message }); } 
     };
     const handleAddSupportTicket = async (category: SupportTicketCategory, subject: string, description: string) => { 
         if(currentUser) { 
@@ -571,7 +575,9 @@ const App: React.FC = () => {
                 response: ticket.response || undefined, 
                 assignedTo: ticket.assigned_to || undefined 
             } 
-        }); 
+        });
+        // Invalidate queries to refresh the list
+        queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
     };
     
     const createCampaign = useCreateCampaign();
@@ -608,7 +614,7 @@ const App: React.FC = () => {
                     lng: data.lng
                 });
             }
-        } catch (err: any) { console.error("Error saving campaign:", err); alert("Error al guardar la campaña: " + err.message); }
+        } catch (err: any) { console.error("Error saving campaign:", err); setErrorModal({ isOpen: true, message: "Error al guardar la campaña: " + err.message }); }
     };
 
     const handleDeleteCampaign = async (id: string) => { 
@@ -650,7 +656,7 @@ const App: React.FC = () => {
         if(!currentUser) return;
         try {
             await createComment.mutateAsync({ petId, text, parentId });
-        } catch (error: any) { console.error("Error adding comment:", error); alert("Error al enviar el comentario: " + (error.message || "Error desconocido")); }
+        } catch (error: any) { console.error("Error adding comment:", error); setErrorModal({ isOpen: true, message: "Error al enviar el comentario: " + (error.message || "Error desconocido") }); }
     };
     const handleLikeComment = async (petId: string, commentId: string) => {
         if(!currentUser) return;
@@ -742,7 +748,7 @@ const App: React.FC = () => {
                         return bTime - aTime;
                     })} pets={pets} users={users} currentUser={currentUser!} onSelectChat={(id) => navigate(`/chat/${id}`)} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="admin" element={<ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN]}><ErrorBoundary name="Admin"><AdminDashboard onBack={() => navigate('/')} users={users} onViewUser={handleViewAdminUser} pets={pets} chats={chats} reports={reports} supportTickets={supportTickets} onUpdateReportStatus={handleUpdateReportStatus} onDeletePet={handleDeletePet} onUpdateSupportTicket={handleUpdateSupportTicket} isAiSearchEnabled={isAiSearchEnabled} onToggleAiSearch={() => setIsAiSearchEnabled(!isAiSearchEnabled)} isLocationAlertsEnabled={isLocationAlertsEnabled} onToggleLocationAlerts={() => setIsLocationAlertsEnabled(!isLocationAlertsEnabled)} locationAlertRadius={locationAlertRadius} onSetLocationAlertRadius={setLocationAlertRadius} campaigns={campaigns} onSaveCampaign={handleSaveCampaign} onDeleteCampaign={handleDeleteCampaign} onNavigate={(path) => navigate(path)} onDeleteComment={handleDeleteComment} /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.user_email === currentUser?.email)} userReports={reports.filter(r => r.reporter_email === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="soporte" element={<ProtectedRoute><ErrorBoundary name="Support"><SupportPage currentUser={currentUser!} userTickets={supportTickets.filter(t => t.user_email === currentUser?.email)} userReports={reports.filter(r => r.reporterEmail === currentUser?.email)} onAddTicket={handleAddSupportTicket} onBack={() => navigate('/')} /></ErrorBoundary></ProtectedRoute>} />
                     <Route path="campanas" element={<ErrorBoundary name="Campaigns"><CampaignsPage campaigns={campaigns} onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="mapa" element={<ErrorBoundary name="Map"><MapPage onNavigate={(path) => navigate(path)} /></ErrorBoundary>} />
                     <Route path="servicios" element={<ErrorBoundary name="Services"><ServicesMapPage /></ErrorBoundary>} />
@@ -765,9 +771,31 @@ const App: React.FC = () => {
             {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
             {isUserDetailModalOpen && selectedUserProfile && <AdminUserDetailModal user={selectedUserProfile} allPets={pets} allChats={chats} allUsers={users} onClose={() => { setIsUserDetailModalOpen(false); setSelectedUserProfile(null); }} onUpdateStatus={handleUpdateUserStatus} onUpdateRole={handleUpdateUserRole} onStartChat={handleStartUserChat} onGhostLogin={ghostLogin} onViewUser={handleViewAdminUser} />}
-            {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={handleRenewPet} onMarkAsFound={handleMarkAsFound} />}
+            {petToRenew && (
+                <RenewModal 
+                    pet={petToRenew} 
+                    onClose={() => setPetToRenew(null)} 
+                    onRenew={handleRenewPet} 
+                    onMarkAsFound={handleMarkAsFound} 
+                />
+            )}
             {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={handleMarkAsFound} onKeepLooking={handleKeepLooking} />}
             {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={handleViewAdminUser} />}
+            
+            {/* Report Success Modal */}
+            <ReportSuccessModal 
+                isOpen={isReportSuccessModalOpen} 
+                onClose={() => setIsReportSuccessModalOpen(false)} 
+            />
+            
+            {/* Error/Info Modal */}
+            <InfoModal 
+                isOpen={errorModal.isOpen} 
+                onClose={() => setErrorModal({ isOpen: false, message: '', type: 'error' })} 
+                title={errorModal.type === 'success' ? 'Éxito' : errorModal.type === 'info' ? 'Información' : 'Error'}
+                message={errorModal.message}
+                type={errorModal.type || 'error'}
+            />
         </ErrorBoundary>
     );
 };

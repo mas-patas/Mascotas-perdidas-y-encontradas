@@ -48,6 +48,9 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
     .from('pets')
     .select(PET_COLUMNS, { count: 'exact' })
     .eq('status', filters.status)
+    // Filter: expires_at > nowIso
+    // This excludes both expired pets (expires_at < now) and permanently deactivated pets (expires_at = '2000-01-01')
+    // Since nowIso is always > '2000-01-01', this single condition handles both cases
     .gt('expires_at', nowIso);
   
   // Apply filters declaratively
@@ -104,6 +107,7 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       .from('pets')
       .select(PET_COLUMNS)
       .eq('status', status)
+      // Filter: expires_at > nowIso (excludes expired and deactivated pets)
       .gt('expires_at', nowIso);
     
     // Apply all filters consistently with getPets using declarative approach
@@ -151,6 +155,7 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
 
 /**
  * Fetch a single pet by ID
+ * Note: This doesn't filter by expiration so owners and admins can see expired pets
  */
 export const getPetById = async (id: string): Promise<Pet | null> => {
   const { data, error } = await supabase
@@ -176,7 +181,37 @@ export const getPetById = async (id: string): Promise<Pet | null> => {
     }
   }
   
-  return mapPetFromDb(data, profiles);
+  // Fetch comments for this pet
+  let comments: CommentRow[] = [];
+  const { data: commentsData, error: commentsError } = await supabase
+    .from('comments')
+    .select('*')
+    .eq('pet_id', id)
+    .order('created_at', { ascending: true });
+  
+  if (commentsError) {
+    console.error('Error fetching comments:', commentsError);
+  } else {
+    comments = commentsData || [];
+  }
+  
+  // Fetch comment likes for all comments
+  let commentLikes: CommentLikeRow[] = [];
+  if (comments.length > 0) {
+    const commentIds = comments.map(c => c.id);
+    const { data: likesData, error: likesError } = await supabase
+      .from('comment_likes')
+      .select('*')
+      .in('comment_id', commentIds);
+    
+    if (likesError) {
+      console.error('Error fetching comment likes:', likesError);
+    } else {
+      commentLikes = likesData || [];
+    }
+  }
+  
+  return mapPetFromDb(data, profiles, comments, commentLikes);
 };
 
 /**
@@ -237,6 +272,7 @@ export const getPetsForMap = async (): Promise<Pet[]> => {
     .select(PET_COLUMNS)
     .not('lat', 'is', null)
     .not('lng', 'is', null)
+    // Filter: expires_at > nowIso (excludes expired and deactivated pets)
     .gt('expires_at', nowIso);
   
   if (error) throw error;
@@ -374,6 +410,26 @@ export const renewPet = async (id: string): Promise<void> => {
     .update({
       expires_at: newExpirationDate.toISOString(),
       created_at: now.toISOString()
+    })
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+/**
+ * Deactivate a pet (mark as permanently deactivated)
+ * This uses a special status or we can add an is_deactivated field
+ * For now, we'll set expires_at to a very old date to mark it as deactivated
+ */
+export const deactivatePet = async (id: string): Promise<void> => {
+  // Set expires_at to a very old date to mark as permanently deactivated
+  // This way it won't appear in any queries that filter by expires_at
+  const deactivatedDate = new Date('2000-01-01');
+  
+  const { error } = await supabase
+    .from('pets')
+    .update({
+      expires_at: deactivatedDate.toISOString()
     })
     .eq('id', id);
 

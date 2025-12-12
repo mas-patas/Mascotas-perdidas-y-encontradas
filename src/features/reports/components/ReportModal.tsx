@@ -26,6 +26,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onSub
         }
         setError('');
         onSubmit(reason, details);
+        // Close modal after submission - parent will show success modal
+        onClose();
     };
 
     const reportTypeName = reportType === 'post' ? 'la publicación' : 'al usuario';

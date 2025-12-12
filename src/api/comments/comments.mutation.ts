@@ -58,6 +58,7 @@ export const useCreateComment = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pets });
+      queryClient.invalidateQueries({ queryKey: petsKeys.pet(variables.petId) });
       queryClient.invalidateQueries({ queryKey: commentsKeys.comments(variables.petId) });
     }
   });
@@ -76,6 +77,7 @@ export const useDeleteComment = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pets });
+      queryClient.invalidateQueries({ queryKey: petsKeys.pet(variables.petId) });
       queryClient.invalidateQueries({ queryKey: commentsKeys.comments(variables.petId) });
     }
   });
@@ -98,6 +100,7 @@ export const useToggleCommentLike = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: commentsKeys.comments(variables.petId) });
       queryClient.invalidateQueries({ queryKey: commentsKeys.commentLikes(variables.commentId) });
+      queryClient.invalidateQueries({ queryKey: petsKeys.pet(variables.petId) });
     }
   });
 };

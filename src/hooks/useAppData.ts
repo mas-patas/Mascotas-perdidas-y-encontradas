@@ -17,7 +17,8 @@ import {
   useNotificationsRealtime,
   useSupportTicketsRealtime,
   useReportsRealtime,
-  useBannedIpsRealtime
+  useBannedIpsRealtime,
+  useCommentsRealtime
 } from '@/api';
 
 // Helper to send System Notification
@@ -77,6 +78,7 @@ export const useAppData = () => {
     useSupportTicketsRealtime(currentUser?.email, isAdmin);
     useReportsRealtime();
     useBannedIpsRealtime();
+    useCommentsRealtime();
 
     const loading = usersLoading || campaignsLoading || (!!currentUser && (chatsLoading || notificationsLoading));
 

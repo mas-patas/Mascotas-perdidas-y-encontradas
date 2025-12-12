@@ -81,3 +81,15 @@ export const updateReportStatus = async (id: string, status: string): Promise<vo
 
   if (error) throw error;
 };
+
+/**
+ * Delete a report
+ */
+export const deleteReport = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('reports')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};

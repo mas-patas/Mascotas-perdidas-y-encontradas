@@ -44,3 +44,19 @@ export const useUpdateReportStatus = () => {
     }
   });
 };
+
+/**
+ * Mutation hook to delete a report
+ */
+export const useDeleteReport = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await reportsApi.deleteReport(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports() });
+    }
+  });
+};

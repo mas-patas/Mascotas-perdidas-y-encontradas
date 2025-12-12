@@ -9,6 +9,7 @@ interface ConfirmationModalProps {
     message: string;
     confirmText?: string;
     cancelText?: string;
+    onCancel?: () => void;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -19,6 +20,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     message,
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
+    onCancel,
 }) => {
     if (!isOpen) {
         return null;
@@ -63,7 +65,12 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     <button
                         type="button"
                         className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary sm:mt-0 sm:w-auto sm:text-sm"
-                        onClick={onClose}
+                        onClick={() => {
+                            if (onCancel) {
+                                onCancel();
+                            }
+                            onClose();
+                        }}
                     >
                         {cancelText}
                     </button>
