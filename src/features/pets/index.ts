@@ -8,6 +8,7 @@ export { default as AddPetModal } from './components/AddPetModal';
 export { ReportPetForm } from './components/ReportPetForm';
 export { ReportAdoptionForm } from './components/ReportAdoptionForm';
 export { RenewModal } from './components/RenewModal';
+export { ExpiredPetModal } from './components/ExpiredPetModal';
 export { StatusCheckModal } from './components/StatusCheckModal';
 export { PotentialMatchesModal } from './components/PotentialMatchesModal';
 export { default as ReunitedPetsPage } from './components/ReunitedPetsPage';

@@ -1,13 +1,14 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import type { PetRow, User, PetStatus } from '@/types';
+import type { PetRow, User, PetStatus, Pet } from '@/types';
 import { PetCard } from '@/features/pets';
 import { PET_STATUS } from '@/constants';
 import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons';
 import { supabase } from '@/services/supabaseClient';
+import { mapPetFromDb } from '@/utils/mappers';
 
 interface PetListProps {
-    pets: PetRow[];
+    pets: Pet[] | PetRow[];
     users: User[];
     onViewUser: (user: User) => void;
     filters: any;
@@ -26,7 +27,7 @@ interface PetListProps {
 const PetSection: React.FC<{ 
     title: string; 
     status: string; // Needed for fetching more
-    initialPets: PetRow[]; 
+    initialPets: Pet[] | PetRow[]; 
     users: User[]; 
     onViewUser: (user: User) => void; 
     onNavigate: (path: string) => void;
@@ -35,26 +36,47 @@ const PetSection: React.FC<{
     onViewAll: () => void;
 }> = ({ title, status, initialPets, users, onViewUser, onNavigate, accentColor, icon, onViewAll }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [additionalPets, setAdditionalPets] = useState<PetRow[]>([]);
+    const [additionalPets, setAdditionalPets] = useState<Pet[]>([]);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMoreHorizontal, setHasMoreHorizontal] = useState(true);
 
-    // Deduplicate initialPets first to ensure no duplicates in props
-    const deduplicatedInitialPets = useMemo(() => {
-        const map = new Map<string, PetRow>();
-        initialPets.forEach(pet => {
-            if (pet && pet.id) {
-                map.set(pet.id, pet);
+    // Check if initialPets are already Pet[] (have imageUrls) or PetRow[] (have image_urls)
+    const isPetType = (pet: Pet | PetRow): pet is Pet => {
+        return 'imageUrls' in pet && Array.isArray((pet as Pet).imageUrls);
+    };
+
+    // Transform initial pets to Pet type with processed image URLs if needed
+    const transformedInitialPets = useMemo(() => {
+        const deduplicated = (() => {
+            const map = new Map<string, Pet | PetRow>();
+            initialPets.forEach(pet => {
+                if (pet && pet.id) {
+                    map.set(pet.id, pet);
+                }
+            });
+            return Array.from(map.values());
+        })();
+
+        // If already Pet[], return as-is. Otherwise transform from PetRow[]
+        return deduplicated.map(pet => {
+            if (isPetType(pet)) {
+                // Already Pet type with processed imageUrls - return as-is
+                return pet;
+            } else {
+                // PetRow type, needs transformation
+                const petRow = pet as PetRow;
+                const owner = users.find(u => u.id === petRow.user_id);
+                const profiles = owner ? [{ id: owner.id, email: owner.email }] : [];
+                return mapPetFromDb(petRow, profiles);
             }
         });
-        return Array.from(map.values());
-    }, [initialPets]);
+    }, [initialPets, users]);
 
     // Combine initial props with fetched data, removing duplicates by ID
     const allPets = useMemo(() => {
-        const allPetsMap = new Map<string, PetRow>();
-        // Add deduplicated initial pets
-        deduplicatedInitialPets.forEach(pet => {
+        const allPetsMap = new Map<string, Pet>();
+        // Add transformed initial pets
+        transformedInitialPets.forEach(pet => {
             if (pet && pet.id) {
                 allPetsMap.set(pet.id, pet);
             }
@@ -66,13 +88,13 @@ const PetSection: React.FC<{
             }
         });
         return Array.from(allPetsMap.values());
-    }, [deduplicatedInitialPets, additionalPets]);
+    }, [transformedInitialPets, additionalPets]);
 
     // Reset when initialPets changes (e.g. refresh) - use a stable reference
     useEffect(() => {
         setAdditionalPets([]);
         setHasMoreHorizontal(true);
-    }, [deduplicatedInitialPets]);
+    }, [transformedInitialPets]);
 
     const fetchMoreHorizontal = async () => {
         if (isLoadingMore || !hasMoreHorizontal) return;
@@ -88,6 +110,7 @@ const PetSection: React.FC<{
                 .from('pets')
                 .select('id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date')
                 .eq('status', status)
+                // Filter: expires_at > now (excludes expired and deactivated pets)
                 .gt('expires_at', new Date().toISOString())
                 .order('created_at', { ascending: false })
                 .range(currentCount, currentCount + BATCH_SIZE - 1);
@@ -95,11 +118,29 @@ const PetSection: React.FC<{
             if (error) throw error;
 
             if (data && data.length > 0) {
-                // Use database types directly (snake_case)
-                const newPets = data as PetRow[];
+                // Get unique user IDs from the fetched pets
+                const userIds = [...new Set(data.map((p: PetRow) => p.user_id).filter(Boolean))];
                 
-                // Filter out pets that are already in deduplicatedInitialPets to avoid duplicates
-                const existingIds = new Set(deduplicatedInitialPets.map(p => p.id));
+                // Fetch profiles for these users
+                let profiles: any[] = [];
+                if (userIds.length > 0) {
+                    const { data: profilesData, error: profilesError } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .in('id', userIds);
+                    
+                    if (profilesError) {
+                        console.error('Error fetching profiles:', profilesError);
+                    } else {
+                        profiles = profilesData || [];
+                    }
+                }
+                
+                // Transform PetRow[] to Pet[] using mapPetFromDb to ensure image URLs are processed
+                const newPets: Pet[] = (data as PetRow[]).map(p => mapPetFromDb(p, profiles));
+                
+                // Filter out pets that are already in transformedInitialPets to avoid duplicates
+                const existingIds = new Set(transformedInitialPets.map(p => p.id));
                 const newUniquePets = newPets.filter(p => p && p.id && !existingIds.has(p.id));
                 
                 // Also filter out pets already in additionalPets
@@ -189,8 +230,8 @@ const PetSection: React.FC<{
                 className="flex gap-2 sm:gap-3 md:gap-4 overflow-x-auto pb-3 sm:pb-4 hide-scrollbar scroll-smooth snap-x snap-mandatory w-full"
             >
                 {allPets.map(pet => {
-                    // Find owner by user_id since PetRow doesn't have userEmail
-                    const petOwner = users.find(u => u.id === pet.user_id);
+                    // Find owner by userEmail since Pet has userEmail
+                    const petOwner = users.find(u => u.email === pet.userEmail);
                     return (
                         <div key={pet.id} className="min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] snap-start flex-shrink-0">
                             <PetCard pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />
@@ -238,9 +279,14 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         key !== 'status' && value !== 'Todos' && value !== ''
     );
 
+    // Helper to check if pet is Pet type (has imageUrls) or PetRow (has image_urls)
+    const isPetType = (pet: Pet | PetRow): pet is Pet => {
+        return 'imageUrls' in pet;
+    };
+
     // Deduplicate pets array to prevent duplicate keys
     const deduplicatedPets = useMemo(() => {
-        const petsMap = new Map<string, PetRow>();
+        const petsMap = new Map<string, Pet | PetRow>();
         pets.forEach(pet => {
             if (pet && pet.id) {
                 petsMap.set(pet.id, pet);
@@ -252,10 +298,10 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     // Grouping for Dashboard View - Only done when needed
     // We filter prop 'pets' which should contain dashboard data when activeTab is ALL
     const dashboardGroups = activeTab === 'ALL' ? {
-        lost: deduplicatedPets.filter(p => p.status === PET_STATUS.PERDIDO),
-        sighted: deduplicatedPets.filter(p => p.status === PET_STATUS.AVISTADO),
-        found: deduplicatedPets.filter(p => p.status === PET_STATUS.ENCONTRADO),
-        adoption: deduplicatedPets.filter(p => p.status === PET_STATUS.EN_ADOPCION)
+        lost: deduplicatedPets.filter(p => p.status === PET_STATUS.PERDIDO) as (Pet | PetRow)[],
+        sighted: deduplicatedPets.filter(p => p.status === PET_STATUS.AVISTADO) as (Pet | PetRow)[],
+        found: deduplicatedPets.filter(p => p.status === PET_STATUS.ENCONTRADO) as (Pet | PetRow)[],
+        adoption: deduplicatedPets.filter(p => p.status === PET_STATUS.EN_ADOPCION) as (Pet | PetRow)[]
     } : null;
 
     // Intersection Observer for Infinite Scroll (Only for Grid Mode)
@@ -452,8 +498,23 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                         <>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-6 md:gap-x-4 md:gap-y-8 animate-fade-in-up w-full">
                                 {deduplicatedPets.map(pet => {
-                                    const petOwner = users.find(u => u.email === pet.userEmail);
-                                    return <PetCard key={pet.id} pet={pet} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
+                                    // Handle both Pet and PetRow types
+                                    let petForCard: Pet;
+                                    let petOwner: User | undefined;
+                                    
+                                    if (isPetType(pet)) {
+                                        // Already Pet type
+                                        petForCard = pet;
+                                        petOwner = users.find(u => u.email === pet.userEmail);
+                                    } else {
+                                        // PetRow type, needs transformation
+                                        const owner = users.find(u => u.id === pet.user_id);
+                                        const profiles = owner ? [{ id: owner.id, email: owner.email }] : [];
+                                        petForCard = mapPetFromDb(pet, profiles);
+                                        petOwner = owner;
+                                    }
+                                    
+                                    return <PetCard key={petForCard.id} pet={petForCard} owner={petOwner} onViewUser={onViewUser} onNavigate={onNavigate} />;
                                 })}
                             </div>
                             
