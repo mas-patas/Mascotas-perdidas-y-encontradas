@@ -10,10 +10,10 @@ import { ConfirmationModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
-import { usePet, useDeleteComment } from '@/api';
+import { usePet, useDeleteComment, useRenewPet, useDeactivatePet } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
-import { ReunionSuccessModal } from '@/features/pets';
+import { ReunionSuccessModal, ExpiredPetModal } from '@/features/pets';
 import { ErrorBoundary } from '@/shared';
 import { supabase } from '@/services/supabaseClient';
 
@@ -299,6 +299,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const { currentUser } = useAuth();
     const queryClient = useQueryClient();
     const deleteComment = useDeleteComment();
+    const renewPet = useRenewPet();
+    const deactivatePet = useDeactivatePet();
     
     // FETCH SPECIFIC PET
     const { data: fetchedPet, isLoading: isLoadingSingle, isError } = usePet(id && !propPet ? id : undefined);
@@ -318,12 +320,48 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isReunionModalOpen, setIsReunionModalOpen] = useState(false);
     const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
+    const [isExpiredModalOpen, setIsExpiredModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
     const [newCommentPreview, setNewCommentPreview] = useState('');
 
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
+
+    // Calculate owner status early (before early returns)
+    const isOwner = pet ? (currentUser?.email === pet.userEmail) : false;
+    
+    // Show expired modal when pet is loaded and expired (only for owner)
+    // This must be before early returns to maintain hook order
+    useEffect(() => {
+        if (!pet || !isOwner) {
+            return;
+        }
+        
+        // Check if pet is expired
+        const checkIfExpired = () => {
+            if (!pet.expiresAt) return false;
+            const now = new Date();
+            const expirationDate = new Date(pet.expiresAt);
+            // Check if expired (more than 1 minute past expiration)
+            return now.getTime() > (expirationDate.getTime() + 60000);
+        };
+        
+        // Check if pet is permanently deactivated (expires_at <= 2000-01-01)
+        const checkIfDeactivated = () => {
+            if (!pet.expiresAt) return false;
+            const deactivatedDate = new Date('2000-01-01');
+            const expirationDate = new Date(pet.expiresAt);
+            return expirationDate.getTime() <= deactivatedDate.getTime();
+        };
+        
+        const isExpired = checkIfExpired();
+        const isDeactivated = checkIfDeactivated();
+        
+        if (isExpired && !isDeactivated) {
+            setIsExpiredModalOpen(true);
+        }
+    }, [pet?.id, pet?.expiresAt, isOwner]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -383,13 +421,34 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const petOwner = users.find(u => u.email === pet.userEmail);
     const ownerName = petOwner?.username || (fetchedPet?.userEmail ? fetchedPet.userEmail.split('@')[0] : 'Usuario');
     
-    const isOwner = currentUser?.email === pet.userEmail;
     const isAdmin = currentUser?.role === USER_ROLES.ADMIN || currentUser?.role === USER_ROLES.SUPERADMIN;
     
     const isLost = pet.status === PET_STATUS.PERDIDO;
     
     // Determine the display name: if 'Desconocido', show status instead
     const displayName = pet.name === 'Desconocido' ? pet.status : pet.name;
+    
+    const handleKeepActive = async (pet: Pet) => {
+        try {
+            await renewPet.mutateAsync(pet.id);
+            setIsExpiredModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            alert('✅ Publicación renovada por 60 días más.');
+        } catch (err: any) {
+            alert('Error al renovar: ' + err.message);
+        }
+    };
+    
+    const handleDeactivate = async (pet: Pet) => {
+        try {
+            await deactivatePet.mutateAsync(pet.id);
+            setIsExpiredModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            alert('✅ Publicación desactivada. Solo tú y los administradores podrán verla.');
+        } catch (err: any) {
+            alert('Error al desactivar: ' + err.message);
+        }
+    };
 
     const handleReunionSubmit = async (story: string, date: string, image?: string) => {
         try {
@@ -956,6 +1015,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     onClose={() => setPublicProfileUser(null)}
                     targetUser={publicProfileUser}
                     onViewAdminProfile={onViewUser} 
+                />
+            )}
+            
+            {isExpiredModalOpen && pet && (
+                <ExpiredPetModal
+                    pet={pet}
+                    onClose={() => setIsExpiredModalOpen(false)}
+                    onKeepActive={handleKeepActive}
+                    onDeactivate={handleDeactivate}
                 />
             )}
         </div>

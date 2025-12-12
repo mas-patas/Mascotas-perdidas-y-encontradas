@@ -657,7 +657,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                             {expired && (
                                                 <div className="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-lg sm:rounded-xl border-2 border-red-200 backdrop-blur-sm p-2">
                                                     <p className="text-status-lost font-bold mb-2 text-xs sm:text-sm md:text-base uppercase">Expirado</p>
-                                                    {onRenewPet && <button onClick={() => onRenewPet(pet)} className="flex items-center gap-1.5 sm:gap-2 bg-brand-primary text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse text-xs sm:text-sm"><SparklesIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Renovar</button>}
+                                                    {onRenewPet && (
+                                                        <button 
+                                                            onClick={() => onRenewPet(pet)} 
+                                                            className="flex items-center gap-1.5 sm:gap-2 bg-brand-primary text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-brand-dark transition-colors shadow-md animate-pulse text-xs sm:text-sm"
+                                                        >
+                                                            <SparklesIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Renovar
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                             <PetCard pet={pet} owner={user} onViewUser={onViewUser} onNavigate={onNavigate} />

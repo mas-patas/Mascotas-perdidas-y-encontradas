@@ -31,7 +31,7 @@ import type { TourStep } from '@/shared';
 import { AboutPage, TipsPage, TermsPage } from '@/pages';
 
 // Types & Constants
-import type { PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
+import type { Pet, PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
 import { PET_STATUS, USER_ROLES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES } from './constants';
 
 // Services & Utils
@@ -131,7 +131,7 @@ const App: React.FC = () => {
     const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
     const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
     const [selectedPetForModal, setSelectedPetForModal] = useState<PetRow | null>(null);
-    const [petToRenew, setPetToRenew] = useState<PetRow | null>(null);
+    const [petToRenew, setPetToRenew] = useState<Pet | null>(null);
     const [petToStatusCheck, setPetToStatusCheck] = useState<PetRow | null>(null);
     const [isPublicProfileModalOpen, setIsPublicProfileModalOpen] = useState(false);
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
@@ -363,7 +363,7 @@ const App: React.FC = () => {
     const updatePetStatus = useUpdatePetStatus();
     const deletePet = useDeletePet();
 
-    const handleRenewPet = async (pet: PetRow) => {
+    const handleRenewPet = async (pet: Pet) => {
         if (!currentUser) return;
         try {
             await renewPet.mutateAsync(pet.id);
@@ -372,7 +372,7 @@ const App: React.FC = () => {
         } catch (err: any) { alert("Error al renovar: " + err.message); }
     };
 
-    const handleMarkAsFound = async (pet: PetRow) => {
+    const handleMarkAsFound = async (pet: Pet) => {
         try { 
             await updatePetStatus.mutateAsync({ id: pet.id, status: PET_STATUS.REUNIDO });
             trackPetReunited(pet.id);
@@ -765,7 +765,14 @@ const App: React.FC = () => {
             {isMatchModalOpen && pendingPetToSubmit && <PotentialMatchesModal matches={potentialMatches} onClose={() => { setIsMatchModalOpen(false); setPendingPetToSubmit(null); }} onConfirmPublication={() => finalizePetSubmission(pendingPetToSubmit)} onPetSelect={(pet) => { setIsMatchModalOpen(false); navigate(`/mascota/${pet.id}`); }} />}
             {isFlyerModalOpen && selectedPetForModal && <FlyerModal pet={selectedPetForModal} onClose={() => { setIsFlyerModalOpen(false); setSelectedPetForModal(null); }} />}
             {isUserDetailModalOpen && selectedUserProfile && <AdminUserDetailModal user={selectedUserProfile} allPets={pets} allChats={chats} allUsers={users} onClose={() => { setIsUserDetailModalOpen(false); setSelectedUserProfile(null); }} onUpdateStatus={handleUpdateUserStatus} onUpdateRole={handleUpdateUserRole} onStartChat={handleStartUserChat} onGhostLogin={ghostLogin} onViewUser={handleViewAdminUser} />}
-            {petToRenew && <RenewModal pet={petToRenew} onClose={() => setPetToRenew(null)} onRenew={handleRenewPet} onMarkAsFound={handleMarkAsFound} />}
+            {petToRenew && (
+                <RenewModal 
+                    pet={petToRenew} 
+                    onClose={() => setPetToRenew(null)} 
+                    onRenew={handleRenewPet} 
+                    onMarkAsFound={handleMarkAsFound} 
+                />
+            )}
             {petToStatusCheck && <StatusCheckModal pet={petToStatusCheck} onClose={() => setPetToStatusCheck(null)} onConfirmFound={handleMarkAsFound} onKeepLooking={handleKeepLooking} />}
             {isPublicProfileModalOpen && publicProfileUser && <UserPublicProfileModal isOpen={isPublicProfileModalOpen} onClose={() => { setIsPublicProfileModalOpen(false); setPublicProfileUser(null); }} targetUser={publicProfileUser} onViewAdminProfile={handleViewAdminUser} />}
         </ErrorBoundary>
