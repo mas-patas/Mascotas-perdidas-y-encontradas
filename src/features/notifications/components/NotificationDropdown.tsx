@@ -48,7 +48,7 @@ const NotificationDropdown = ({ notifications, onMarkAsRead, onClose }: Notifica
         
         try {
             if (notification.link === 'support') {
-                navigate('/soporte');
+                navigate('/soporte?tab=reports');
             } else if (notification.link === 'messages') {
                 navigate('/mensajes');
             } else if (typeof notification.link === 'object' && notification.link !== null) {

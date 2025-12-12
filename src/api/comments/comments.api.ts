@@ -55,8 +55,9 @@ export const getCommentById = async (id: string): Promise<CommentWithLikes | nul
     .eq('id', id)
     .single();
   
-  if (error) throw error;
-  if (!data) return null;
+  // PGRST116 = no rows returned (comment not found)
+  if (error && error.code !== 'PGRST116') throw error;
+  if (!data || error?.code === 'PGRST116') return null;
 
   // Fetch likes
   const { data: likes } = await supabase
@@ -130,9 +131,33 @@ export const createComment = async (data: CreateCommentData): Promise<string> =>
 };
 
 /**
- * Delete a comment
+ * Delete a comment and all its subcomments (replies) recursively
  */
 export const deleteComment = async (id: string): Promise<void> => {
+  // First, find all subcomments (comments that have this comment as parent)
+  const { data: subcomments, error: fetchError } = await supabase
+    .from('comments')
+    .select('id')
+    .eq('parent_id', id);
+
+  if (fetchError) throw fetchError;
+
+  // Recursively delete all subcomments
+  if (subcomments && subcomments.length > 0) {
+    for (const subcomment of subcomments) {
+      await deleteComment(subcomment.id);
+    }
+  }
+
+  // Delete comment likes associated with this comment
+  const { error: likesError } = await supabase
+    .from('comment_likes')
+    .delete()
+    .eq('comment_id', id);
+
+  if (likesError) throw likesError;
+
+  // Finally, delete the comment itself
   const { error } = await supabase
     .from('comments')
     .delete()

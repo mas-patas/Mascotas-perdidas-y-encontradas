@@ -187,7 +187,37 @@ export const getPetById = async (id: string): Promise<Pet | null> => {
     }
   }
   
-  return mapPetFromDb(data, profiles);
+  // Fetch comments for this pet
+  let comments: CommentRow[] = [];
+  const { data: commentsData, error: commentsError } = await supabase
+    .from('comments')
+    .select('*')
+    .eq('pet_id', id)
+    .order('created_at', { ascending: true });
+  
+  if (commentsError) {
+    console.error('Error fetching comments:', commentsError);
+  } else {
+    comments = commentsData || [];
+  }
+  
+  // Fetch comment likes for all comments
+  let commentLikes: CommentLikeRow[] = [];
+  if (comments.length > 0) {
+    const commentIds = comments.map(c => c.id);
+    const { data: likesData, error: likesError } = await supabase
+      .from('comment_likes')
+      .select('*')
+      .in('comment_id', commentIds);
+    
+    if (likesError) {
+      console.error('Error fetching comment likes:', likesError);
+    } else {
+      commentLikes = likesData || [];
+    }
+  }
+  
+  return mapPetFromDb(data, profiles, comments, commentLikes);
 };
 
 /**
