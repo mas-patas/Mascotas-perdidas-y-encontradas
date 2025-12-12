@@ -16,6 +16,8 @@ import { ShareModal } from '@/shared';
 import { ReunionSuccessModal, ExpiredPetModal } from '@/features/pets';
 import { ErrorBoundary } from '@/shared';
 import { supabase } from '@/services/supabaseClient';
+import { CelebrationEffect } from '@/shared/components/CelebrationEffect';
+import { hasCelebrated, markAsCelebrated } from '@/utils/celebrationTracker';
 
 interface PetDetailPageProps {
     pet?: Pet;
@@ -324,6 +326,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     const [publicProfileUser, setPublicProfileUser] = useState<User | null>(null);
     const [contactRevealed, setContactRevealed] = useState(false);
     const [newCommentPreview, setNewCommentPreview] = useState('');
+    const [showCelebration, setShowCelebration] = useState(false);
 
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
@@ -405,6 +408,33 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         return () => clearTimeout(timer);
     }, [pet]);
 
+    // Celebration effect for reunited pets
+    useEffect(() => {
+        if (!pet) return;
+        
+        // Only show celebration if pet is reunited
+        if (pet.status === PET_STATUS.REUNIDO) {
+            const userId = currentUser?.id || null;
+            
+            // Check if user has already seen the celebration for this pet
+            if (!hasCelebrated(pet.id, userId)) {
+                // Show celebration and mark as seen
+                setShowCelebration(true);
+                markAsCelebrated(pet.id, userId);
+                
+                // Hide celebration after duration
+                const timer = setTimeout(() => {
+                    setShowCelebration(false);
+                }, 1000);
+                
+                return () => clearTimeout(timer);
+            }
+        } else {
+            // Hide celebration if pet is not reunited
+            setShowCelebration(false);
+        }
+    }, [pet?.id, pet?.status, currentUser?.id]);
+
     if (isLoadingSingle && !pet) return <div className="p-16 text-center text-gray-500 font-bold"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-brand-primary mx-auto mb-4"></div>Cargando detalles...</div>;
     
     if (isError) return (
@@ -478,6 +508,58 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         } catch (error: any) {
             console.error("Error updating reunion status:", error);
             alert("Hubo un error al guardar.");
+        }
+    };
+
+    const handleSaveForLater = async () => {
+        try {
+            const updateData: any = {
+                status: PET_STATUS.REUNIDO,
+                reunion_date: new Date().toISOString().split('T')[0]
+            };
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            trackPetReunited(pet.id);
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion status:", error);
+            alert("Hubo un error al guardar.");
+            throw error;
+        }
+    };
+
+    const handleUpdateReunionStory = async (story: string, date: string, image?: string) => {
+        try {
+            const updateData: any = {
+                reunion_story: story,
+                reunion_date: date
+            };
+
+            if (image) {
+                updateData.image_urls = [image, ...(pet.imageUrls || [])];
+            }
+
+            const { error } = await supabase
+                .from('pets')
+                .update(updateData)
+                .eq('id', pet.id);
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['pet_detail', pet.id] });
+            
+        } catch (error: any) {
+            console.error("Error updating reunion story:", error);
+            alert("Hubo un error al guardar la historia.");
         }
     };
 
@@ -690,6 +772,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
                 </div>
 
+                {pet.status === PET_STATUS.REUNIDO && pet.reunionDate && (
+                    <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="p-1.5 sm:p-2 bg-green-100 text-green-600 rounded-full mt-1 flex-shrink-0">
+                            <HeartIcon className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" filled />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[10px] sm:text-xs text-green-600 font-bold uppercase tracking-wider">Fecha de Reencuentro</p>
+                            <p className="text-green-700 font-bold text-sm sm:text-base lg:text-lg capitalize break-words">
+                                {new Date(pet.reunionDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="border-t border-card-border pt-3 sm:pt-4"></div>
+
                 <div className="flex items-start gap-3 sm:gap-4">
                     <div className="p-1.5 sm:p-2 bg-gray-100 text-icon-gray rounded-full mt-1 flex-shrink-0">
                         <LocationMarkerIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -836,6 +934,15 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                     ¡Ya encontré a mi mascota!
                                 </button>
                             )}
+                            {pet.status === PET_STATUS.REUNIDO && (
+                                <button 
+                                    onClick={() => setIsReunionModalOpen(true)}
+                                    className="w-full bg-purple-100 text-purple-700 font-bold py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-center gap-2 shadow-sm mb-2 sm:mb-3 text-sm sm:text-base"
+                                >
+                                    <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" filled />
+                                    Contar mi experiencia de cómo me reuní con mi mascota
+                                </button>
+                            )}
                             <div className="flex gap-2 sm:gap-3">
                                 <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
                                     <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
@@ -910,6 +1017,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 <title>{displayName} - {pet.status} | Mas Patas</title>
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
+
+            {/* Celebration Effect */}
+            {showCelebration && <CelebrationEffect duration={1000} />}
 
             <button onClick={onClose} className="mb-3 sm:mb-4 flex items-center text-icon-gray hover:text-brand-primary font-bold transition-colors text-sm sm:text-base">
                 <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1" /> Volver al listado
@@ -991,7 +1101,8 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 isOpen={isReunionModalOpen}
                 onClose={() => setIsReunionModalOpen(false)}
                 pet={pet}
-                onSubmit={handleReunionSubmit}
+                onSubmit={pet.status === PET_STATUS.REUNIDO ? handleUpdateReunionStory : handleReunionSubmit}
+                onSaveForLater={pet.status === PET_STATUS.REUNIDO ? undefined : handleSaveForLater}
             />
 
             <CommentsModal 
