@@ -96,7 +96,7 @@ const PetSection: React.FC<{
     useEffect(() => {
         setAdditionalPets([]);
         setHasMoreHorizontal(true);
-    }, [deduplicatedInitialPets, filters]);
+    }, [transformedInitialPets, filters]);
 
     const fetchMoreHorizontal = async () => {
         if (isLoadingMore || !hasMoreHorizontal) return;
