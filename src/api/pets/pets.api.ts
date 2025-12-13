@@ -2,6 +2,7 @@ import { supabase } from '../../services/supabaseClient';
 import type { PetRow, CommentRow, ProfileRow, CommentLikeRow, Pet } from '../../types';
 import type { PetFilters, FetchPetsParams, CreatePetData, UpdatePetData, MarkReunionData } from './pets.types';
 import { mapPetFromDb } from '../../utils/mappers';
+import { applyPetFilters } from './pets.filters';
 
 const PET_COLUMNS = 'id, status, name, animal_type, breed, color, size, location, date, contact, description, image_urls, adoption_requirements, share_contact_info, contact_requests, reward, currency, lat, lng, created_at, expires_at, user_id, reunion_story, reunion_date';
 
@@ -52,11 +53,8 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
     // Since nowIso is always > '2000-01-01', this single condition handles both cases
     .gt('expires_at', nowIso);
   
-  if (filters.type !== 'Todos') query = query.eq('animal_type', filters.type);
-  if (filters.breed !== 'Todos') query = query.eq('breed', filters.breed);
-  if (filters.size !== 'Todos') query = query.eq('size', filters.size);
-  if (filters.color1 !== 'Todos') query = query.ilike('color', `%${filters.color1}%`);
-  if (filters.department !== 'Todos') query = query.ilike('location', `%${filters.department}%`);
+  // Apply filters declaratively
+  query = applyPetFilters(query, filters);
   
   const { data, count, error } = await query
     .order('created_at', { ascending: false })
@@ -112,12 +110,8 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       // Filter: expires_at > nowIso (excludes expired and deactivated pets)
       .gt('expires_at', nowIso);
     
-    if (filters.department && filters.department !== 'Todos') {
-      query = query.ilike('location', `%${filters.department}%`);
-    }
-    if (filters.type && filters.type !== 'Todos') {
-      query = query.eq('animal_type', filters.type);
-    }
+    // Apply all filters consistently with getPets using declarative approach
+    query = applyPetFilters(query, filters);
 
     const { data, error } = await query
       .order('created_at', { ascending: false })

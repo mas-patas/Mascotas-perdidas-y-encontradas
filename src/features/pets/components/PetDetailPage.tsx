@@ -10,7 +10,7 @@ import { ConfirmationModal, InfoModal } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
-import { usePet, useDeleteComment, useCommentsByPetId, useRenewPet } from '@/api';
+import { usePet, useDeleteComment, useCommentsByPetId, useRenewPet, useDeactivatePet } from '@/api';
 import { trackContactOwner, trackPetReunited } from '@/services/analytics';
 import { ShareModal } from '@/shared';
 import { ReunionSuccessModal, ExpiredPetModal } from '@/features/pets';
