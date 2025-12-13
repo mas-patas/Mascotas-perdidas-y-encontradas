@@ -7,6 +7,8 @@ import { WarningIcon, MapIcon, FilterIcon, XCircleIcon, HeartIcon, ChevronLeftIc
 import { supabase } from '@/services/supabaseClient';
 import { applyPetFilters } from '@/api/pets/pets.filters';
 import { mapPetFromDb } from '@/utils/mappers';
+import { BannerCarousel } from '@/shared';
+import { useActiveBanners } from '@/api';
 
 interface PetListProps {
     pets: Pet[] | PetRow[];
@@ -266,6 +268,7 @@ const PetSection: React.FC<{
 export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filters, setFilters, onNavigate, onSelectStatus, onReset, loadMore, hasMore, isLoading, isError, onRetry }) => {
     
     const sentinelRef = useRef<HTMLDivElement>(null);
+    const { data: banners = [] } = useActiveBanners();
     
     // DIRECT STATE DERIVATION: No more local state syncing issues
     // If filters.status is 'Todos', we are in 'ALL' (Dashboard) mode.
@@ -356,31 +359,37 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                 }
             `}</style>
 
-            {/* 1. Banner */}
+            {/* 1. Banner Carousel or Default Banner */}
             {activeTab === 'ALL' && (
-                <div 
-                    className="relative rounded-xl sm:rounded-2xl overflow-hidden shadow-md h-[120px] sm:h-[150px] md:h-[180px] flex items-center bg-gray-900 group cursor-pointer animate-fade-in"
-                    onClick={() => onNavigate('/reunidos')}
-                >
-                    <img 
-                        src="https://images.unsplash.com/photo-1544568100-847a948585b9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" 
-                        alt="Happy dog" 
-                        className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-sky-500/80 to-blue-600/40"></div>
-                    
-                    <div className="relative z-10 p-4 sm:p-5 md:p-6 lg:px-10 text-white max-w-2xl">
-                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-                            <span className="bg-white/20 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">Historias Reales</span>
+                <>
+                    {banners.length > 0 ? (
+                        <BannerCarousel banners={banners} />
+                    ) : (
+                        <div 
+                            className="relative rounded-xl sm:rounded-2xl overflow-hidden shadow-md h-[120px] sm:h-[150px] md:h-[180px] flex items-center bg-gray-900 group cursor-pointer animate-fade-in"
+                            onClick={() => onNavigate('/reunidos')}
+                        >
+                            <img 
+                                src="https://images.unsplash.com/photo-1544568100-847a948585b9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" 
+                                alt="Happy dog" 
+                                className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-r from-sky-500/80 to-blue-600/40"></div>
+                            
+                            <div className="relative z-10 p-4 sm:p-5 md:p-6 lg:px-10 text-white max-w-2xl">
+                                <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                                    <span className="bg-white/20 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">Historias Reales</span>
+                                </div>
+                                <h2 className="text-base sm:text-lg md:text-xl lg:text-3xl font-black mb-1.5 sm:mb-2 leading-tight drop-shadow-md">
+                                    Cuando la esperanza <br className="hidden sm:block"/> vuelve a casa.
+                                </h2>
+                                <button className="bg-white text-indigo-600 text-[10px] sm:text-xs font-bold py-1.5 sm:py-2 px-3 sm:px-4 rounded-full shadow hover:bg-gray-50 transition-colors flex items-center gap-1 sm:gap-1.5">
+                                    <HeartIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current text-red-500" /> <span>Ver Reencuentros</span>
+                                </button>
+                            </div>
                         </div>
-                        <h2 className="text-base sm:text-lg md:text-xl lg:text-3xl font-black mb-1.5 sm:mb-2 leading-tight drop-shadow-md">
-                            Cuando la esperanza <br className="hidden sm:block"/> vuelve a casa.
-                        </h2>
-                        <button className="bg-white text-indigo-600 text-[10px] sm:text-xs font-bold py-1.5 sm:py-2 px-3 sm:px-4 rounded-full shadow hover:bg-gray-50 transition-colors flex items-center gap-1 sm:gap-1.5">
-                            <HeartIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current text-red-500" /> <span>Ver Reencuentros</span>
-                        </button>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
 
             {/* Sticky Navigation Bar */}
