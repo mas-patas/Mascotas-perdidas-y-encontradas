@@ -188,7 +188,7 @@ const ReunitedPetsPage: React.FC = () => {
                                             
                                             {/* Overlay Information */}
                                             <div className="absolute bottom-0 left-0 w-full p-6 lg:p-8 z-20 bg-gradient-to-t from-black/60 via-black/30 to-transparent">
-                                                <div className="space-y-2 mb-4">
+                                                <div className="space-y-2">
                                                     {/* Green Tag */}
                                                     <span className="inline-block bg-green-500 text-white text-xs font-black px-3 py-1.5 rounded-md uppercase tracking-wider shadow-sm">
                                                         REUNIDO EN {days} {days === 1 ? 'DÍA' : 'DÍAS'}
@@ -204,22 +204,22 @@ const ReunitedPetsPage: React.FC = () => {
                                                         "{pet.reunionStory || 'lo encontre cerca a mi casa'}"
                                                     </p>
                                                 </div>
-                                                
-                                                {/* Pagination Dots */}
-                                                <div className="flex gap-2 justify-center">
-                                                    {featuredPets.map((_, idx) => (
-                                                        <button 
-                                                            key={idx}
-                                                            onClick={() => setCurrentIndex(idx)}
-                                                            className={`h-2 rounded-full transition-all duration-300 ${currentIndex === idx ? 'w-8 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'}`}
-                                                            aria-label={`Ver historia ${idx + 1}`}
-                                                        />
-                                                    ))}
-                                                </div>
                                             </div>
                                         </div>
                                     );
                                 })}
+
+                                {/* Pagination Dots */}
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+                                    {featuredPets.map((_, idx) => (
+                                        <button 
+                                            key={idx}
+                                            onClick={() => setCurrentIndex(idx)}
+                                            className={`h-2 rounded-full transition-all duration-300 ${currentIndex === idx ? 'w-8 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'}`}
+                                            aria-label={`Ver historia ${idx + 1}`}
+                                        />
+                                    ))}
+                                </div>
 
                                 {/* Navigation Arrows */}
                                 {featuredPets.length > 1 && (
