@@ -143,14 +143,12 @@ const ReunitedPetsPage: React.FC = () => {
                             {/* Main Heading */}
                             <div className="flex-1 flex flex-col justify-center">
                                 <h1 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 leading-tight tracking-tight text-white">
-                                    Reencuentros<br/>
-                                    que nos<br/>
-                                    devuelven la<br/>
-                                    sonrisa
+                                    Historias que <br className="md:hidden"/>
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-200">Inspiran Esperanza</span>
                                 </h1>
                                 <p className="text-base md:text-lg text-white/95 font-medium leading-relaxed mb-6">
-                                    Mascotas que estuvieron perdidas y hoy volvieron a<br/>
-                                    casa gracias a la comunidad.
+                                    Detrás de cada foto hay una comunidad que no se rindió. <br/>
+                                    Estos son los momentos por los que trabajamos.
                                 </p>
                             </div>
 
