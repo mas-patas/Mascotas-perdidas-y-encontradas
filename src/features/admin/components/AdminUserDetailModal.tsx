@@ -250,7 +250,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                      <div className="mt-6 pt-4 border-t space-y-3">
                                         <h3 className="text-lg font-semibold text-gray-800">Acciones de Moderación</h3>
                                         <div className="flex flex-col sm:flex-row gap-3">
-                                            <button onClick={() => onStartChat(safeUser.email)} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
+                                            <button onClick={() => { onStartChat(safeUser.email); onClose(); }} className="flex-1 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
                                                 Enviar Mensaje
                                             </button>
                                              <button 
@@ -268,6 +268,7 @@ const AdminUserDetailModal: React.FC<AdminUserDetailModalProps> = ({ user, allPe
                                                         return;
                                                     }
                                                     onGhostLogin(safeUser);
+                                                    onClose();
                                                 }}
                                                 className="w-full mt-3 py-2 px-4 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
                                             >

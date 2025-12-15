@@ -42,6 +42,7 @@ import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
 import { usePets as usePetsHook } from './hooks/usePets';
 import { sendPageView, trackPetReunited } from './services/analytics';
+import { queryKeys as chatsQueryKeys } from './api/chats/chats.keys';
 
 // API Hooks
 import {
@@ -473,14 +474,31 @@ const App: React.FC = () => {
                 participantEmails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail]
             });
             const now = new Date().toISOString();
-            setChats((prev: ChatRow[]) => [...prev, { 
+            const newChat: ChatRow = { 
                 id: chatId, 
                 pet_id: pet.id, 
                 participant_emails: [normalizedCurrentUserEmail, normalizedPetOwnerEmail], 
                 messages: null, 
                 last_read_timestamps: {}, 
                 created_at: now 
-            } as ChatRow]);
+            } as ChatRow;
+            
+            // Update local state
+            setChats((prev: ChatRow[]) => {
+                // Avoid duplicate chats
+                if (prev.find(c => c.id === chatId)) return prev;
+                return [...prev, newChat];
+            });
+            
+            // Update React Query cache immediately so ChatPage can find it
+            // Use a function to avoid unnecessary updates
+            queryClient.setQueryData(chatsQueryKeys.chats(normalizedCurrentUserEmail), (old: ChatRow[] | undefined) => {
+                if (!old) return [newChat];
+                // Return same reference if chat already exists to prevent re-renders
+                if (old.find(c => c.id === chatId)) return old;
+                return [...old, newChat];
+            });
+            
             navigate(`/chat/${chatId}`);
         } catch(e:any){ 
             setErrorModal({ isOpen: true, message: e.message || 'Error al iniciar chat' }); 
@@ -507,14 +525,31 @@ const App: React.FC = () => {
                 participantEmails: [normalizedCurrentEmail, normalizedOtherEmail]
             });
             const now = new Date().toISOString();
-            setChats((prev: ChatRow[]) => [...prev, { 
+            const newChat: ChatRow = { 
                 id: chatId, 
                 pet_id: null, 
                 participant_emails: [normalizedCurrentEmail, normalizedOtherEmail], 
                 messages: null, 
                 last_read_timestamps: {}, 
                 created_at: now 
-            } as ChatRow]);
+            } as ChatRow;
+            
+            // Update local state
+            setChats((prev: ChatRow[]) => {
+                // Avoid duplicate chats
+                if (prev.find(c => c.id === chatId)) return prev;
+                return [...prev, newChat];
+            });
+            
+            // Update React Query cache immediately so ChatPage can find it
+            // Use a function to avoid unnecessary updates
+            queryClient.setQueryData(chatsQueryKeys.chats(normalizedCurrentEmail), (old: ChatRow[] | undefined) => {
+                if (!old) return [newChat];
+                // Return same reference if chat already exists to prevent re-renders
+                if (old.find(c => c.id === chatId)) return old;
+                return [...old, newChat];
+            });
+            
             navigate(`/chat/${chatId}`);
         } catch(e:any){ 
             setErrorModal({ isOpen: true, message: e.message || 'Error al iniciar chat' }); 
@@ -530,15 +565,13 @@ const App: React.FC = () => {
 
     const handleMarkChatAsRead = useCallback(async (chatId: string) => {
         if (!currentUser) return;
-        const now = new Date().toISOString();
-        setChats((prev: ChatRow[]) => prev.map((c: ChatRow) => {
-            if (c.id === chatId) {
-                const timestamps = (c.last_read_timestamps as Record<string, string>) || {};
-                return { ...c, last_read_timestamps: { ...timestamps, [currentUser.email]: now } };
-            }
-            return c;
-        }));
-        await markChatAsRead.mutateAsync(chatId); 
+        // Don't update local state - let React Query handle it through invalidation
+        // This prevents infinite loops
+        try {
+            await markChatAsRead.mutateAsync(chatId);
+        } catch (error) {
+            console.error('Error marking chat as read:', error);
+        }
     }, [currentUser, markChatAsRead]);
 
     const createReport = useCreateReport();
