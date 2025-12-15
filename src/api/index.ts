@@ -17,6 +17,7 @@ import { queryKeys as savedSearchesKeys } from './savedSearches/savedSearches.ke
 import { queryKeys as bannedIpsKeys } from './bannedIps/bannedIps.keys';
 import { queryKeys as gamificationKeys } from './gamification/gamification.keys';
 import { bannerKeys } from './banners/banners.keys';
+import { queryKeys as campaignReportsKeys } from './campaignReports/campaignReports.keys';
 
 export const queryKeys = {
   ...authKeys,
@@ -33,6 +34,7 @@ export const queryKeys = {
   ...bannedIpsKeys,
   ...gamificationKeys,
   banners: bannerKeys,
+  ...campaignReportsKeys,
 } as const;
 
 // Type Definitions
@@ -62,6 +64,7 @@ export * as bannedIpsApi from './bannedIps/bannedIps.api';
 export * as gamificationApi from './gamification/gamification.api';
 export * as pushSubscriptionsApi from './pushSubscriptions/pushSubscriptions.api';
 export * as bannersApi from './banners/banners.api';
+export * as campaignReportsApi from './campaignReports/campaignReports.api';
 
 // Query Hooks
 export * from './users/users.query';
@@ -78,6 +81,7 @@ export * from './bannedIps/bannedIps.query';
 export * from './gamification/gamification.query';
 export * from './admin/admin.query';
 export * from './banners/banners.query';
+export * from './campaignReports/campaignReports.query';
 
 // Mutation Hooks
 export * from './auth/auth.mutation';
@@ -94,3 +98,4 @@ export * from './savedSearches/savedSearches.mutation';
 export * from './bannedIps/bannedIps.mutation';
 export * from './pushSubscriptions/pushSubscriptions.mutation';
 export * from './banners/banners.mutation';
+export * from './campaignReports/campaignReports.mutation';

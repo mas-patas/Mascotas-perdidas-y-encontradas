@@ -125,15 +125,13 @@ export const Header: React.FC<HeaderProps> = ({
                 
                 {/* LEFT: Logo & Home */}
                 <div className="flex items-center gap-1 sm:gap-2 md:gap-4 flex-1 min-w-0">
-                     {isMainView && (
-                        <button 
-                            onClick={onToggleSidebar} 
-                            className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
-                            aria-label="Abrir menú de filtros"
-                        >
-                            <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                        </button>
-                     )}
+                     <button 
+                         onClick={onToggleSidebar} 
+                         className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
+                         aria-label="Abrir menú de navegación"
+                     >
+                         <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                     </button>
                      <div 
                         className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-0.5 sm:gap-1 md:gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-0.5 sm:mr-1 md:mr-2 lg:mr-4 flex-shrink-0" 
                         onClick={handleHomeClick}
