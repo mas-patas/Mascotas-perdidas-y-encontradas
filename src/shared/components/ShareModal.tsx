@@ -363,7 +363,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                             position: 'absolute', 
                             top: '40px', 
                             right: '40px', 
-                            backgroundColor: '#10B981', 
+                            backgroundColor: '#D4AF37', 
                             color: 'white', 
                             padding: '15px 30px', 
                             borderRadius: '50px', 

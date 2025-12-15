@@ -5,7 +5,7 @@ import type { PetStatus, AnimalType, PetSize } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '@/constants';
 import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments } from '@/data/locations';
-import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon } from '@/shared/components/icons';
+import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon, UsersIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/auth';
 
 type Filters = {
@@ -96,6 +96,9 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                         {/* Removed Home button from Sidebar as requested */}
                         <button onClick={() => { navigate('/reunidos'); onClose(); }} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
                             <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Reencuentros</span>
+                        </button>
+                        <button onClick={() => { navigate('/nosotros'); onClose(); }} className={navLinkClass(location.pathname === '/nosotros')}>
+                            <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Nosotros</span>
                         </button>
                         <button onClick={() => { navigate('/mapa'); onClose(); }} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
                             <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa de mascotas</span>

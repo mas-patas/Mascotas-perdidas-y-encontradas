@@ -229,7 +229,7 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
                         <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
                         <div class="flex flex-wrap justify-center gap-1 mb-2">
                             <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">${pet.status}</span>
-                            ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-green-800 bg-green-100 border border-green-200 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
+                            ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-yellow-900 bg-yellow-100 border border-yellow-300 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
                         </div>
                         <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
                         <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
