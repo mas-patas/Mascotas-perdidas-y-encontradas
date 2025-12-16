@@ -186,23 +186,33 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
         const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
         
         if (deptMatch) {
-            setDepartment(deptMatch);
             const newProvs = getProvinces(deptMatch);
-            setProvinces(newProvs);
             
             // 2. Find Province
             const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
             const provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
             
+            let newDists: string[] = [];
+            let distMatch: string | null = null;
+            
             if (provMatch) {
-                setProvince(provMatch);
-                const newDists = getDistricts(deptMatch, provMatch);
-                setDistricts(newDists);
+                newDists = getDistricts(deptMatch, provMatch);
                 
                 // 3. Find District
                 const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
-                const distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
-                
+                distMatch = newDists.find(d => normalizeLocationName(d) === apiDist) || null;
+            }
+
+            // Update provinces and districts lists first
+            setProvinces(newProvs);
+            if (newDists.length > 0) {
+                setDistricts(newDists);
+            }
+
+            // Then update all form values at once
+            setDepartment(deptMatch);
+            if (provMatch) {
+                setProvince(provMatch);
                 if (distMatch) {
                     setDistrict(distMatch);
                 }
@@ -211,7 +221,7 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
     };
     
     // Reverse geocoding function
-    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+    const performReverseGeocoding = async (latitude: number, longitude: number, isRetry = false) => {
         isUpdatingFromMapRef.current = true;
         
         if (reverseGeocodingAbortController.current) {
@@ -250,6 +260,14 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
                 
                 // Update location hierarchy
                 parseAndSetHierarchy(addr);
+                
+                // If this is the first call (not a retry), make a second call after 1.5 seconds
+                // to ensure district is set correctly after lists are updated
+                if (!isRetry) {
+                    setTimeout(() => {
+                        performReverseGeocoding(latitude, longitude, true);
+                    }, 1500);
+                }
             }
         } catch (err: any) {
             // Ignore aborts
