@@ -1,5 +1,6 @@
 import React from 'react';
 import { CalendarIcon, ClockIcon, HeartIcon } from './icons';
+import { calculateDaysApart, formatDate } from '@/utils/date.utils';
 
 interface ReunionTimelineProps {
     lostDate: string;
@@ -7,21 +8,6 @@ interface ReunionTimelineProps {
     orientation?: 'horizontal' | 'vertical';
     className?: string;
 }
-
-const calculateDaysApart = (start: string, end?: string): number => {
-    const date1 = new Date(start);
-    const date2 = end ? new Date(end) : new Date();
-    const diffTime = Math.abs(date2.getTime() - date1.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    });
-};
 
 export const ReunionTimeline: React.FC<ReunionTimelineProps> = ({
     lostDate,

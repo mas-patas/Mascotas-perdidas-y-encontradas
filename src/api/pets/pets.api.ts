@@ -229,6 +229,40 @@ export const getPetBasicInfo = async (id: string): Promise<{ user_id: string; an
 };
 
 /**
+ * Fetch a reunited pet story by ID
+ * Only returns pets with REUNIDO status
+ */
+export const getReunionStoryById = async (id: string): Promise<Pet | null> => {
+  const { PET_STATUS } = await import('../../constants');
+  
+  const { data, error } = await supabase
+    .from('pets')
+    .select(PET_COLUMNS)
+    .eq('id', id)
+    .eq('status', PET_STATUS.REUNIDO)
+    .single();
+  
+  if (error) throw error;
+  if (!data) return null;
+  
+  // Fetch profile for this pet's owner
+  let profiles: ProfileRow[] = [];
+  if (data.user_id) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user_id)
+      .single();
+    
+    if (!profileError && profileData) {
+      profiles = [profileData];
+    }
+  }
+  
+  return mapPetFromDb(data, profiles);
+};
+
+/**
  * Fetch pets by user ID
  */
 export const getPetsByUserId = async (userId: string): Promise<Pet[]> => {

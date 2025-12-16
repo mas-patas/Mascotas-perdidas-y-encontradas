@@ -1,65 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/services/supabaseClient';
-import type { Pet } from '@/types';
-import { PET_STATUS } from '@/constants';
+import React from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useReunionStory } from '@/api/pets/pets.query';
 import { ReunionTimeline } from '@/shared/components/ReunionTimeline';
 import { ChevronLeftIcon, LocationMarkerIcon, HeartIcon } from '@/shared/components/icons';
 import { Helmet } from 'react-helmet-async';
 
 const ReunionStoryPage: React.FC = () => {
     const { petId } = useParams<{ petId: string }>();
-    const navigate = useNavigate();
-    const [pet, setPet] = useState<Pet | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchPet = async () => {
-            if (!petId) return;
-
-            setLoading(true);
-            try {
-                const { data, error } = await supabase
-                    .from('pets')
-                    .select('*, profiles:user_id(username)')
-                    .eq('id', petId)
-                    .eq('status', PET_STATUS.REUNIDO)
-                    .single();
-
-                if (error) throw error;
-
-                const mapped: Pet = {
-                    id: data.id,
-                    userEmail: data.profiles?.username || 'Usuario',
-                    status: data.status,
-                    name: data.name,
-                    animalType: data.animal_type,
-                    breed: data.breed,
-                    color: data.color,
-                    size: data.size,
-                    location: data.location,
-                    date: data.date,
-                    contact: '',
-                    description: data.description,
-                    imageUrls: data.image_urls || [],
-                    lat: data.lat,
-                    lng: data.lng,
-                    reunionStory: data.reunion_story,
-                    reunionDate: data.reunion_date,
-                    comments: [],
-                    createdAt: data.created_at
-                };
-
-                setPet(mapped);
-            } catch (err) {
-                console.error("Error fetching reunion story:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchPet();
-    }, [petId]);
+    const { data: pet, isLoading: loading, error } = useReunionStory(petId);
 
     if (loading) {
         return (
