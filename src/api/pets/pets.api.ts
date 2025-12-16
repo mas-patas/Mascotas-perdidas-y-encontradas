@@ -351,6 +351,32 @@ export const createPet = async (data: CreatePetData): Promise<string> => {
     }
   }
 
+  // Trigger proximity alerts by calling Edge Function directly from frontend
+  // This is a workaround since pg_net is not available in the trigger
+  if (data.lat && data.lng && data.status === 'Perdido') {
+    try {
+      // Get the complete pet data to send to Edge Function
+      const { data: petData, error: fetchError } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('id', newPetId)
+        .single();
+
+      if (!fetchError && petData) {
+        // Call Edge Function asynchronously (fire and forget)
+        supabase.functions.invoke('send-proximity-alerts', {
+          body: petData
+        }).catch((err) => {
+          // Silently fail - we don't want to block pet creation if alerts fail
+          console.warn('Failed to trigger proximity alerts:', err);
+        });
+      }
+    } catch (err) {
+      // Silently fail - we don't want to block pet creation if alerts fail
+      console.warn('Error triggering proximity alerts:', err);
+    }
+  }
+
   return newPetId;
 };
 

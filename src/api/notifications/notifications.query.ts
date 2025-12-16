@@ -46,7 +46,8 @@ export const useNotifications = (userId: string | undefined) => {
       return transformNotificationRows(rows);
     },
     enabled: !!userId,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 5000, // Polling cada 5 segundos como fallback/supplement a Realtime
   });
 };
 
@@ -82,15 +83,39 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('🔔 [useNotificationsRealtime] No userId provided, skipping subscription');
+      return;
+    }
 
+    console.log('🔔 [useNotificationsRealtime] Setting up subscription for user:', userId);
+
+    // Use a unique channel name per user to avoid conflicts
+    const channelName = `notifications-realtime-${userId}`;
+    
     const channel = supabase
-      .channel('notifications-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications'
+          // Removed filter - checking user_id in the handler instead
+          // filter: `user_id=eq.${userId}` // This filter might not work if Realtime is not properly configured
+        },
         (payload) => {
+          console.log('🔔 [useNotificationsRealtime] Realtime event received:', {
+            notification_user_id: payload.new.user_id,
+            current_user_id: userId,
+            message: payload.new.message,
+            matches: payload.new.user_id === userId
+          });
+          
+          // With the filter, we can be confident this notification is for this user
           if (payload.new.user_id === userId) {
+            console.log('✅ [useNotificationsRealtime] Notification matches user, processing...');
+            
             queryClient.setQueryData(queryKeys.notifications(userId), (old: any) => {
               const newNotif = transformNotificationRow(payload.new as any);
               return [newNotif, ...(old || [])];
@@ -110,12 +135,23 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
             }
             
             sendSystemNotification('Mas Patas: Nueva Notificación', payload.new.message, link);
+            console.log('✅ [useNotificationsRealtime] Notification processed successfully');
+          } else {
+            console.log('❌ [useNotificationsRealtime] Notification user_id does not match current user');
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 [useNotificationsRealtime] Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [useNotificationsRealtime] Successfully subscribed to notifications');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ [useNotificationsRealtime] Channel error - check Realtime is enabled in Supabase');
+        }
+      });
 
     return () => {
+      console.log('🔌 [useNotificationsRealtime] Removing subscription');
       supabase.removeChannel(channel);
     };
   }, [userId, queryClient, showToast]);
