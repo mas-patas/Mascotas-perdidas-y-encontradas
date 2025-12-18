@@ -172,7 +172,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
     };
     const statusColor = getStatusColor();
     
-    const displayStatus = pet.status === PET_STATUS.PERDIDO ? 'SE BUSCA' : pet.status === PET_STATUS.ENCONTRADO ? 'PERDIDO' : pet.status.toUpperCase();
+    const displayStatus = pet.status === PET_STATUS.PERDIDO ? 'SE BUSCA' : pet.status === PET_STATUS.ENCONTRADO ? 'AVISTADO' : pet.status.toUpperCase();
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 z-[3000] flex justify-center items-center p-4 backdrop-blur-sm" onClick={onClose}>
