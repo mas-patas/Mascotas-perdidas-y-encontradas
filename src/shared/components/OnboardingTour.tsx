@@ -30,6 +30,10 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
         const hasCompleted = localStorage.getItem(`tour_completed_${tourId}`);
         if (!hasCompleted) {
             // Intelligent timing: wait for elements to be rendered
+            let retryCount = 0;
+            const MAX_RETRIES = 25; // Maximum 25 retries (5 seconds total: 300ms initial + 200ms * 25)
+            const RETRY_DELAY = 200;
+            
             const checkElementsReady = () => {
                 // Check if at least the first step's target element exists
                 if (steps.length > 0) {
@@ -37,8 +41,14 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
                     if (firstElement) {
                         setIsVisible(true);
                     } else {
-                        // Retry after a short delay if element not found
-                        setTimeout(checkElementsReady, 200);
+                        // Retry after a short delay if element not found, but limit retries
+                        if (retryCount < MAX_RETRIES) {
+                            retryCount++;
+                            setTimeout(checkElementsReady, RETRY_DELAY);
+                        } else {
+                            // Max retries reached, element likely doesn't exist or selector is incorrect
+                            console.warn(`OnboardingTour: Target element "${steps[0].target}" not found after ${MAX_RETRIES} retries. Tour will not be displayed.`);
+                        }
                     }
                 } else {
                     setIsVisible(true);

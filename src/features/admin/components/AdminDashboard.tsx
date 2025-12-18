@@ -1267,6 +1267,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         setIsCampaignModalOpen(false);
                         setCampaignToEdit(null);
                     }}
+                    onSaveCampaign={onSaveCampaign}
                     campaignToEdit={campaignToEdit}
                 />
             )}

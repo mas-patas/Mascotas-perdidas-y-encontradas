@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { XCircleIcon, LocationMarkerIcon, CameraIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { CAMPAIGN_TYPES } from '@/constants';
-import { useCreateCampaign } from '@/api';
+import { useCreateCampaign, useUpdateCampaign } from '@/api';
 import type { Campaign } from '@/types';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
 
@@ -19,6 +19,7 @@ interface CampaignFormModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    onSaveCampaign?: (campaignData: Omit<Campaign, 'id' | 'userEmail'>, idToUpdate?: string) => void;
     campaignToEdit?: Campaign | null;
 }
 
@@ -26,9 +27,11 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
     isOpen, 
     onClose, 
     onSuccess,
+    onSaveCampaign,
     campaignToEdit 
 }) => {
     const createCampaign = useCreateCampaign();
+    const updateCampaign = useUpdateCampaign();
     const isEditMode = !!campaignToEdit;
     
     // Form state
@@ -90,18 +93,85 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
             setTitle(campaignToEdit.title || '');
             setType(campaignToEdit.type || CAMPAIGN_TYPES.ESTERILIZACION);
             setDate(campaignToEdit.date ? new Date(campaignToEdit.date).toISOString().split('T')[0] : '');
+            
             // Parse location string to extract address, department, province, district
-            const locationParts = (campaignToEdit.location || '').split(',').map(s => s.trim());
+            const locationString = campaignToEdit.location || '';
+            const locationParts = locationString.split(',').map(s => s.trim());
+            
+            // Extract address (first part)
             if (locationParts.length > 0) {
                 setAddress(locationParts[0] || '');
             }
+            
             // Try to extract department, province, district from location string
-            // This is a simple parsing - you might need to adjust based on your data format
+            // Location format is typically: "address, district, province, department"
+            // We'll try to match against our known departments, provinces, and districts
+            let foundDept = '';
+            let foundProv = '';
+            let foundDist = '';
+            
+            // Reverse order: department, province, district (last parts of location string)
+            for (let i = locationParts.length - 1; i >= 0; i--) {
+                const part = locationParts[i];
+                if (!part) continue;
+                
+                // Check if it's a department
+                if (!foundDept) {
+                    const deptMatch = departments.find(d => 
+                        normalizeLocationName(d) === normalizeLocationName(part)
+                    );
+                    if (deptMatch) {
+                        foundDept = deptMatch;
+                        continue;
+                    }
+                }
+                
+                // Check if it's a province (only if we have a department)
+                if (foundDept && !foundProv) {
+                    const provs = getProvinces(foundDept);
+                    const provMatch = provs.find(p => 
+                        normalizeLocationName(p) === normalizeLocationName(part)
+                    );
+                    if (provMatch) {
+                        foundProv = provMatch;
+                        continue;
+                    }
+                }
+                
+                // Check if it's a district (only if we have province)
+                if (foundDept && foundProv && !foundDist) {
+                    const dists = getDistricts(foundDept, foundProv);
+                    const distMatch = dists.find(d => 
+                        normalizeLocationName(d) === normalizeLocationName(part)
+                    );
+                    if (distMatch) {
+                        foundDist = distMatch;
+                        continue;
+                    }
+                }
+            }
+            
+            // Set extracted values or defaults
+            if (foundDept) {
+                setDepartment(foundDept);
+                if (foundProv) {
+                    setProvince(foundProv);
+                    if (foundDist) {
+                        setDistrict(foundDist);
+                    }
+                }
+            }
+            
             setPhone(campaignToEdit.contactPhone || '');
             setDescription(campaignToEdit.description || '');
             setImageUrls(campaignToEdit.imageUrls || []);
             setLat(campaignToEdit.lat);
             setLng(campaignToEdit.lng);
+            
+            // If we have coordinates but missing location hierarchy, perform reverse geocoding
+            if (campaignToEdit.lat && campaignToEdit.lng && (!foundDept || !foundProv || !foundDist)) {
+                // Will be triggered by the map initialization effect
+            }
         } else {
             // Reset form
             setTitle('');
@@ -434,27 +504,41 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
         const finalLocation = [address, district, province, department].filter(Boolean).join(', ');
         
         try {
+            const campaignData = {
+                title: title.trim(),
+                type: finalType,
+                date: new Date(date).toISOString(),
+                location: finalLocation,
+                contactPhone: phone.trim() || undefined,
+                description: description.trim(),
+                imageUrls: imageUrls,
+                lat: lat,
+                lng: lng
+            };
+            
             if (isEditMode && campaignToEdit) {
-                // Update campaign - this would need to be implemented
-                // For now, we'll just create a new one
-                setError('La edición de campañas aún no está implementada.');
-                return;
-            } else {
-                await createCampaign.mutateAsync({
-                    title: title.trim(),
-                    type: finalType,
-                    date: new Date(date).toISOString(),
-                    location: finalLocation,
-                    contactPhone: phone.trim() || undefined,
-                    description: description.trim(),
-                    imageUrls: imageUrls,
-                    lat: lat,
-                    lng: lng
+                // Update existing campaign
+                await updateCampaign.mutateAsync({
+                    id: campaignToEdit.id,
+                    data: campaignData
                 });
                 
-                if (onSuccess) onSuccess();
-                onClose();
+                // Call onSaveCampaign callback if provided (for parent component state updates)
+                if (onSaveCampaign) {
+                    onSaveCampaign(campaignData, campaignToEdit.id);
+                }
+            } else {
+                // Create new campaign
+                await createCampaign.mutateAsync(campaignData);
+                
+                // Call onSaveCampaign callback if provided (for parent component state updates)
+                if (onSaveCampaign) {
+                    onSaveCampaign(campaignData);
+                }
             }
+            
+            if (onSuccess) onSuccess();
+            onClose();
         } catch (err: any) {
             console.error("Error saving campaign:", err);
             setError("Error al guardar la campaña: " + (err.message || 'Error desconocido'));
@@ -729,16 +813,16 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
                             type="button"
                             onClick={onClose}
                             className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors"
-                            disabled={createCampaign.isPending}
+                            disabled={createCampaign.isPending || updateCampaign.isPending}
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            disabled={isUploading || createCampaign.isPending}
+                            disabled={isUploading || createCampaign.isPending || updateCampaign.isPending}
                             className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50"
                         >
-                            {createCampaign.isPending ? 'Guardando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Crear Campaña')}
+                            {(createCampaign.isPending || updateCampaign.isPending) ? 'Guardando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Crear Campaña')}
                         </button>
                     </div>
                 </form>
