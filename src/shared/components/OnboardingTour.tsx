@@ -25,15 +25,31 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
     const [tooltipPos, setTooltipPos] = useState<{ top: number, left: number }>({ top: 0, left: 0 });
     const [arrowPos, setArrowPos] = useState<string>('top'); // Where the arrow/caret should point relative to tooltip
 
-    // Check localStorage on mount
+    // Check localStorage on mount and verify elements are rendered
     useEffect(() => {
         const hasCompleted = localStorage.getItem(`tour_completed_${tourId}`);
         if (!hasCompleted) {
-            // Small delay to ensure UI is fully rendered before calculating positions
-            const timer = setTimeout(() => setIsVisible(true), 1500);
+            // Intelligent timing: wait for elements to be rendered
+            const checkElementsReady = () => {
+                // Check if at least the first step's target element exists
+                if (steps.length > 0) {
+                    const firstElement = document.querySelector(steps[0].target);
+                    if (firstElement) {
+                        setIsVisible(true);
+                    } else {
+                        // Retry after a short delay if element not found
+                        setTimeout(checkElementsReady, 200);
+                    }
+                } else {
+                    setIsVisible(true);
+                }
+            };
+            
+            // Start checking after initial render
+            const timer = setTimeout(checkElementsReady, 300);
             return () => clearTimeout(timer);
         }
-    }, [tourId]);
+    }, [tourId, steps]);
 
     const currentStep = steps[currentStepIndex];
 
@@ -69,11 +85,21 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
 
         const element = document.querySelector(currentStep.target);
         if (element) {
-            // Scroll element into view smoothly
-            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-            
+            // Scroll element into view smoothly but less aggressively (since tour is non-blocking)
             const rect = element.getBoundingClientRect();
-            setTargetRect(rect);
+            
+            // Only scroll if element is not visible in viewport
+            const isElementVisible = rect.top >= 0 && rect.left >= 0 && 
+                                    rect.bottom <= window.innerHeight && 
+                                    rect.right <= window.innerWidth;
+            
+            if (!isElementVisible) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
+            
+            // Recalculate rect after potential scroll
+            const updatedRect = element.getBoundingClientRect();
+            setTargetRect(updatedRect);
             
             const spacing = 15; // Distance from target
             const tooltipWidth = 320; // Fixed width defined in CSS
@@ -87,20 +113,20 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
             // --- FLIP LOGIC ---
             // Check if preferred position causes overflow, if so, flip it.
             
-            if (pos === 'right' && (rect.right + tooltipWidth + spacing > vw)) {
+            if (pos === 'right' && (updatedRect.right + tooltipWidth + spacing > vw)) {
                 pos = 'left'; // Flip to left
                 // If left also overflows (on mobile), fallback to bottom
-                if (rect.left - tooltipWidth - spacing < 0) pos = 'bottom';
+                if (updatedRect.left - tooltipWidth - spacing < 0) pos = 'bottom';
             }
-            else if (pos === 'left' && (rect.left - tooltipWidth - spacing < 0)) {
+            else if (pos === 'left' && (updatedRect.left - tooltipWidth - spacing < 0)) {
                 pos = 'right';
                 // If right also overflows, fallback to bottom
-                if (rect.right + tooltipWidth + spacing > vw) pos = 'bottom';
+                if (updatedRect.right + tooltipWidth + spacing > vw) pos = 'bottom';
             }
-            else if (pos === 'top' && (rect.top - tooltipHeightEstimate - spacing < 0)) {
+            else if (pos === 'top' && (updatedRect.top - tooltipHeightEstimate - spacing < 0)) {
                 pos = 'bottom';
             }
-            else if (pos === 'bottom' && (rect.bottom + tooltipHeightEstimate + spacing > vh)) {
+            else if (pos === 'bottom' && (updatedRect.bottom + tooltipHeightEstimate + spacing > vh)) {
                 pos = 'top';
             }
 
@@ -108,17 +134,17 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
             let t = 0, l = 0;
             
             if (pos === 'top') {
-                t = rect.top - spacing; 
-                l = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                t = updatedRect.top - spacing; 
+                l = updatedRect.left + (updatedRect.width / 2) - (tooltipWidth / 2);
             } else if (pos === 'bottom') {
-                t = rect.bottom + spacing;
-                l = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                t = updatedRect.bottom + spacing;
+                l = updatedRect.left + (updatedRect.width / 2) - (tooltipWidth / 2);
             } else if (pos === 'left') {
-                t = rect.top + (rect.height / 2); // Centered vertically, CSS will translateY(-50%)
-                l = rect.left - tooltipWidth - spacing;
+                t = updatedRect.top + (updatedRect.height / 2); // Centered vertically, CSS will translateY(-50%)
+                l = updatedRect.left - tooltipWidth - spacing;
             } else if (pos === 'right') {
-                t = rect.top + (rect.height / 2);
-                l = rect.right + spacing;
+                t = updatedRect.top + (updatedRect.height / 2);
+                l = updatedRect.right + spacing;
             }
 
             // --- CLAMPING (Keep within Viewport) ---
@@ -199,48 +225,21 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] animate-fade-in font-sans touch-none">
-            {/* Backdrop with SVG Mask for Spotlight Effect */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                <defs>
-                    <mask id="tour-mask">
-                        <rect x="0" y="0" width="100%" height="100%" fill="white" />
-                        {/* The hole around target */}
-                        <rect 
-                            x={targetRect.left - 5} 
-                            y={targetRect.top - 5} 
-                            width={targetRect.width + 10} 
-                            height={targetRect.height + 10} 
-                            rx="8" 
-                            fill="black" 
-                        />
-                    </mask>
-                </defs>
-                <rect 
-                    x="0" 
-                    y="0" 
-                    width="100%" 
-                    height="100%" 
-                    fill="rgba(0, 0, 0, 0.7)" 
-                    mask="url(#tour-mask)" 
-                />
-            </svg>
-
-            {/* Glowing Border around target (Visual indicator) */}
+        <>
+            {/* Subtle highlight on target element (non-blocking) */}
             <div 
-                className="absolute border-4 border-brand-secondary rounded-lg shadow-[0_0_30px_rgba(251,191,36,0.6)] pointer-events-none transition-all duration-300 ease-in-out box-content"
+                className="fixed border-2 border-brand-primary rounded-lg shadow-lg pointer-events-none transition-all duration-300 ease-in-out z-50"
                 style={{
-                    top: targetRect.top - 5,
-                    left: targetRect.left - 5,
-                    width: targetRect.width,
-                    height: targetRect.height,
-                    padding: '5px'
+                    top: targetRect.top - 2,
+                    left: targetRect.left - 2,
+                    width: targetRect.width + 4,
+                    height: targetRect.height + 4,
                 }}
             />
 
-            {/* The Tooltip Card */}
+            {/* The Tooltip Card - Non-blocking, positioned absolutely */}
             <div 
-                className="absolute bg-white rounded-xl shadow-2xl p-0 transition-all duration-300 ease-in-out flex flex-col border border-brand-light w-[300px] sm:w-[320px]"
+                className="fixed bg-white rounded-xl shadow-2xl p-0 transition-all duration-300 ease-in-out flex flex-col border border-brand-light w-[300px] sm:w-[320px] z-50 animate-fade-in font-sans"
                 style={{
                     top: tooltipPos.top,
                     left: tooltipPos.left,
@@ -299,7 +298,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ steps, tourId, o
                     </div>
                 </div>
             </div>
-        </div>,
+        </>,
         document.body
     );
 };

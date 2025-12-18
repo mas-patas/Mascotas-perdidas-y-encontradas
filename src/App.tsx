@@ -736,7 +736,9 @@ const App: React.FC = () => {
 
     return (
         <ErrorBoundary name="Root">
-            {currentUser && location.pathname === '/' && (
+            {currentUser && 
+             currentUser.username && 
+             location.pathname === '/' && (
                 <OnboardingTour 
                     steps={homeTourSteps} 
                     tourId="home_v1" 
