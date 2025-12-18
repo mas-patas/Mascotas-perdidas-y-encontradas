@@ -90,7 +90,6 @@ serve(async (req: Request) => {
       .single();
 
     const rateLimitMinutes = rateLimitSetting?.value?.minutes ?? 60; // Default: 60 minutes (1 hour)
-    console.log('⏱️ Rate limit configurado:', rateLimitMinutes, 'minutos');
 
     // Get all users with location data
     const { data: users, error: usersError } = await supabase
@@ -131,7 +130,6 @@ serve(async (req: Request) => {
     // Check rate limiting (configurable minutes, default 60 minutes = 1 hour)
     const rateLimitMs = rateLimitMinutes * 60 * 1000;
     const rateLimitAgo = new Date(Date.now() - rateLimitMs).toISOString();
-    console.log('⏱️ Buscando notificaciones desde:', rateLimitAgo, `(${rateLimitMinutes} minutos atrás)`);
     
     const { data: recentNotifications } = await supabase
       .from('notifications')
@@ -139,14 +137,6 @@ serve(async (req: Request) => {
       .in('user_id', userIds)
       .like('message', '¡Alerta de Proximidad!%')
       .gte('created_at', rateLimitAgo);
-
-    console.log('⏱️ Notificaciones recientes encontradas:', recentNotifications?.length || 0);
-    if (recentNotifications && recentNotifications.length > 0) {
-      console.log('⏱️ Usuarios bloqueados:', recentNotifications.map((n: any) => ({
-        user_id: n.user_id,
-        created_at: n.created_at
-      })));
-    }
 
     const notifiedUserIds = new Set(recentNotifications?.map((n: any) => n.user_id) || []);
 

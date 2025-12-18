@@ -47,7 +47,6 @@ export const useUserLocation = ({
         },
         (error) => {
           // Silently handle errors (user denied, timeout, etc.)
-          console.debug('Location update failed:', error.message);
         },
         {
           enableHighAccuracy: false,
