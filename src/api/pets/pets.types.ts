@@ -6,11 +6,13 @@ export interface PetFilters {
   status: string;
   type: string;
   breed: string;
-  color1: string;
-  color2: string;
-  color3: string;
+  colors: string[]; // Array of selected colors (max 3)
   size: string;
   department: string;
+  province: string;
+  district: string;
+  dateFilter: string; // 'today' | 'last3days' | 'lastWeek' | 'lastMonth' | ''
+  name: string; // Only used when status includes 'Perdido'
 }
 
 export interface FetchPetsParams {

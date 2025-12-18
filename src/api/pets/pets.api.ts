@@ -46,14 +46,14 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
 
   let query = supabase
     .from('pets')
-    .select(PET_COLUMNS, { count: 'exact' })
-    .eq('status', filters.status)
-    // Filter: expires_at > nowIso
-    // This excludes both expired pets (expires_at < now) and permanently deactivated pets (expires_at = '2000-01-01')
-    // Since nowIso is always > '2000-01-01', this single condition handles both cases
-    .gt('expires_at', nowIso);
+    .select(PET_COLUMNS, { count: 'exact' });
   
-  // Apply filters declaratively
+  // Filter: expires_at > nowIso
+  // This excludes both expired pets (expires_at < now) and permanently deactivated pets (expires_at = '2000-01-01')
+  // Since nowIso is always > '2000-01-01', this single condition handles both cases
+  query = query.gt('expires_at', nowIso);
+  
+  // Apply filters declaratively (includes status filter)
   query = applyPetFilters(query, filters);
   
   const { data, count, error } = await query
@@ -99,7 +99,17 @@ export const getPets = async ({ filters, page = 0, pageSize = 12 }: FetchPetsPar
 export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise<Pet[]> => {
   const nowIso = new Date().toISOString();
   const { PET_STATUS } = await import('../../constants');
-  const categories = [PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
+  
+  // Determine which categories to fetch based on status filter
+  let categories: string[] = [];
+  if (filters.status === 'Todos' || !filters.status) {
+    // Default: fetch all categories
+    categories = [PET_STATUS.PERDIDO, PET_STATUS.ENCONTRADO, PET_STATUS.AVISTADO, PET_STATUS.EN_ADOPCION, PET_STATUS.REUNIDO];
+  } else {
+    // Single status
+    categories = [filters.status];
+  }
+  
   const limit = 8;
 
   const fetchCategory = async (status: string) => {
@@ -110,8 +120,11 @@ export const getPetsForDashboard = async (filters: Partial<PetFilters>): Promise
       // Filter: expires_at > nowIso (excludes expired and deactivated pets)
       .gt('expires_at', nowIso);
     
-    // Apply all filters consistently with getPets using declarative approach
-    query = applyPetFilters(query, filters);
+    // Apply all filters except status (already applied above)
+    // Create a copy of filters without status to avoid double filtering
+    const filtersWithoutStatus = { ...filters };
+    delete filtersWithoutStatus.status;
+    query = applyPetFilters(query, filtersWithoutStatus);
 
     const { data, error } = await query
       .order('created_at', { ascending: false })

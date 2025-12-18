@@ -31,10 +31,9 @@ const FILTER_CONFIGS: FilterConfig[] = [
   { key: 'type', column: 'animal_type', method: 'eq', skipIfTodos: true },
   { key: 'breed', column: 'breed', method: 'eq', skipIfTodos: true },
   { key: 'size', column: 'size', method: 'eq', skipIfTodos: true },
-  { key: 'color1', column: 'color', method: 'ilike', skipIfTodos: true },
-  { key: 'color2', column: 'color', method: 'ilike', skipIfTodos: true },
-  { key: 'color3', column: 'color', method: 'ilike', skipIfTodos: true },
   { key: 'department', column: 'location', method: 'ilike', skipIfTodos: true },
+  { key: 'province', column: 'location', method: 'ilike', skipIfTodos: true },
+  { key: 'district', column: 'location', method: 'ilike', skipIfTodos: true },
 ];
 
 /**
@@ -56,6 +55,52 @@ export function applyPetFilters(
   filters: Partial<PetFilters>,
   configs: FilterConfig[] = FILTER_CONFIGS
 ): QueryBuilder {
+  // Handle status filter
+  if (filters.status && filters.status !== 'Todos') {
+    query = query.eq('status', filters.status);
+  }
+
+  // Handle colors filter (OR logic - pet must match at least one)
+  if (filters.colors && Array.isArray(filters.colors) && filters.colors.length > 0) {
+    // Use .or() to match any of the selected colors
+    // Supabase .or() syntax: "column.ilike.%value1%,column.ilike.%value2%"
+    const colorConditions = filters.colors.map(color => `color.ilike.%${color}%`).join(',');
+    query = query.or(colorConditions);
+  }
+
+  // Handle date filter
+  if (filters.dateFilter) {
+    const now = new Date();
+    let dateThreshold: Date;
+    
+    switch (filters.dateFilter) {
+      case 'today':
+        dateThreshold = new Date(now.setHours(0, 0, 0, 0));
+        break;
+      case 'last3days':
+        dateThreshold = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        break;
+      case 'lastWeek':
+        dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'lastMonth':
+        dateThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        dateThreshold = new Date(0);
+    }
+    
+    if (dateThreshold.getTime() > 0) {
+      query = query.gte('created_at', dateThreshold.toISOString());
+    }
+  }
+
+  // Handle name filter (only if status is 'Perdido')
+  if (filters.name && filters.name.trim() && filters.status === 'Perdido') {
+    query = query.ilike('name', `%${filters.name}%`);
+  }
+
+  // Apply standard filters using configs
   return configs.reduce((acc, config) => {
     const filterValue = filters[config.key];
     

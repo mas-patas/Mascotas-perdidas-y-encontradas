@@ -15,10 +15,13 @@ interface UsePetsProps {
         status: PetStatus | 'Todos';
         type: AnimalType | 'Todos';
         breed: string;
-        color1: string;
-        color2: string;
+        colors: string[];
         size: PetSize | 'Todos';
         department: string;
+        province?: string;
+        district?: string;
+        dateFilter?: string;
+        name?: string;
     };
 }
 
