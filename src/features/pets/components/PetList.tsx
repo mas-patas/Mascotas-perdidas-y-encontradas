@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import type { PetRow, User, PetStatus, Pet } from '@/types';
 import { PetCard } from '@/features/pets';
 import { PET_STATUS } from '@/constants';
@@ -100,7 +100,7 @@ const PetSection: React.FC<{
         setHasMoreHorizontal(true);
     }, [transformedInitialPets, filters]);
 
-    const fetchMoreHorizontal = async () => {
+    const fetchMoreHorizontal = useCallback(async () => {
         if (isLoadingMore || !hasMoreHorizontal) return;
         
         setIsLoadingMore(true);
@@ -172,7 +172,7 @@ const PetSection: React.FC<{
         } finally {
             setIsLoadingMore(false);
         }
-    };
+    }, [isLoadingMore, hasMoreHorizontal, allPets.length, status, filters, transformedInitialPets]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -194,6 +194,32 @@ const PetSection: React.FC<{
             });
         }
     };
+
+    // Listen to scroll events for touch/mobile scrolling to load more pets
+    useEffect(() => {
+        const scrollElement = scrollRef.current;
+        if (!scrollElement) return;
+
+        const handleScroll = () => {
+            if (!hasMoreHorizontal || isLoadingMore) return;
+
+            const { scrollLeft, scrollWidth, clientWidth } = scrollElement;
+            const maxScrollLeft = scrollWidth - clientWidth;
+            const threshold = 200; // Distance from end to trigger load (in pixels)
+
+            // Check if user has scrolled near the end (within threshold)
+            if (scrollLeft >= maxScrollLeft - threshold) {
+                fetchMoreHorizontal();
+            }
+        };
+
+        // Use passive listener for better performance on mobile
+        scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            scrollElement.removeEventListener('scroll', handleScroll);
+        };
+    }, [hasMoreHorizontal, isLoadingMore, fetchMoreHorizontal]); // Include fetchMoreHorizontal in dependencies
 
     if (allPets.length === 0) return null;
 
