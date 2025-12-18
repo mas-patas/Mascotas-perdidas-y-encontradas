@@ -50,26 +50,36 @@ export const usePetFilters = (pets: Pet[]) => {
             if (filters.province !== 'Todos' && !pet.location.includes(filters.province)) return false;
             if (filters.district !== 'Todos' && !pet.location.includes(filters.district)) return false;
 
-            // Date filter
+            // Date filter (using calendar day boundaries to match server-side logic)
             if (filters.dateFilter) {
                 const petDate = new Date(pet.date || pet.createdAt);
                 const now = new Date();
-                const daysDiff = Math.floor((now.getTime() - petDate.getTime()) / (1000 * 60 * 60 * 24));
+                let dateThreshold: Date;
                 
                 switch (filters.dateFilter) {
                     case 'today':
-                        if (daysDiff > 0) return false;
+                        // Use calendar day start (midnight) to match server-side logic
+                        dateThreshold = new Date(now);
+                        dateThreshold.setHours(0, 0, 0, 0);
                         break;
                     case 'last3days':
-                        if (daysDiff > 3) return false;
+                        dateThreshold = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                        dateThreshold.setHours(0, 0, 0, 0);
                         break;
                     case 'lastWeek':
-                        if (daysDiff > 7) return false;
+                        dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        dateThreshold.setHours(0, 0, 0, 0);
                         break;
                     case 'lastMonth':
-                        if (daysDiff > 30) return false;
+                        dateThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        dateThreshold.setHours(0, 0, 0, 0);
                         break;
+                    default:
+                        return true; // No filter applied
                 }
+                
+                // Check if pet date is on or after the threshold
+                if (petDate < dateThreshold) return false;
             }
 
             // Name filter: only apply if status is 'Perdido'

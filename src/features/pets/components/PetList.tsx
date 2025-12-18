@@ -327,7 +327,10 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                     dateFilter: '',
                     name: ''
                 };
-                return { ...prev, [key]: defaultValues[key] || 'Todos' };
+                // Use the default value if key exists, otherwise fallback to 'Todos'
+                // This preserves empty strings for dateFilter and name fields
+                const defaultValue = key in defaultValues ? defaultValues[key] : 'Todos';
+                return { ...prev, [key]: defaultValue };
             }
         });
     };
