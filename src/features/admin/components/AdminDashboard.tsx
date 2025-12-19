@@ -2,14 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User, UserRole, Pet, Chat, PetStatus, AnimalType, UserStatus, Report, ReportStatus as ReportStatusType, ReportPostSnapshot, SupportTicketRow, SupportTicketStatus, SupportTicketCategory, Campaign, BannedIP } from '@/types';
 import { USER_ROLES, PET_STATUS, ANIMAL_TYPES, USER_STATUS, REPORT_STATUS, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_CATEGORIES, CAMPAIGN_TYPES } from '@/constants';
-import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EditIcon, EyeIcon, BellIcon, LocationMarkerIcon, XCircleIcon, PlusIcon, StoreIcon, CheckCircleIcon, CalendarIcon } from '@/shared/components/icons';
+import { UsersIcon, PetIcon, FlagIcon, SupportIcon, MegaphoneIcon, TrashIcon, EyeIcon, BellIcon, LocationMarkerIcon, XCircleIcon, StoreIcon, CheckCircleIcon, CalendarIcon, PlusIcon } from '@/shared/components/icons';
 import { ReportDetailModal } from '@/features/reports';
 import { SupportTicketModal } from '@/features/support';
 import { CampaignFormModal } from '@/features/campaigns';
 import { ConfirmationModal, InfoModal } from '@/shared';
 import { useAppData } from '@/hooks/useAppData';
 import { AdminBusinessPanel } from '@/features/admin';
-import { useAdminStats, useCreateBannedIp, useDeleteBannedIp, useDeleteReport, useBanners, useCreateBanner, useUpdateBanner, useDeleteBanner } from '@/api';
+import { useAdminStats, useCreateBannedIp, useDeleteBannedIp, useDeleteReport, useBanners, useCreateBanner, useUpdateBanner, useDeleteBanner, useCampaignReports, useUpdateCampaignReportStatus, useDeleteCampaignReport } from '@/api';
 import { supabase } from '@/services/supabaseClient';
 import BannerManagementModal from './BannerManagementModal';
 
@@ -179,6 +179,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const { bannedIps } = useAppData();
     const deleteReport = useDeleteReport();
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'reports' | 'support' | 'campaigns' | 'settings' | 'security' | 'businesses'>('dashboard');
+    const [campaignReportsSubTab, setCampaignReportsSubTab] = useState<'campaigns' | 'reports'>('campaigns');
     const [infoModal, setInfoModal] = useState<{ isOpen: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ isOpen: false, message: '', type: 'info' });
     const [statusFilter, setStatusFilter] = useState<PetStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<AnimalType | 'all'>('all');
@@ -215,6 +216,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const createBanner = useCreateBanner();
     const deleteBanner = useDeleteBanner();
     const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
+
+    // Campaign Reports Hooks
+    const { data: campaignReports = [], isLoading: campaignReportsLoading, error: campaignReportsError } = useCampaignReports();
+    const updateCampaignReportStatus = useUpdateCampaignReportStatus();
+    const deleteCampaignReport = useDeleteCampaignReport();
+    const [campaignReportStatusFilter, setCampaignReportStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
     // Advanced User Filters
     const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -766,8 +773,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const totalCampaignPages = Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE);
         const paginatedCampaigns = filteredCampaigns.slice((campaignPage - 1) * CAMPAIGNS_PER_PAGE, campaignPage * CAMPAIGNS_PER_PAGE);
 
+        const filteredCampaignReports = campaignReports.filter(r => {
+            if (campaignReportStatusFilter === 'all') return true;
+            return r.status === campaignReportStatusFilter;
+        });
+
+        const handleUpdateReportStatus = async (id: string, status: 'pending' | 'approved' | 'rejected') => {
+            try {
+                await updateCampaignReportStatus.mutateAsync({ id, status });
+                setInfoModal({ isOpen: true, message: 'Estado del reporte actualizado correctamente', type: 'success' });
+            } catch (err: any) {
+                setInfoModal({ isOpen: true, message: 'Error al actualizar el estado: ' + err.message, type: 'error' });
+            }
+        };
+
+        const handleDeleteReport = async (id: string) => {
+            try {
+                await deleteCampaignReport.mutateAsync(id);
+                setInfoModal({ isOpen: true, message: 'Reporte eliminado correctamente', type: 'success' });
+            } catch (err: any) {
+                setInfoModal({ isOpen: true, message: 'Error al eliminar el reporte: ' + err.message, type: 'error' });
+            }
+        };
+
         return (
-            <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
+                {/* Sub-tabs */}
+                <div className="bg-white p-4 rounded-lg shadow-md">
+                    <div className="flex gap-2 border-b border-gray-200">
+                        <button
+                            onClick={() => setCampaignReportsSubTab('campaigns')}
+                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                campaignReportsSubTab === 'campaigns'
+                                    ? 'border-brand-primary text-brand-primary'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Campañas
+                        </button>
+                        <button
+                            onClick={() => setCampaignReportsSubTab('reports')}
+                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                campaignReportsSubTab === 'reports'
+                                    ? 'border-brand-primary text-brand-primary'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Reportes de Campañas
+                            {campaignReports.filter(r => r.status === 'pending').length > 0 && (
+                                <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-200 text-red-800">
+                                    {campaignReports.filter(r => r.status === 'pending').length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                {campaignReportsSubTab === 'campaigns' ? (
+            <div className="bg-white p-6 rounded-lg shadow-md">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                     <h3 className="text-xl font-bold text-gray-800">Gestión de Campañas</h3>
                     <div className="flex gap-2">
@@ -780,7 +843,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <option value="upcoming">Próximas</option>
                             <option value="expired">Pasadas</option>
                         </select>
-                        <button onClick={() => { setCampaignToEdit(null); setIsCampaignModalOpen(true); }} className="py-2 px-4 bg-brand-primary text-white rounded-lg flex items-center gap-2 text-sm font-bold shadow hover:bg-brand-dark transition-colors"><PlusIcon /> Crear Nueva</button>
+                        <button 
+                            onClick={() => { setCampaignToEdit(null); setIsCampaignModalOpen(true); }} 
+                            className="py-2 px-4 bg-brand-primary text-white rounded-lg flex items-center gap-2 text-sm font-bold shadow hover:bg-brand-dark transition-colors"
+                        >
+                            <PlusIcon className="h-4 w-4" /> Crear Nueva
+                        </button>
                     </div>
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -800,7 +868,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <td className="py-4 px-4 text-sm text-gray-900"><span className={`px-2 py-1 rounded-full text-xs font-bold ${campaign.type === CAMPAIGN_TYPES.ESTERILIZACION ? 'bg-teal-100 text-teal-800' : 'bg-indigo-100 text-indigo-800'}`}>{campaign.type}</span></td>
                                     <td className="py-4 px-4 text-sm text-gray-900">{formatDateSafe(campaign.date)}</td>
                                     <td className="py-4 px-4 text-sm flex gap-3">
-                                        <button onClick={() => { setCampaignToEdit(campaign); setIsCampaignModalOpen(true); }} className="text-blue-600 hover:text-blue-800 bg-blue-50 p-2 rounded hover:bg-blue-100 transition-colors"><EditIcon /></button>
                                         <button onClick={() => setCampaignToDelete(campaign)} className="text-red-600 hover:text-red-800 bg-red-50 p-2 rounded hover:bg-red-100 transition-colors"><TrashIcon /></button>
                                     </td>
                                 </tr>
@@ -817,6 +884,166 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onPageChange={setCampaignPage} 
                     totalItems={filteredCampaigns.length} 
                 />
+            </div>
+                ) : (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 className="text-xl font-bold text-gray-800">Reportes de Campañas</h3>
+                    <select 
+                        value={campaignReportStatusFilter} 
+                        onChange={(e) => setCampaignReportStatusFilter(e.target.value as any)}
+                        className="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg p-2"
+                    >
+                        <option value="all">Todos</option>
+                        <option value="pending">Pendientes</option>
+                        <option value="approved">Aprobados</option>
+                        <option value="rejected">Rechazados</option>
+                    </select>
+                </div>
+                {campaignReportsLoading ? (
+                    <div className="text-center py-8">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+                    </div>
+                ) : campaignReportsError ? (
+                    <div className="text-center py-8">
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                            <p className="font-bold mb-2">Error al cargar reportes de campañas</p>
+                            <p className="text-sm">{(campaignReportsError as any)?.message || 'Error desconocido'}</p>
+                            <p className="text-xs mt-2 text-red-600">
+                                Asegúrate de que la migración <code className="bg-red-100 px-1 rounded">20250109000000_create_campaign_reports_table.sql</code> se haya ejecutado.
+                            </p>
+                        </div>
+                    </div>
+                ) : filteredCampaignReports.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                        {campaignReports.length === 0 
+                            ? 'No hay reportes de campañas registrados.'
+                            : 'No hay reportes con el filtro seleccionado.'}
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-full bg-white">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Usuario</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Dirección</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Link Social</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Distrito</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Fecha</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Estado</th>
+                                    <th className="py-3 px-4 text-left text-xs font-bold text-gray-600 uppercase">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {filteredCampaignReports.map(report => {
+                                    const getUserName = () => {
+                                        if (report.user) {
+                                            if (report.user.username) return report.user.username;
+                                            if (report.user.first_name && report.user.last_name) {
+                                                return `${report.user.first_name} ${report.user.last_name}`;
+                                            }
+                                            if (report.user.first_name) return report.user.first_name;
+                                            return report.user.email || 'Usuario';
+                                        }
+                                        return report.user_email || 'Anónimo';
+                                    };
+
+                                    const getUserForView = (): User | null => {
+                                        if (!report.user || !report.user.id) return null;
+                                        return users.find(u => u.id === report.user!.id) || null;
+                                    };
+
+                                    const userName = getUserName();
+                                    const userForView = getUserForView();
+
+                                    return (
+                                    <tr key={report.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="py-4 px-4 text-sm text-gray-900">
+                                            {userForView ? (
+                                                <button
+                                                    onClick={() => onViewUser(userForView)}
+                                                    className="text-brand-primary hover:text-brand-dark font-bold hover:underline cursor-pointer"
+                                                >
+                                                    {userName}
+                                                </button>
+                                            ) : (
+                                                <span>{userName}</span>
+                                            )}
+                                        </td>
+                                        <td className="py-4 px-4 text-sm text-gray-900 max-w-xs truncate" title={report.address}>
+                                            {report.address}
+                                        </td>
+                                        <td className="py-4 px-4 text-sm">
+                                            <a
+                                                href={report.social_link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-800 underline truncate block max-w-xs"
+                                            >
+                                                {report.social_link}
+                                            </a>
+                                        </td>
+                                        <td className="py-4 px-4 text-sm text-gray-900">
+                                            {report.district}, {report.province}, {report.department}
+                                        </td>
+                                        <td className="py-4 px-4 text-sm text-gray-900">
+                                            {formatDateSafe(report.created_at)}
+                                        </td>
+                                        <td className="py-4 px-4 text-sm">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                                report.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                report.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                'bg-red-100 text-red-800'
+                                            }`}>
+                                                {report.status === 'pending' ? 'Pendiente' :
+                                                 report.status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4 text-sm flex gap-2">
+                                            {report.image_url && (
+                                                <button
+                                                    onClick={() => window.open(report.image_url!, '_blank')}
+                                                    className="text-blue-600 hover:text-blue-800 bg-blue-50 p-2 rounded hover:bg-blue-100 transition-colors"
+                                                    title="Ver imagen"
+                                                >
+                                                    <EyeIcon />
+                                                </button>
+                                            )}
+                                            {report.status === 'pending' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleUpdateReportStatus(report.id, 'approved')}
+                                                        className="text-green-600 hover:text-green-800 bg-green-50 p-2 rounded hover:bg-green-100 transition-colors"
+                                                        title="Aprobar"
+                                                    >
+                                                        <CheckCircleIcon />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleUpdateReportStatus(report.id, 'rejected')}
+                                                        className="text-red-600 hover:text-red-800 bg-red-50 p-2 rounded hover:bg-red-100 transition-colors"
+                                                        title="Rechazar"
+                                                    >
+                                                        <XCircleIcon />
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button
+                                                onClick={() => handleDeleteReport(report.id)}
+                                                className="text-red-600 hover:text-red-800 bg-red-50 p-2 rounded hover:bg-red-100 transition-colors"
+                                                title="Eliminar"
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+                )}
             </div>
         );
     };
@@ -1032,7 +1259,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Modals */}
             {viewingReportDetail && <ReportDetailModal isOpen={!!viewingReportDetail} onClose={() => setViewingReportDetail(null)} report={viewingReportDetail.report} pet={viewingReportDetail.pet as Pet} isDeleted={viewingReportDetail.isDeleted} onDeletePet={onDeletePet} onUpdateReportStatus={onUpdateReportStatus} allUsers={users} onViewUser={onViewUser} onDeleteComment={onDeleteComment} />}
             {viewingTicket && <SupportTicketModal isOpen={!!viewingTicket} onClose={() => setViewingTicket(null)} ticket={viewingTicket} onUpdate={(ticket) => { onUpdateSupportTicket(ticket); setViewingTicket(null); }} allUsers={users} />}
-            {isCampaignModalOpen && <CampaignFormModal isOpen={isCampaignModalOpen} onClose={() => setIsCampaignModalOpen(false)} onSave={(data, id) => { onSaveCampaign(data, id); setIsCampaignModalOpen(false); }} campaignToEdit={campaignToEdit} />}
+            {isCampaignModalOpen && (
+                <CampaignFormModal
+                    isOpen={isCampaignModalOpen}
+                    onClose={() => { setIsCampaignModalOpen(false); setCampaignToEdit(null); }}
+                    onSuccess={() => {
+                        setIsCampaignModalOpen(false);
+                        setCampaignToEdit(null);
+                    }}
+                    onSaveCampaign={onSaveCampaign}
+                    campaignToEdit={campaignToEdit}
+                />
+            )}
             {campaignToDelete && <ConfirmationModal isOpen={!!campaignToDelete} onClose={() => setCampaignToDelete(null)} onConfirm={() => { onDeleteCampaign(campaignToDelete.id); setCampaignToDelete(null); }} title="Eliminar Campaña" message={`¿Estás seguro de que quieres eliminar la campaña "${campaignToDelete.title}"?`} />}
             
             <InfoModal 

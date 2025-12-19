@@ -174,6 +174,7 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     const selectClass = "w-full p-1.5 sm:p-2 bg-white/10 border border-white/20 rounded-lg text-[10px] sm:text-xs text-white placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-transparent block transition-colors option:text-gray-900";
     const labelClass = "block mb-1 sm:mb-1.5 text-[9px] sm:text-[10px] font-bold text-white/90 uppercase tracking-wider";
     const navLinkClass = (isActive: boolean) => `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-200 font-medium text-sm sm:text-base ${isActive ? 'bg-white/20 text-white shadow-lg' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
+    const navLinkReunitedClass = (isActive: boolean) => `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-bold text-sm sm:text-base ${isActive ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:shadow-[0_6px_25px_rgba(251,191,36,0.6)] hover:scale-105' : 'text-blue-100 hover:bg-gradient-to-r hover:from-amber-400 hover:to-yellow-400 hover:text-amber-900 hover:shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:scale-105'}`;
 
     return (
         <>
@@ -197,20 +198,27 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     </div>
                     
                     <nav className="space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
-                        <button onClick={() => navigate('/reunidos')} className={navLinkClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
-                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Reencuentros</span>
+                        {/* Removed Home button from Sidebar as requested */}
+                        <button onClick={() => { navigate('/reunidos'); onClose(); }} className={navLinkReunitedClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
+                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5 fill-current text-red-500 animate-pulse" /> 
+                            <span className="text-sm sm:text-base">
+                                Reencuentros
+                            </span>
                         </button>
-                        <button onClick={() => navigate('/mapa')} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
+                        <button onClick={() => { navigate('/nosotros'); onClose(); }} className={navLinkClass(location.pathname === '/nosotros')}>
+                            <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Nosotros</span>
+                        </button>
+                        <button onClick={() => { navigate('/mapa'); onClose(); }} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
                             <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa de mascotas</span>
                         </button>
-                        <button onClick={() => navigate('/campanas')} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
+                        <button onClick={() => { navigate('/campanas'); onClose(); }} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
                             <MegaphoneIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Campañas</span>
                         </button>
-                        <button onClick={() => navigate('/tips')} className={navLinkClass(location.pathname === '/tips')}>
+                        <button onClick={() => { navigate('/tips'); onClose(); }} className={navLinkClass(location.pathname === '/tips')}>
                             <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Tips y Consejos</span>
                         </button>
                         {currentUser?.role === USER_ROLES.SUPERADMIN && (
-                            <button onClick={() => navigate('/servicios')} className={navLinkClass(location.pathname === '/servicios')}>
+                            <button onClick={() => { navigate('/servicios'); onClose(); }} className={navLinkClass(location.pathname === '/servicios')}>
                                 <StoreIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Servicios</span>
                             </button>
                         )}

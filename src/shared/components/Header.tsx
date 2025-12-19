@@ -125,15 +125,13 @@ export const Header: React.FC<HeaderProps> = ({
                 
                 {/* LEFT: Logo & Home */}
                 <div className="flex items-center gap-1 sm:gap-2 md:gap-4 flex-1 min-w-0">
-                     {isMainView && (
-                        <button 
-                            onClick={onToggleSidebar} 
-                            className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
-                            aria-label="Abrir menú de filtros"
-                        >
-                            <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                        </button>
-                     )}
+                     <button 
+                         onClick={onToggleSidebar} 
+                         className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
+                         aria-label="Abrir menú de navegación"
+                     >
+                         <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                     </button>
                      <div 
                         className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-0.5 sm:gap-1 md:gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-0.5 sm:mr-1 md:mr-2 lg:mr-4 flex-shrink-0" 
                         onClick={handleHomeClick}
@@ -156,8 +154,8 @@ export const Header: React.FC<HeaderProps> = ({
                         <span className="hidden sm:inline whitespace-nowrap">MAS PATAS</span><span className="hidden sm:inline text-[#FF4F4F]">.</span>
                     </div>
                     
-                    <button onClick={handleHomeClick} className="hidden md:flex items-center gap-2 text-gray-600 hover:text-brand-primary font-bold text-sm px-3 py-2 rounded-full hover:bg-gray-100 transition-colors">
-                        <HomeIcon className="h-5 w-5" /> Inicio
+                    <button onClick={handleHomeClick} className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-brand-primary font-bold text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 transition-colors">
+                        <HomeIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="hidden sm:inline">Inicio</span>
                     </button>
                 </div>
                 
@@ -165,10 +163,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="relative flex-shrink-0" ref={reportDropdownRef} data-tour="header-report-btn">
                     <button
                         onClick={() => setIsReportDropdownOpen(prev => !prev)}
-                        className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-[#FF4F4F] to-red-600 text-white font-bold py-1.5 px-3 sm:py-2 sm:px-4 md:py-3 md:px-8 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all transform text-[10px] sm:text-xs md:text-sm uppercase tracking-wider whitespace-nowrap"
+                        className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-[#FF4F4F] to-red-600 text-white font-bold py-1.5 px-2 sm:py-2 sm:px-4 md:py-3 md:px-8 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all transform text-[9px] sm:text-xs md:text-sm uppercase tracking-wider whitespace-nowrap"
                     >
                         <PlusIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                        <span className="hidden sm:inline">Reportar</span>
+                        <span>REPORTAR</span>
                     </button>
                     {isReportDropdownOpen && (
                         <div className="absolute left-1/2 transform -translate-x-1/2 mt-2 sm:mt-3 w-[calc(100vw-2rem)] max-w-[280px] sm:w-72 bg-white rounded-xl shadow-2xl py-2 z-50 ring-1 ring-black ring-opacity-5 animate-fade-in-up origin-top overflow-hidden">

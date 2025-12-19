@@ -30,7 +30,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
     const getStatusBadgeStyle = () => {
         switch (pet.status) {
             case PET_STATUS.PERDIDO: return { backgroundColor: '#FF4F4F', color: 'white' }; // Rojo suave
-            case PET_STATUS.ENCONTRADO: return { backgroundColor: '#4CAF50', color: 'white' }; // Verde suave (matches reward, differentiation by context)
+            case PET_STATUS.ENCONTRADO: return { backgroundColor: '#4CAF50', color: 'white' }; // Verde suave
             case PET_STATUS.AVISTADO: return { backgroundColor: '#3B82F6', color: 'white' };
             case PET_STATUS.EN_ADOPCION: return { backgroundColor: '#8B5CF6', color: 'white' };
             case PET_STATUS.REUNIDO: return { backgroundColor: '#222222', color: 'white' };
@@ -70,9 +70,9 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
                     {pet.status}
                 </div>
 
-                {/* Reward Badge - Bottom Left (Green) */}
+                {/* Reward Badge - Bottom Right (Gold) */}
                 {pet.reward && pet.reward > 0 && !isReunited && (
-                    <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#4CAF50] text-white text-[9px] sm:text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-0.5 sm:gap-1">
+                    <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#D4AF37] text-white text-[9px] sm:text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-0.5 sm:gap-1">
                         <span>💵 Recompensa</span>
                     </div>
                 )}

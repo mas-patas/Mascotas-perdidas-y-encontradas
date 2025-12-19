@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import type { PetRow, User, PetStatus, Pet } from '@/types';
 import { PetCard } from '@/features/pets';
 import { PET_STATUS } from '@/constants';
@@ -100,7 +100,7 @@ const PetSection: React.FC<{
         setHasMoreHorizontal(true);
     }, [transformedInitialPets, filters]);
 
-    const fetchMoreHorizontal = async () => {
+    const fetchMoreHorizontal = useCallback(async () => {
         if (isLoadingMore || !hasMoreHorizontal) return;
         
         setIsLoadingMore(true);
@@ -172,7 +172,7 @@ const PetSection: React.FC<{
         } finally {
             setIsLoadingMore(false);
         }
-    };
+    }, [isLoadingMore, hasMoreHorizontal, allPets.length, status, filters, transformedInitialPets]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -194,6 +194,32 @@ const PetSection: React.FC<{
             });
         }
     };
+
+    // Listen to scroll events for touch/mobile scrolling to load more pets
+    useEffect(() => {
+        const scrollElement = scrollRef.current;
+        if (!scrollElement) return;
+
+        const handleScroll = () => {
+            if (!hasMoreHorizontal || isLoadingMore) return;
+
+            const { scrollLeft, scrollWidth, clientWidth } = scrollElement;
+            const maxScrollLeft = scrollWidth - clientWidth;
+            const threshold = 200; // Distance from end to trigger load (in pixels)
+
+            // Check if user has scrolled near the end (within threshold)
+            if (scrollLeft >= maxScrollLeft - threshold) {
+                fetchMoreHorizontal();
+            }
+        };
+
+        // Use passive listener for better performance on mobile
+        scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            scrollElement.removeEventListener('scroll', handleScroll);
+        };
+    }, [hasMoreHorizontal, isLoadingMore, fetchMoreHorizontal]); // Include fetchMoreHorizontal in dependencies
 
     if (allPets.length === 0) return null;
 
@@ -541,8 +567,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                                 <h2 className="text-base sm:text-lg md:text-xl lg:text-3xl font-black mb-1.5 sm:mb-2 leading-tight drop-shadow-md">
                                     Cuando la esperanza <br className="hidden sm:block"/> vuelve a casa.
                                 </h2>
-                                <button className="bg-white text-indigo-600 text-[10px] sm:text-xs font-bold py-1.5 sm:py-2 px-3 sm:px-4 rounded-full shadow hover:bg-gray-50 transition-colors flex items-center gap-1 sm:gap-1.5">
-                                    <HeartIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current text-red-500" /> <span>Ver Reencuentros</span>
+                                <button className="bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 text-[10px] sm:text-xs font-bold py-1.5 sm:py-2 px-3 sm:px-4 rounded-full shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:shadow-[0_6px_25px_rgba(251,191,36,0.6)] hover:scale-105 transition-all duration-300 flex items-center gap-1 sm:gap-1.5">
+                                    <HeartIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current text-red-500 animate-pulse" /> <span>Ver Reencuentros</span>
                                 </button>
                             </div>
                         </div>

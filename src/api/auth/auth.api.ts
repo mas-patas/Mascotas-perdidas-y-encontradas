@@ -68,6 +68,19 @@ export const signInWithGoogle = async (): Promise<void> => {
 };
 
 /**
+ * Sign in with Facebook OAuth
+ */
+export const signInWithFacebook = async (): Promise<void> => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'facebook',
+    options: {
+      redirectTo: `${window.location.origin}/`,
+    },
+  });
+  if (error) throw new Error(error.message);
+};
+
+/**
  * Reset password for email
  */
 export const resetPasswordForEmail = async (email: string): Promise<void> => {

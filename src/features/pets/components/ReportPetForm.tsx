@@ -33,6 +33,7 @@ interface FormValues {
     department: string;
     province: string;
     district: string;
+    neighbourhood: string;
     address: string;
     lat: number;
     lng: number;
@@ -69,9 +70,10 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             department: 'Lima',
             province: '',
             district: '',
+            neighbourhood: '',
             date: new Date().toISOString().split('T')[0],
             shareContactInfo: true,
-            createAlert: true,
+            createAlert: false,
             currency: 'S/',
             imageUrls: [],
             ... (isEditMode && petToEdit ? {
@@ -99,6 +101,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const watchedDepartment = watch('department');
     const watchedProvince = watch('province');
     const watchedDistrict = watch('district');
+    const watchedNeighbourhood = watch('neighbourhood');
     const watchedAddress = watch('address');
     const watchedImageUrls = watch('imageUrls');
     const watchedLat = watch('lat');
@@ -155,20 +158,20 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             }
 
             // Location Parsing Logic for Edit
+            // Format: address, neighbourhood, district, province, department
             if (petToEdit.location) {
-                // Try to split by comma (reverse order: Addr, Dist, Prov, Dept)
                 const parts = petToEdit.location.split(',').map(s => s.trim());
                 if (parts.length >= 3) {
-                    // Try to match department
+                    // Try to match department (last part)
                     const deptCand = parts[parts.length - 1];
                     const deptMatch = departments.find(d => normalizeLocationName(d) === normalizeLocationName(deptCand));
                     
                     if (deptMatch) {
                         setValue('department', deptMatch);
-                        // We must update the state lists manually here because useEffects might be too slow or racey
                         const provList = getProvinces(deptMatch);
                         setProvinces(provList);
 
+                        // Try to match province (second to last)
                         const provCand = parts[parts.length - 2];
                         const provMatch = provList.find(p => normalizeLocationName(p) === normalizeLocationName(provCand));
                         
@@ -177,17 +180,40 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             const distList = getDistricts(deptMatch, provMatch);
                             setDistricts(distList);
 
+                            // Try to match district (third to last)
                             const distCand = parts[parts.length - 3];
                             const distMatch = distList.find(d => normalizeLocationName(d) === normalizeLocationName(distCand));
+                            
                             if (distMatch) {
                                 setValue('district', distMatch);
-                                // The rest is the address
-                                setValue('address', parts.slice(0, parts.length - 3).join(', '));
+                                
+                                // If there are 5 parts, the 4th from end is likely neighbourhood
+                                if (parts.length >= 5) {
+                                    const neighbourhoodCand = parts[parts.length - 4];
+                                    setValue('neighbourhood', neighbourhoodCand);
+                                    // The rest is the address
+                                    setValue('address', parts.slice(0, parts.length - 4).join(', '));
+                                } else {
+                                    // No neighbourhood, rest is address
+                                    setValue('address', parts.slice(0, parts.length - 3).join(', '));
+                                }
                             } else {
-                                setValue('address', parts.slice(0, parts.length - 2).join(', '));
+                                // District not found, check if 4th from end might be district
+                                if (parts.length >= 4) {
+                                    const distCandAlt = parts[parts.length - 4];
+                                    const distMatchAlt = distList.find(d => normalizeLocationName(d) === normalizeLocationName(distCandAlt));
+                                    if (distMatchAlt) {
+                                        setValue('district', distMatchAlt);
+                                        setValue('address', parts.slice(0, parts.length - 4).join(', '));
+                                    } else {
+                                        setValue('address', parts.slice(0, parts.length - 2).join(', '));
+                                    }
+                                } else {
+                                    setValue('address', parts.slice(0, parts.length - 2).join(', '));
+                                }
                             }
                         } else {
-                             setValue('address', parts.slice(0, parts.length - 1).join(', '));
+                            setValue('address', parts.slice(0, parts.length - 1).join(', '));
                         }
                     } else {
                         setValue('address', petToEdit.location);
@@ -358,25 +384,58 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
         
         if (deptMatch) {
-            setValue('department', deptMatch);
             const newProvs = getProvinces(deptMatch);
-            setProvinces(newProvs); // Force update state immediately
-
+            
             // 2. Find Province
             const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
             const provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
 
-            if (provMatch) {
-                setValue('province', provMatch);
-                const newDists = getDistricts(deptMatch, provMatch);
-                setDistricts(newDists); // Force update state immediately
+            let newDists: string[] = [];
+            let distMatch: string | null = null;
 
+            if (provMatch) {
+                newDists = getDistricts(deptMatch, provMatch);
+                
                 // 3. Find District
                 const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
-                const distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
-                
+                distMatch = newDists.find(d => normalizeLocationName(d) === apiDist) || null;
+            }
+
+            // Update provinces and districts lists first
+            setProvinces(newProvs);
+            if (newDists.length > 0) {
+                setDistricts(newDists);
+            }
+
+            // Then update all form values at once
+            setValue('department', deptMatch);
+            if (provMatch) {
+                setValue('province', provMatch);
                 if (distMatch) {
                     setValue('district', distMatch);
+                    
+                    // 4. Extract Urbanization/Neighbourhood (suburb, neighbourhood, residential, quarter)
+                    // These fields typically contain urbanization information in Peru
+                    const urbanization = addr.suburb || 
+                                       addr.neighbourhood || 
+                                       addr.residential || 
+                                       addr.quarter || 
+                                       '';
+                    
+                    if (urbanization) {
+                        setValue('neighbourhood', urbanization);
+                    }
+                } else {
+                    // If district not found, check if suburb might be the district
+                    const apiDistFallback = normalizeLocationName(addr.suburb || '');
+                    const distMatchFallback = newDists.find(d => normalizeLocationName(d) === apiDistFallback);
+                    
+                    if (distMatchFallback) {
+                        setValue('district', distMatchFallback);
+                    } else if (addr.suburb) {
+                        // If suburb doesn't match a district, it's likely an urbanization
+                        setValue('neighbourhood', addr.suburb);
+                    }
                 }
             }
         }
@@ -419,7 +478,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         }
     };
 
-    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+    const performReverseGeocoding = async (latitude: number, longitude: number, isRetry = false) => {
         isUpdatingFromMapRef.current = true;
         
         if (reverseGeocodingAbortController.current) reverseGeocodingAbortController.current.abort();
@@ -456,6 +515,14 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
                 // Update Hierarchy
                 parseAndSetHierarchy(addr);
+                
+                // If this is the first call (not a retry), make a second call after 1.5 seconds
+                // to ensure district is set correctly after lists are updated
+                if (!isRetry) {
+                    setTimeout(() => {
+                        performReverseGeocoding(latitude, longitude, true);
+                    }, 1500);
+                }
             }
         } catch (err: any) { 
             // Ignore aborts
@@ -575,13 +642,33 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         }
 
         const finalColors = [data.color1, data.color2, data.color3].filter(Boolean).join(', ');
-        const finalLocation = [data.address, data.district, data.province, data.department].filter(Boolean).join(', ');
+        // Build location with hierarchy: address, neighbourhood (urbanization), district, province, department
+        const finalLocation = [
+            data.address, 
+            data.neighbourhood, 
+            data.district, 
+            data.province, 
+            data.department
+        ].filter(Boolean).join(', ');
         const finalBreed = data.breed === 'Otro' ? data.customBreed : data.breed;
         const finalType = data.animalType === 'Otro' ? ANIMAL_TYPES.OTRO : data.animalType;
         
         let finalDescription = data.description;
         if (data.animalType === 'Otro' && data.customAnimalType) {
             finalDescription = `[Tipo: ${data.customAnimalType}] ${data.description}`;
+        }
+
+        // Obtener coordenadas: usar las del mapa si existen, sino usar coordenadas por defecto de la ubicación
+        let finalLat = data.lat;
+        let finalLng = data.lng;
+        
+        // Si no hay coordenadas del mapa, usar coordenadas por defecto basadas en provincia o departamento
+        if (!finalLat || !finalLng) {
+            const coords = locationCoordinates[data.province] || locationCoordinates[data.department];
+            if (coords) {
+                finalLat = coords.lat;
+                finalLng = coords.lng;
+            }
         }
 
         const petData = {
@@ -599,8 +686,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             shareContactInfo: data.shareContactInfo,
             reward: data.reward ? Number(data.reward) : undefined,
             currency: data.currency,
-            lat: data.lat,
-            lng: data.lng,
+            lat: finalLat,
+            lng: finalLng,
             createAlert: data.createAlert && data.status === PET_STATUS.PERDIDO && !isEditMode
         };
 
@@ -764,6 +851,16 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                     {districts.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1">Urbanización (Opcional)</label>
+                                <input 
+                                    type="text" 
+                                    {...register('neighbourhood')}
+                                    className={inputClass} 
+                                    placeholder="Ej: Mangomarca, Campoy" 
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Se detecta automáticamente al seleccionar en el mapa</p>
+                            </div>
                         </div>
                         
                         <div className="relative">
@@ -838,9 +935,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                 <input type="date" {...register('date', { required: true })} className={inputClass} max={new Date().toISOString().split('T')[0]} />
                             </div>
                             <div>
-                                <label className={labelClass}>Teléfono de Contacto <span className="text-red-500">*</span></label>
-                                <input type="tel" {...register('contact', { required: "El contacto es obligatorio" })} className={inputClass} placeholder="999888777" />
-                                {errors.contact && <span className="text-red-500 text-xs">{errors.contact.message}</span>}
+                                <label className={labelClass}>Teléfono de Contacto (Opcional)</label>
+                                <input type="tel" {...register('contact')} className={inputClass} placeholder="999888777" />
                                 <div className="flex items-center mt-2">
                                     <input type="checkbox" {...register('shareContactInfo')} className="mr-2 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded" />
                                     <label className="text-sm text-gray-600">Mostrar número públicamente</label>

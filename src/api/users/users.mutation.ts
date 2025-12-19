@@ -72,3 +72,20 @@ export const useUpdateUserProfile = () => {
     }
   });
 };
+
+/**
+ * Mutation hook to update user location
+ */
+export const useUpdateUserLocation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, lat, lng }: { userId: string; lat: number; lng: number }) => {
+      await usersApi.updateUserLocation(userId, lat, lng);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.users });
+      queryClient.invalidateQueries({ queryKey: queryKeys.user(variables.userId) });
+    }
+  });
+};

@@ -38,6 +38,15 @@ export const useSignInWithGoogle = () => {
 };
 
 /**
+ * Mutation hook to sign in with Facebook
+ */
+export const useSignInWithFacebook = () => {
+  return useMutation({
+    mutationFn: () => authApi.signInWithFacebook(),
+  });
+};
+
+/**
  * Mutation hook to reset password
  */
 export const useResetPassword = () => {

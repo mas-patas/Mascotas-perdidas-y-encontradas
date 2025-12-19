@@ -128,7 +128,7 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
     };
 
     // Reverse geocoding function
-    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+    const performReverseGeocoding = async (latitude: number, longitude: number, isRetry = false) => {
         // Don't set isUpdatingFromMapRef here - it will be set after we get the response
         
         if (reverseGeocodingAbortController.current) reverseGeocodingAbortController.current.abort();
@@ -209,6 +209,14 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                 };
                 return updated;
             });
+            
+            // If this is the first call (not a retry), make a second call after 1.5 seconds
+            // to ensure district is set correctly after lists are updated
+            if (!isRetry) {
+                setTimeout(() => {
+                    performReverseGeocoding(latitude, longitude, true);
+                }, 1500);
+            }
         } catch (err: any) { 
             // Ignore aborts
             if (err.name !== 'AbortError') {
@@ -513,13 +521,8 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             return;
         }
 
-        if (!formData.contact.trim()) {
-            setError("La información de contacto es obligatoria.");
-            return;
-        }
-
         const contactValue = formData.contact.trim();
-        if (/^\d+$/.test(contactValue) && !/^9\d{8}$/.test(contactValue)) {
+        if (contactValue && /^\d+$/.test(contactValue) && !/^9\d{8}$/.test(contactValue)) {
             setError("El número de teléfono de contacto debe tener 9 dígitos y empezar con 9. Si es un email, asegúrate de que esté bien escrito.");
             return;
         }
@@ -554,6 +557,19 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
 
         const generatedName = formData.name.trim() || `${typeLabel} En Adopción`;
 
+        // Obtener coordenadas: usar las del mapa si existen, sino usar coordenadas por defecto de la ubicación
+        let finalLat = formData.lat;
+        let finalLng = formData.lng;
+        
+        // Si no hay coordenadas del mapa, usar coordenadas por defecto basadas en provincia o departamento
+        if (!finalLat || !finalLng) {
+            const coords = locationCoordinates[formData.province] || locationCoordinates[formData.department];
+            if (coords) {
+                finalLat = coords.lat;
+                finalLng = coords.lng;
+            }
+        }
+
         const petToSubmit: Omit<Pet, 'id' | 'userEmail'> = {
             status: PET_STATUS.EN_ADOPCION,
             name: generatedName,
@@ -568,8 +584,8 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             adoptionRequirements: formData.adoptionRequirements,
             imageUrls: imagePreviews,
             shareContactInfo: shareContactInfo,
-            lat: formData.lat,
-            lng: formData.lng
+            lat: finalLat,
+            lng: finalLng
         };
         
         onSubmit(petToSubmit);
@@ -768,8 +784,8 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                         </div>
                         
                         <div>
-                            <label className="block text-sm font-medium text-gray-900">Información de Contacto <span className="text-red-500">*</span></label>
-                            <input type="text" name="contact" value={formData.contact} onChange={handleInputChange} className={inputClass} placeholder="Tu teléfono o email" required />
+                            <label className="block text-sm font-medium text-gray-900">Información de Contacto (Opcional)</label>
+                            <input type="text" name="contact" value={formData.contact} onChange={handleInputChange} className={inputClass} placeholder="Tu teléfono o email" />
                             <div className="mt-2 flex items-start">
                                 <div className="flex items-center h-5">
                                     <input

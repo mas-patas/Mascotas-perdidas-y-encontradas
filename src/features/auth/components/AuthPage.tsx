@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
-import { GoogleIcon, WarningIcon, EyeIcon, EyeOffIcon, InfoIcon, CheckCircleIcon, ChevronLeftIcon } from '@/shared/components/icons';
+import { GoogleIcon, FacebookIcon, WarningIcon, EyeIcon, EyeOffIcon, InfoIcon, CheckCircleIcon, ChevronLeftIcon } from '@/shared/components/icons';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
@@ -23,7 +23,7 @@ const AuthPage: React.FC = () => {
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
-    const { login, loginWithGoogle, resetPassword, currentUser } = useAuth();
+    const { login, loginWithGoogle, loginWithFacebook, resetPassword, currentUser } = useAuth();
     const navigate = useNavigate();
 
     // Auto-redirect if already logged in
@@ -117,6 +117,19 @@ const AuthPage: React.FC = () => {
         setSocialLoading(true);
         try {
             await loginWithGoogle();
+        } catch (err: any) {
+            setError(err.message || 'Ocurrió un error con el inicio de sesión social.');
+            setSocialLoading(false);
+        }
+    }
+
+    const handleFacebookLogin = async () => {
+        if (loading || socialLoading || lockoutTime) return;
+        
+        setError('');
+        setSocialLoading(true);
+        try {
+            await loginWithFacebook();
         } catch (err: any) {
             setError(err.message || 'Ocurrió un error con el inicio de sesión social.');
             setSocialLoading(false);
@@ -253,9 +266,9 @@ const AuthPage: React.FC = () => {
                                 <InfoIcon className="h-8 w-8 text-blue-600" />
                             </div>
                         </div>
-                        <h3 className="text-lg font-bold text-blue-900 mb-2">Registro Exclusivo con Google</h3>
+                        <h3 className="text-lg font-bold text-blue-900 mb-2">Registro con Redes Sociales</h3>
                         <p className="text-sm text-blue-700 leading-relaxed mb-4">
-                            Para verificar tu identidad, el registro inicial es exclusivamente mediante Google.
+                            Para verificar tu identidad, el registro inicial es mediante Google o Facebook.
                         </p>
                         <p className="text-xs text-blue-600 italic font-medium">
                             * Podrás crear una contraseña para tu cuenta en el siguiente paso para tener un acceso alternativo.
@@ -280,6 +293,10 @@ const AuthPage: React.FC = () => {
                             <button onClick={handleSocialLogin} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
                                 {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <GoogleIcon />}
                                 <span className="font-medium text-gray-900">Google</span>
+                            </button>
+                            <button onClick={handleFacebookLogin} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
+                                {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <FacebookIcon />}
+                                <span className="font-medium text-gray-900">Facebook</span>
                             </button>
                         </div>
 

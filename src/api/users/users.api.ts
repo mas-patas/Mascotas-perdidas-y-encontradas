@@ -209,3 +209,20 @@ export const pingDatabase = async (): Promise<void> => {
   const { error } = await supabase.from('profiles').select('id').limit(1);
   if (error) throw error;
 };
+
+/**
+ * Update user location (lat/lng) and timestamp
+ */
+export const updateUserLocation = async (userId: string, lat: number, lng: number): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      lat,
+      lng,
+      location_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) throw error;
+};
