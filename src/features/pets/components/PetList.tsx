@@ -300,6 +300,30 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
     // If filters.status is 'Todos', we are in 'ALL' (Dashboard) mode.
     const activeTab = filters.status === 'Todos' ? 'ALL' : filters.status;
 
+    // Check if we should show dashboard view (rows) or grid view
+    // Dashboard view only when: NO filters active at all (completely default state)
+    // When ANY filter is active, show grid view
+    const shouldShowDashboard = useMemo(() => {
+        // Check if status filter is active
+        const hasStatusFilter = filters.status !== 'Todos';
+        
+        // Check if any other filter is active
+        const hasOtherFilters = 
+            filters.type !== 'Todos' ||
+            filters.breed !== 'Todos' ||
+            filters.colors.length > 0 ||
+            filters.size !== 'Todos' ||
+            filters.department !== 'Todos' ||
+            filters.province !== 'Todos' ||
+            filters.district !== 'Todos' ||
+            filters.dateFilter !== '' ||
+            filters.name !== '';
+        
+        // Show dashboard ONLY if NO filters are active (completely default state)
+        // If ANY filter is active (status or other), show grid view
+        return !hasStatusFilter && !hasOtherFilters;
+    }, [filters]);
+
     const handleTabChange = (status: string) => {
         if (status === 'ALL') {
             setFilters((prev: any) => ({ ...prev, status: 'Todos' }));
@@ -308,14 +332,148 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         }
     };
 
-    const removeFilter = (key: string) => {
-        setFilters((prev: any) => ({ ...prev, [key]: 'Todos' }));
+    const removeFilter = (key: string, valueToRemove?: string) => {
+        setFilters((prev: any) => {
+            if (key === 'colors' && Array.isArray(prev.colors)) {
+                // Remove specific color from array
+                if (valueToRemove) {
+                    return { ...prev, colors: prev.colors.filter((c: string) => c !== valueToRemove) };
+                }
+                return { ...prev, colors: [] };
+            } else {
+                // Standard filter removal
+                const defaultValues: any = {
+                    status: 'Todos',
+                    type: 'Todos',
+                    breed: 'Todos',
+                    size: 'Todos',
+                    department: 'Todos',
+                    province: 'Todos',
+                    district: 'Todos',
+                    dateFilter: '',
+                    name: ''
+                };
+                // Use the default value if key exists, otherwise fallback to 'Todos'
+                // This preserves empty strings for dateFilter and name fields
+                const defaultValue = key in defaultValues ? defaultValues[key] : 'Todos';
+                return { ...prev, [key]: defaultValue };
+            }
+        });
     };
 
-    // Active Filters Logic
-    const activeFilters = Object.entries(filters).filter(([key, value]) => 
-        key !== 'status' && value !== 'Todos' && value !== ''
-    );
+    // Active Filters Logic - Declarative Configuration Approach
+    const activeFilters = useMemo(() => {
+        type FilterConfig = {
+            key: string;
+            label: string;
+            isValid: (value: any) => boolean;
+            getValue: (value: any) => string | string[];
+            isArray?: boolean;
+        };
+
+        const DATE_LABELS: Record<string, string> = {
+            'today': 'Hoy',
+            'last3days': 'Últimos 3 días',
+            'lastWeek': 'Última semana',
+            'lastMonth': 'Último mes'
+        };
+
+        const isNotDefault = (value: any, defaultValue: string = 'Todos'): boolean => {
+            return value && value !== defaultValue;
+        };
+
+        const isNotEmpty = (value: any): boolean => {
+            return value && typeof value === 'string' && value.trim() !== '';
+        };
+
+        const filterConfigs: FilterConfig[] = [
+            {
+                key: 'status',
+                label: 'Tipo',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'type',
+                label: 'Animal',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'breed',
+                label: 'Raza',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'colors',
+                label: 'Color',
+                isValid: (value) => Array.isArray(value) && value.length > 0,
+                getValue: (value) => value,
+                isArray: true
+            },
+            {
+                key: 'size',
+                label: 'Tamaño',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'department',
+                label: 'Ubicación',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'province',
+                label: 'Provincia',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'district',
+                label: 'Distrito',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'dateFilter',
+                label: 'Fecha',
+                isValid: (value) => isNotEmpty(value),
+                getValue: (value) => DATE_LABELS[value] || value
+            },
+            {
+                key: 'name',
+                label: 'Nombre',
+                isValid: (value) => isNotEmpty(value),
+                getValue: (value) => value
+            }
+        ];
+
+        return filterConfigs
+            .filter(config => {
+                const filterValue = filters[config.key as keyof typeof filters];
+                return config.isValid(filterValue);
+            })
+            .flatMap(config => {
+                const filterValue = filters[config.key as keyof typeof filters];
+                const processedValue = config.getValue(filterValue);
+                
+                if (config.isArray && Array.isArray(processedValue)) {
+                    return processedValue.map(value => ({
+                        key: config.key,
+                        label: config.label,
+                        value: String(value)
+                    }));
+                }
+                
+                return [{
+                    key: config.key,
+                    label: config.label,
+                    value: String(processedValue)
+                }];
+            });
+    }, [filters]);
 
     // Helper to check if pet is Pet type (has imageUrls) or PetRow (has image_urls)
     const isPetType = (pet: Pet | PetRow): pet is Pet => {
@@ -386,7 +544,7 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
             `}</style>
 
             {/* 1. Banner Carousel or Default Banner */}
-            {activeTab === 'ALL' && (
+            {shouldShowDashboard && (
                 <>
                     {banners.length > 0 ? (
                         <BannerCarousel banners={banners} />
@@ -448,13 +606,14 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                             {activeFilters.length > 0 ? (
                                 <>
                                     <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wide mr-0.5 sm:mr-1 flex-shrink-0"><FilterIcon className="inline h-2.5 w-2.5 sm:h-3 sm:w-3 mb-0.5"/> <span className="hidden sm:inline">Filtros:</span></span>
-                                    {activeFilters.map(([key, value]) => (
+                                    {activeFilters.map((filter, index) => (
                                         <button
-                                            key={key}
-                                            onClick={() => removeFilter(key)}
+                                            key={`${filter.key}-${filter.value}-${index}`}
+                                            onClick={() => removeFilter(filter.key, filter.value)}
                                             className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 bg-white border border-gray-200 text-gray-700 text-[10px] sm:text-xs font-bold rounded-full hover:bg-gray-50 transition-colors shadow-sm flex-shrink-0"
+                                            title={`${filter.label}: ${filter.value}`}
                                         >
-                                            <span className="truncate max-w-[80px] sm:max-w-none">{value as string}</span> <XCircleIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gray-400 flex-shrink-0" />
+                                            <span className="truncate max-w-[80px] sm:max-w-none">{filter.value}</span> <XCircleIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gray-400 flex-shrink-0" />
                                         </button>
                                     ))}
                                     <button onClick={onReset} className="text-[10px] sm:text-xs text-gray-500 hover:text-red-500 font-bold underline ml-0.5 sm:ml-1 flex-shrink-0">Borrar</button>
@@ -486,8 +645,8 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
                 </div>
             ) : deduplicatedPets.length > 0 ? (
                 <>
-                    {/* 2. DASHBOARD VIEW (Rows) - Only when viewing 'ALL' */}
-                    {activeTab === 'ALL' && dashboardGroups ? (
+                    {/* 2. DASHBOARD VIEW (Rows) - Only when no filters active */}
+                    {shouldShowDashboard && dashboardGroups ? (
                         <div className="space-y-4 sm:space-y-6 md:space-y-8 animate-fade-in w-full">
                             <PetSection 
                                 title="Mascotas Perdidas" 
