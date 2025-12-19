@@ -36,17 +36,6 @@ const ReportDetailModal: React.FC<ReportDetailModalProps> = ({ isOpen, onClose, 
     const isCommentReport = report.type === 'comment';
     const commentId = isCommentReport ? report.targetId : undefined;
     const { data: commentDataFromApi, isLoading: isLoadingComment, error: commentError } = useComment(commentId);
-    
-    // Debug: Log comment ID and data
-    if (isCommentReport && commentId) {
-        console.log('Comment Report Debug:', {
-            commentId,
-            commentDataFromApi,
-            isLoadingComment,
-            commentError,
-            reportTargetId: report.targetId
-        });
-    }
 
     const nextImage = (e: React.MouseEvent) => {
         e.stopPropagation();

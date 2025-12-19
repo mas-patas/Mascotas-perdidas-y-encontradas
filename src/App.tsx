@@ -42,6 +42,7 @@ import { useAppData } from './hooks/useAppData';
 import { usePetFilters } from './hooks/usePetFilters';
 import { usePets as usePetsHook } from './hooks/usePets';
 import { sendPageView, trackPetReunited } from './services/analytics';
+import { useUserLocation } from './hooks/useUserLocation';
 
 // API Hooks
 import {
@@ -174,6 +175,21 @@ const App: React.FC = () => {
     useEffect(() => localStorage.setItem('platform_aiSearchEnabled', JSON.stringify(isAiSearchEnabled)), [isAiSearchEnabled]);
     useEffect(() => localStorage.setItem('platform_locationAlertsEnabled', JSON.stringify(isLocationAlertsEnabled)), [isLocationAlertsEnabled]);
     useEffect(() => localStorage.setItem('platform_locationAlertRadius', JSON.stringify(locationAlertRadius)), [locationAlertRadius]);
+
+    // Listen for location alerts changes from ProfilePage
+    useEffect(() => {
+        const handleLocationAlertsChanged = (event: CustomEvent) => {
+            setIsLocationAlertsEnabled(event.detail);
+        };
+        
+        window.addEventListener('locationAlertsChanged', handleLocationAlertsChanged as EventListener);
+        return () => {
+            window.removeEventListener('locationAlertsChanged', handleLocationAlertsChanged as EventListener);
+        };
+    }, []);
+
+    // Auto-update user location when alerts are enabled
+    useUserLocation({ enabled: isLocationAlertsEnabled && !!currentUser });
 
     // --- IP Check Effect ---
     useEffect(() => {

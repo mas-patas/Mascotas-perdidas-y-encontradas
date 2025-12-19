@@ -5,14 +5,14 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import type { User, Pet, OwnedPet, UserRating, SavedSearchRow, PetStatus, PetRow } from '@/types';
 import { PetCard } from '@/features/pets';
 import { useAuth } from '@/contexts/auth';
-import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, EyeIcon, EyeOffIcon, LockIcon } from '@/shared/components/icons';
+import { EditIcon, PlusIcon, TrashIcon, SparklesIcon, TrophyIcon, StoreIcon, BellIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, EyeIcon, EyeOffIcon, LockIcon, LocationMarkerIcon } from '@/shared/components/icons';
 import { AddPetModal } from '@/features/pets';
 import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
 import { mapPetFromDb } from '@/utils/mappers';
 import { StarRating } from '@/shared';
-import { useDeleteSavedSearch, useBusinessByOwner } from '@/api';
+import { useDeleteSavedSearch, useBusinessByOwner, useUpdateUserLocation } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
 import { GamificationDashboard } from '@/features/gamification';
 import { BusinessManagementModal } from '@/features/businesses';
@@ -49,6 +49,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const { updateUserProfile, addOwnedPet, updateOwnedPet, deleteOwnedPet, updatePassword } = useAuth();
     const queryClient = useQueryClient();
     const { points: gamificationPoints } = useGamification(user.id);
+    const updateLocation = useUpdateUserLocation();
     
     // UI State
     const [isEditing, setIsEditing] = useState(false);
@@ -73,7 +74,34 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
     const [passwordError, setPasswordError] = useState('');
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     
+    // Location alerts state
+    const [isLocationAlertsEnabled, setIsLocationAlertsEnabled] = useState(() => {
+        const stored = localStorage.getItem('platform_locationAlertsEnabled');
+        return stored !== null ? JSON.parse(stored) : false;
+    });
+    const [locationPermissionStatus, setLocationPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+    const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+    
     const filterRef = useRef<HTMLDivElement>(null);
+
+    // Check location permission status
+    useEffect(() => {
+        if ('geolocation' in navigator && 'permissions' in navigator) {
+            navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                setLocationPermissionStatus(result.state);
+                result.onchange = () => {
+                    setLocationPermissionStatus(result.state);
+                };
+            });
+        }
+    }, []);
+
+    // Sync location alerts state with localStorage
+    useEffect(() => {
+        localStorage.setItem('platform_locationAlertsEnabled', JSON.stringify(isLocationAlertsEnabled));
+        // Trigger a custom event to notify App.tsx
+        window.dispatchEvent(new CustomEvent('locationAlertsChanged', { detail: isLocationAlertsEnabled }));
+    }, [isLocationAlertsEnabled]);
 
     // Click outside to close filter dropdown
     useEffect(() => {
@@ -344,6 +372,65 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             setIsChangingPassword(false);
         }
     };
+
+    const handleToggleLocationAlerts = async () => {
+        if (!isLocationAlertsEnabled) {
+            // Activating: Request location permission
+            setIsRequestingLocation(true);
+            
+            if (!navigator.geolocation) {
+                alert('La geolocalización no es soportada por este navegador.');
+                setIsRequestingLocation(false);
+                return;
+            }
+
+            try {
+                // Request permission and get current location
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        
+                        // Update user location in database
+                        try {
+                            await updateLocation.mutateAsync({
+                                userId: user.id,
+                                lat: latitude,
+                                lng: longitude,
+                            });
+                        } catch (err) {
+                            console.error('Error updating location:', err);
+                        }
+                        
+                        // Enable alerts
+                        setIsLocationAlertsEnabled(true);
+                        setLocationPermissionStatus('granted');
+                        setIsRequestingLocation(false);
+                    },
+                    (error) => {
+                        console.error('Location error:', error);
+                        if (error.code === error.PERMISSION_DENIED) {
+                            alert('Se necesita permiso de ubicación para activar las alertas de proximidad. Por favor, permite el acceso a tu ubicación en la configuración del navegador.');
+                            setLocationPermissionStatus('denied');
+                        } else {
+                            alert('No se pudo obtener tu ubicación. Por favor, intenta nuevamente.');
+                        }
+                        setIsRequestingLocation(false);
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 0,
+                    }
+                );
+            } catch (err) {
+                console.error('Error requesting location:', err);
+                setIsRequestingLocation(false);
+            }
+        } else {
+            // Deactivating: Just disable alerts
+            setIsLocationAlertsEnabled(false);
+        }
+    };
     
     const profileTourSteps: TourStep[] = [
         { target: '[data-tour="gamification-card"]', title: 'Tu Progreso', content: 'Aquí verás tu nivel como héroe de mascotas.', position: 'left' },
@@ -506,6 +593,44 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                     >
                                         <LockIcon className="h-4 w-4" /> Cambiar Contraseña
                                     </button>
+                                    
+                                    {/* Location Alerts Toggle */}
+                                    <div className="w-full max-w-xs mx-auto mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <LocationMarkerIcon className="h-5 w-5 text-brand-primary" />
+                                                <span className="text-xs sm:text-sm font-semibold text-text-main">
+                                                    Alertas de Proximidad
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={handleToggleLocationAlerts}
+                                                disabled={isRequestingLocation}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 ${
+                                                    isLocationAlertsEnabled ? 'bg-brand-primary' : 'bg-gray-300'
+                                                } ${isRequestingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                        isLocationAlertsEnabled ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] sm:text-xs text-text-sub mt-1">
+                                            {isLocationAlertsEnabled 
+                                                ? locationPermissionStatus === 'granted'
+                                                    ? '✅ Recibirás notificaciones cuando se reporten mascotas cerca de ti'
+                                                    : '⚠️ Permisos de ubicación necesarios'
+                                                : 'Activa para recibir alertas cuando se reporten mascotas cerca de tu ubicación'
+                                            }
+                                        </p>
+                                        {isRequestingLocation && (
+                                            <p className="text-[10px] sm:text-xs text-brand-primary mt-1 font-semibold">
+                                                Solicitando permisos de ubicación...
+                                            </p>
+                                        )}
+                                    </div>
                                     
                                     {/* Mobile Edit Button */}
                                     <button 

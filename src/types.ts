@@ -210,6 +210,9 @@ export interface User {
   savedPetIds?: string[];
   avatarUrl?: string;
   businessId?: string;
+  lat?: number | null;
+  lng?: number | null;
+  locationUpdatedAt?: string | null;
 }
 
 /**

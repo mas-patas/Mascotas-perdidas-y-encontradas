@@ -82,7 +82,6 @@ const NotificationPermissionBanner: React.FC = () => {
                                     p256dh: subData.keys.p256dh,
                                     auth: subData.keys.auth,
                                 });
-                                console.log("Suscripción Web Push guardada exitosamente.");
                             } catch (error) {
                                 console.error("Error guardando suscripción en BD:", error);
                             }

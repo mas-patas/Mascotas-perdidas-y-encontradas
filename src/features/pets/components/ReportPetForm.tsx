@@ -584,6 +584,19 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             finalDescription = `[Tipo: ${data.customAnimalType}] ${data.description}`;
         }
 
+        // Obtener coordenadas: usar las del mapa si existen, sino usar coordenadas por defecto de la ubicación
+        let finalLat = data.lat;
+        let finalLng = data.lng;
+        
+        // Si no hay coordenadas del mapa, usar coordenadas por defecto basadas en provincia o departamento
+        if (!finalLat || !finalLng) {
+            const coords = locationCoordinates[data.province] || locationCoordinates[data.department];
+            if (coords) {
+                finalLat = coords.lat;
+                finalLng = coords.lng;
+            }
+        }
+
         const petData = {
             status: data.status,
             name: data.name || 'Desconocido',
@@ -599,8 +612,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             shareContactInfo: data.shareContactInfo,
             reward: data.reward ? Number(data.reward) : undefined,
             currency: data.currency,
-            lat: data.lat,
-            lng: data.lng,
+            lat: finalLat,
+            lng: finalLng,
             createAlert: data.createAlert && data.status === PET_STATUS.PERDIDO && !isEditMode
         };
 

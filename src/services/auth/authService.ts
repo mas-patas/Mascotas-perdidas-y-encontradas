@@ -18,7 +18,6 @@ export const initSession = async (): Promise<AuthSession | null> => {
     return session;
   } catch (error) {
     console.error("Auth Init Error Details:", error);
-    console.log("Auth init info: Defaulting to guest mode due to timeout or network.");
     return null;
   }
 };
