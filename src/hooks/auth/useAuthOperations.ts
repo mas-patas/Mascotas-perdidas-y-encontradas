@@ -1,4 +1,4 @@
-import { useSignIn, useSignUp, useSignInWithGoogle, useResetPassword, useSignOut } from '@/api/auth/auth.mutation';
+import { useSignIn, useSignUp, useSignInWithGoogle, useSignInWithFacebook, useResetPassword, useSignOut } from '@/api/auth/auth.mutation';
 import { useQueryClient } from '@tanstack/react-query';
 import * as authApi from '@/api/auth/auth.api';
 import { clearGhosting } from '@/services/auth/ghostingService';
@@ -11,6 +11,7 @@ export const useAuthOperations = () => {
   const signInMutation = useSignIn();
   const signUpMutation = useSignUp();
   const signInWithGoogleMutation = useSignInWithGoogle();
+  const signInWithFacebookMutation = useSignInWithFacebook();
   const resetPasswordMutation = useResetPassword();
   const signOutMutation = useSignOut();
 
@@ -24,6 +25,10 @@ export const useAuthOperations = () => {
 
   const loginWithGoogle = async (): Promise<void> => {
     await signInWithGoogleMutation.mutateAsync();
+  };
+
+  const loginWithFacebook = async (): Promise<void> => {
+    await signInWithFacebookMutation.mutateAsync();
   };
 
   const resetPassword = async (email: string): Promise<void> => {
@@ -46,6 +51,7 @@ export const useAuthOperations = () => {
     login,
     register,
     loginWithGoogle,
+    loginWithFacebook,
     resetPassword,
     logout,
   };
