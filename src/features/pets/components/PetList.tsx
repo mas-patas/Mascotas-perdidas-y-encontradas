@@ -335,65 +335,118 @@ export const PetList: React.FC<PetListProps> = ({ pets, users, onViewUser, filte
         });
     };
 
-    // Active Filters Logic
+    // Active Filters Logic - Declarative Configuration Approach
     const activeFilters = useMemo(() => {
-        const filtersList: Array<{ key: string; label: string; value: string }> = [];
-        
-        // Status filter
-        if (filters.status && filters.status !== 'Todos') {
-            filtersList.push({ key: 'status', label: 'Tipo', value: filters.status });
-        }
-        
-        // Type filter
-        if (filters.type && filters.type !== 'Todos') {
-            filtersList.push({ key: 'type', label: 'Animal', value: filters.type });
-        }
-        
-        // Breed filter
-        if (filters.breed && filters.breed !== 'Todos') {
-            filtersList.push({ key: 'breed', label: 'Raza', value: filters.breed });
-        }
-        
-        // Colors filter (array)
-        if (Array.isArray(filters.colors) && filters.colors.length > 0) {
-            filters.colors.forEach((color: string) => {
-                filtersList.push({ key: 'colors', label: 'Color', value: color });
-            });
-        }
-        
-        // Size filter
-        if (filters.size && filters.size !== 'Todos') {
-            filtersList.push({ key: 'size', label: 'Tamaño', value: filters.size });
-        }
-        
-        // Location filters
-        if (filters.department && filters.department !== 'Todos') {
-            filtersList.push({ key: 'department', label: 'Ubicación', value: filters.department });
-        }
-        if (filters.province && filters.province !== 'Todos') {
-            filtersList.push({ key: 'province', label: 'Provincia', value: filters.province });
-        }
-        if (filters.district && filters.district !== 'Todos') {
-            filtersList.push({ key: 'district', label: 'Distrito', value: filters.district });
-        }
-        
-        // Date filter
-        const dateLabels: { [key: string]: string } = {
+        type FilterConfig = {
+            key: string;
+            label: string;
+            isValid: (value: any) => boolean;
+            getValue: (value: any) => string | string[];
+            isArray?: boolean;
+        };
+
+        const DATE_LABELS: Record<string, string> = {
             'today': 'Hoy',
             'last3days': 'Últimos 3 días',
             'lastWeek': 'Última semana',
             'lastMonth': 'Último mes'
         };
-        if (filters.dateFilter && filters.dateFilter !== '') {
-            filtersList.push({ key: 'dateFilter', label: 'Fecha', value: dateLabels[filters.dateFilter] || filters.dateFilter });
-        }
-        
-        // Name filter
-        if (filters.name && filters.name.trim() !== '') {
-            filtersList.push({ key: 'name', label: 'Nombre', value: filters.name });
-        }
-        
-        return filtersList;
+
+        const isNotDefault = (value: any, defaultValue: string = 'Todos'): boolean => {
+            return value && value !== defaultValue;
+        };
+
+        const isNotEmpty = (value: any): boolean => {
+            return value && typeof value === 'string' && value.trim() !== '';
+        };
+
+        const filterConfigs: FilterConfig[] = [
+            {
+                key: 'status',
+                label: 'Tipo',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'type',
+                label: 'Animal',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'breed',
+                label: 'Raza',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'colors',
+                label: 'Color',
+                isValid: (value) => Array.isArray(value) && value.length > 0,
+                getValue: (value) => value,
+                isArray: true
+            },
+            {
+                key: 'size',
+                label: 'Tamaño',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'department',
+                label: 'Ubicación',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'province',
+                label: 'Provincia',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'district',
+                label: 'Distrito',
+                isValid: (value) => isNotDefault(value),
+                getValue: (value) => value
+            },
+            {
+                key: 'dateFilter',
+                label: 'Fecha',
+                isValid: (value) => isNotEmpty(value),
+                getValue: (value) => DATE_LABELS[value] || value
+            },
+            {
+                key: 'name',
+                label: 'Nombre',
+                isValid: (value) => isNotEmpty(value),
+                getValue: (value) => value
+            }
+        ];
+
+        return filterConfigs
+            .filter(config => {
+                const filterValue = filters[config.key as keyof typeof filters];
+                return config.isValid(filterValue);
+            })
+            .flatMap(config => {
+                const filterValue = filters[config.key as keyof typeof filters];
+                const processedValue = config.getValue(filterValue);
+                
+                if (config.isArray && Array.isArray(processedValue)) {
+                    return processedValue.map(value => ({
+                        key: config.key,
+                        label: config.label,
+                        value: String(value)
+                    }));
+                }
+                
+                return [{
+                    key: config.key,
+                    label: config.label,
+                    value: String(processedValue)
+                }];
+            });
     }, [filters]);
 
     // Helper to check if pet is Pet type (has imageUrls) or PetRow (has image_urls)
