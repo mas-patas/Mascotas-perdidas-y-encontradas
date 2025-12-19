@@ -557,6 +557,19 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
 
         const generatedName = formData.name.trim() || `${typeLabel} En Adopción`;
 
+        // Obtener coordenadas: usar las del mapa si existen, sino usar coordenadas por defecto de la ubicación
+        let finalLat = formData.lat;
+        let finalLng = formData.lng;
+        
+        // Si no hay coordenadas del mapa, usar coordenadas por defecto basadas en provincia o departamento
+        if (!finalLat || !finalLng) {
+            const coords = locationCoordinates[formData.province] || locationCoordinates[formData.department];
+            if (coords) {
+                finalLat = coords.lat;
+                finalLng = coords.lng;
+            }
+        }
+
         const petToSubmit: Omit<Pet, 'id' | 'userEmail'> = {
             status: PET_STATUS.EN_ADOPCION,
             name: generatedName,
@@ -571,8 +584,8 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
             adoptionRequirements: formData.adoptionRequirements,
             imageUrls: imagePreviews,
             shareContactInfo: shareContactInfo,
-            lat: formData.lat,
-            lng: formData.lng
+            lat: finalLat,
+            lng: finalLng
         };
         
         onSubmit(petToSubmit);

@@ -679,7 +679,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         {/* Mobile Actions - Compact buttons */}
                         <div className="flex gap-1.5 mt-3 pt-3 border-t border-card-border">
                             <button onClick={() => setIsShareModalOpen(true)} className="flex-1 py-2 text-text-sub bg-brand-light rounded-lg text-[11px] sm:text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-1.5 border border-card-border">
-                                <ShareIcon className="h-3.5 w-3.5" /> Compartir
+                                COMPARTIR
                             </button>
                             <button onClick={() => onGenerateFlyer(pet)} className="flex-1 py-2 text-brand-dark bg-brand-secondary rounded-lg text-[11px] sm:text-xs font-bold hover:bg-amber-500 transition-colors flex items-center justify-center gap-1.5 shadow-sm">
                                 <PrinterIcon className="h-3.5 w-3.5" /> Afiche
@@ -720,10 +720,10 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     <div className="flex items-center justify-center gap-3 w-full max-w-lg">
                         <button 
                             onClick={() => setIsShareModalOpen(true)} 
-                            className="p-3 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors"
+                            className="px-4 py-3 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors font-bold text-sm"
                             title="Compartir"
                         >
-                            <ShareIcon className="h-6 w-6" />
+                            COMPARTIR
                         </button>
                         
                         <button 

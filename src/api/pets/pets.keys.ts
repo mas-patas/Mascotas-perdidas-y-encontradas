@@ -7,5 +7,6 @@ export const queryKeys = {
   pet: (id: string) => ['pets', id] as const,
   myPets: (userId: string) => ['myPets', userId] as const,
   mapPets: ['mapPets'] as const,
+  reunionStory: (id: string) => ['reunionStory', id] as const,
 } as const;
 

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/services/supabaseClient';
 import type { PetRow, AnimalType } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES } from '@/constants';
-import { HeartIcon, CalendarIcon, UserIcon, ArrowDownIcon, SearchIcon, SparklesIcon, TrophyIcon, DogIcon, CatIcon, ChevronLeftIcon, ChevronRightIcon, LocationMarkerIcon, PetIcon } from '@/shared/components/icons';
+import { HeartIcon, CalendarIcon, UserIcon, ArrowDownIcon, SearchIcon, SparklesIcon, TrophyIcon, DogIcon, CatIcon, ChevronLeftIcon, ChevronRightIcon, LocationMarkerIcon, PetIcon, PawIcon } from '@/shared/components/icons';
 import { Helmet } from 'react-helmet-async';
 
 // Helper para calcular días transcurridos
@@ -127,132 +127,148 @@ const ReunitedPetsPage: React.FC = () => {
             </Helmet>
 
             {/* --- HERO SECTION --- */}
-            <div className="relative bg-gradient-to-b from-sky-400 to-blue-700 text-white overflow-hidden pb-12 pt-6 rounded-b-[3rem] shadow-card-hover mb-12">
-                {/* Abstract Shapes */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
-                    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-sky-300 rounded-full blur-[100px]"></div>
-                    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-500 rounded-full blur-[100px]"></div>
-                </div>
+            <div className="relative bg-gradient-to-b from-sky-400 to-blue-700 text-white mb-12 rounded-lg sm:rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden">
+                <div className="max-w-full mx-auto">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[450px] lg:min-h-[500px]">
+                        {/* LEFT SECTION - Text Content with Gradient */}
+                        <div className="relative bg-gradient-to-b from-sky-400 via-blue-500 to-blue-700 flex flex-col justify-between p-6 lg:p-10 text-center lg:text-left">
+                            {/* Top Indicator Chip */}
+                            <div className="mb-6 flex justify-center lg:justify-start">
+                                <span className="inline-flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-bold text-blue-700 shadow-md">
+                                    <PawIcon className="h-5 w-5" />
+                                    +{totalReunited} reencuentros logrados
+                                </span>
+                            </div>
 
-                <div className="max-w-7xl mx-auto px-6 relative z-10">
-                    <div className="text-center mb-12">
-                        <span className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-4 py-1.5 rounded-full text-sm font-bold text-white border border-white/25 mb-6 shadow-card animate-fade-in-up">
-                            <SparklesIcon className="h-4 w-4" /> {totalReunited} mascotas han vuelto a casa
-                        </span>
-                        
-                        <h1 className="text-4xl md:text-6xl font-black mb-4 leading-tight tracking-tight drop-shadow-xl">
-                            Historias que <br className="md:hidden"/>
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-200">Inspiran Esperanza</span>
-                        </h1>
-                        <p className="text-lg md:text-xl text-white/95 max-w-2xl mx-auto font-medium leading-relaxed">
-                            Detrás de cada foto hay una comunidad que no se rindió. <br/>
-                            Estos son los momentos por los que trabajamos.
-                        </p>
-                    </div>
+                            {/* Main Heading */}
+                            <div className="flex-1 flex flex-col justify-center">
+                                <h1 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 leading-tight tracking-tight text-white">
+                                    Historias que <br className="md:hidden"/>
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-200">Inspiran Esperanza</span>
+                                </h1>
+                                <p className="text-base md:text-lg text-white/95 font-medium leading-relaxed mb-6">
+                                    Detrás de cada foto hay una comunidad que no se rindió. <br/>
+                                    Estos son los momentos por los que trabajamos.
+                                </p>
+                            </div>
 
-                    {/* --- FEATURED CAROUSEL (Hero Card) --- */}
-                    {featuredPets.length > 0 && (
-                        <div 
-                            className="relative w-full max-w-5xl mx-auto aspect-[4/3] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-card-hover border-4 border-white/15 bg-black/30 backdrop-blur-sm"
-                            onMouseEnter={() => setIsCarouselPaused(true)}
-                            onMouseLeave={() => setIsCarouselPaused(false)}
-                        >
-                            {/* Navigation Arrows */}
-                            {featuredPets.length > 1 && (
-                                <>
-                                    <button
-                                        onClick={handlePrevSlide}
-                                        className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-2 md:p-3 transition-all duration-200 hover:scale-110 border border-white/20"
-                                        aria-label="Historia anterior"
-                                    >
-                                        <ChevronLeftIcon className="h-5 w-5 md:h-6 md:w-6 text-white" />
-                                    </button>
-                                    <button
-                                        onClick={handleNextSlide}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-2 md:p-3 transition-all duration-200 hover:scale-110 border border-white/20"
-                                        aria-label="Siguiente historia"
-                                    >
-                                        <ChevronRightIcon className="h-5 w-5 md:h-6 md:w-6 text-white" />
-                                    </button>
-                                </>
-                            )}
+                            {/* Bottom Motto */}
+                            <div className="flex items-center justify-center lg:justify-start gap-2 text-white/95">
+                                <HeartIcon className="h-5 w-5" filled />
+                                <span className="text-base font-medium">Cada historia es una razón para seguir creyendo</span>
+                            </div>
+                        </div>
 
-                            {featuredPets.map((pet, index) => {
-                                const isActive = index === currentIndex;
-                                const days = calculateDaysApart(pet.date, pet.reunionDate);
-                                
-                                return (
-                                    <div 
-                                        key={pet.id}
-                                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                                    >
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-10"></div>
-                                        <img 
-                                            src={pet.imageUrls[0]} 
-                                            alt={pet.name} 
-                                            className="w-full h-full object-cover"
-                                        />
-                                        
-                                        <div className="absolute bottom-0 left-0 w-full p-6 md:p-10 z-20 flex flex-col md:flex-row items-end justify-between gap-4">
-                                            <div className="text-left space-y-3 max-w-2xl">
-                                                <div className="flex items-center gap-3 flex-wrap">
-                                                    <span className="bg-emerald-400/95 backdrop-blur-sm text-white text-xs font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-lg">
-                                                        Reunido en {days} {days === 1 ? 'día' : 'días'}
-                                                    </span>
-                                                    <span className="flex items-center gap-1.5 text-white/95 text-sm font-bold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10">
-                                                        <UserIcon className="h-3.5 w-3.5" /> @{pet.userEmail}
-                                                    </span>
-                                                </div>
-                                                <h2 className="text-3xl md:text-5xl font-black text-white leading-none drop-shadow-lg">
-                                                    {pet.name}
-                                                </h2>
-                                                <p className="text-white/95 text-sm md:text-lg font-medium line-clamp-2 md:line-clamp-none italic font-serif drop-shadow-md">
-                                                    "{pet.reunionStory || "Gracias a todos por compartir, ¡ya estamos juntos de nuevo!"}"
-                                                </p>
-                                            </div>
+                        {/* RIGHT SECTION - Image Carousel */}
+                        {featuredPets.length > 0 && (
+                            <div 
+                                className="relative w-full h-full min-h-[400px] lg:min-h-[500px] overflow-hidden"
+                                onMouseEnter={() => setIsCarouselPaused(true)}
+                                onMouseLeave={() => setIsCarouselPaused(false)}
+                            >
+                                {featuredPets.map((pet, index) => {
+                                    const isActive = index === currentIndex;
+                                    const days = calculateDaysApart(pet.date, pet.reunionDate);
+                                    
+                                    return (
+                                        <div 
+                                            key={pet.id}
+                                            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                                        >
+                                            <img 
+                                                src={pet.imageUrls[0] || 'https://via.placeholder.com/800x700'} 
+                                                alt={pet.name} 
+                                                className="w-full h-full object-cover"
+                                            />
                                             
-                                            {/* Navigation Dots */}
-                                            <div className="flex gap-2">
-                                                {featuredPets.map((_, idx) => (
-                                                    <button 
-                                                        key={idx}
-                                                        onClick={() => setCurrentIndex(idx)}
-                                                        className={`h-2.5 rounded-full transition-all duration-300 shadow-sm ${currentIndex === idx ? 'w-8 bg-white' : 'w-2.5 bg-white/60 hover:bg-white/80'}`}
-                                                        aria-label={`Ver historia ${idx + 1}`}
-                                                    />
-                                                ))}
+                                            {/* Overlay Information */}
+                                            <div className="absolute bottom-0 left-0 w-full p-6 lg:p-8 z-20 bg-gradient-to-t from-black/60 via-black/30 to-transparent">
+                                                <div className="space-y-2">
+                                                    {/* Green Tag */}
+                                                    <span className="inline-block bg-green-500 text-white text-xs font-black px-3 py-1.5 rounded-md uppercase tracking-wider shadow-sm">
+                                                        REUNIDO EN {days} {days === 1 ? 'DÍA' : 'DÍAS'}
+                                                    </span>
+                                                    
+                                                    {/* Pet Name */}
+                                                    <h2 className="text-3xl md:text-4xl font-black text-white leading-none drop-shadow-lg">
+                                                        {pet.name}
+                                                    </h2>
+                                                    
+                                                    {/* Owner Quote */}
+                                                    <p className="text-white text-sm md:text-base font-medium italic drop-shadow-md max-w-md">
+                                                        "{pet.reunionStory || 'lo encontre cerca a mi casa'}"
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                    );
+                                })}
+
+                                {/* Pagination Dots */}
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+                                    {featuredPets.map((_, idx) => (
+                                        <button 
+                                            key={idx}
+                                            onClick={() => setCurrentIndex(idx)}
+                                            className={`h-2 rounded-full transition-all duration-300 ${currentIndex === idx ? 'w-8 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'}`}
+                                            aria-label={`Ver historia ${idx + 1}`}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Navigation Arrows */}
+                                {featuredPets.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={handlePrevSlide}
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white/90 hover:bg-white backdrop-blur-md rounded-full p-3 transition-all duration-200 hover:scale-110 shadow-lg border border-white/50"
+                                            aria-label="Historia anterior"
+                                        >
+                                            <ChevronLeftIcon className="h-5 w-5 text-blue-600" />
+                                        </button>
+                                        <button
+                                            onClick={handleNextSlide}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-white/90 hover:bg-white backdrop-blur-md rounded-full p-3 transition-all duration-200 hover:scale-110 shadow-lg border border-white/50"
+                                            aria-label="Siguiente historia"
+                                        >
+                                            <ChevronRightIcon className="h-5 w-5 text-blue-600" />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* --- STATS STRIP --- */}
-            <div className="max-w-4xl mx-auto px-6 -mt-20 relative z-20 mb-12">
-                <div className="bg-white rounded-2xl shadow-card-hover p-6 md:p-8 grid grid-cols-2 md:grid-cols-3 divide-x divide-card-border border border-card-border">
-                    <div className="text-center px-4 transition-transform duration-200 hover:scale-105 cursor-default">
-                        <div className="flex justify-center mb-2">
-                            <HeartIcon className="h-10 w-10 md:h-12 md:w-12 text-sky-600" filled />
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-8 sm:-mt-10 relative z-20 mb-8 sm:mb-12">
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-card-hover p-2 sm:p-3 md:p-4 grid grid-cols-3 divide-x divide-card-border border border-card-border">
+                    <div className="text-center px-2 sm:px-3 md:px-4 transition-transform duration-200 hover:scale-105 cursor-default py-1">
+                        <div className="flex justify-center items-center mb-0.5 sm:mb-1 h-5 sm:h-6 md:h-7">
+                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-sky-600" filled />
                         </div>
-                        <p className="text-3xl md:text-4xl font-black text-sky-600">{totalReunited}</p>
-                        <p className="text-xs text-icon-gray font-bold uppercase tracking-wider mt-1.5">Reencuentros</p>
+                        <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black text-sky-600 leading-tight">{totalReunited}</p>
+                        <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase tracking-wider mt-0">Reencuentros</p>
                     </div>
-                    <div className="text-center px-4 transition-transform duration-200 hover:scale-105 cursor-default">
-                        <div className="flex justify-center mb-2">
-                            <SparklesIcon className="h-10 w-10 md:h-12 md:w-12 text-emerald-500" />
+                    <div className="text-center px-2 sm:px-3 md:px-4 transition-transform duration-200 hover:scale-105 cursor-default py-1">
+                        <div className="flex justify-center items-center mb-0.5 sm:mb-1 h-5 sm:h-6 md:h-7">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="12" cy="12" r="10" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                            </svg>
                         </div>
-                        <p className="text-3xl md:text-4xl font-black text-emerald-500">{fastReunions}</p>
-                        <p className="text-xs text-icon-gray font-bold uppercase tracking-wider mt-1.5">En menos de 72h</p>
+                        <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black text-emerald-500 leading-tight">{fastReunions}</p>
+                        <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase tracking-wider mt-0">En menos de 72h</p>
                     </div>
-                    <div className="hidden md:block text-center px-4 transition-transform duration-200 hover:scale-105 cursor-default">
-                        <div className="flex justify-center text-amber-400 mb-1.5">
-                            <TrophyIcon className="h-10 w-10 md:h-12 md:w-12" />
+                    <div className="text-center px-2 sm:px-3 md:px-4 transition-transform duration-200 hover:scale-105 cursor-default py-1">
+                        <div className="flex justify-center items-center text-amber-400 mb-0.5 sm:mb-1 h-5 sm:h-6 md:h-7">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
                         </div>
-                        <p className="text-xs text-icon-gray font-bold uppercase tracking-wider">Comunidad #1</p>
+                        <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-black text-amber-400 leading-tight">#1</p>
+                        <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase tracking-wider mt-0">Comunidad</p>
                     </div>
                 </div>
             </div>

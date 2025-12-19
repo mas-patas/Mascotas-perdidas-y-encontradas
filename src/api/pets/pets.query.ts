@@ -143,6 +143,18 @@ export const usePetsForMap = () => {
 };
 
 /**
+ * Query hook to fetch a reunited pet story by ID
+ */
+export const useReunionStory = (id: string | undefined) => {
+  return useQuery({
+    queryKey: queryKeys.reunionStory(id!),
+    queryFn: () => petsApi.getReunionStoryById(id!),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+};
+
+/**
  * Hook to set up realtime subscriptions for pets
  */
 export const usePetsRealtime = () => {

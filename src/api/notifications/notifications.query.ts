@@ -46,7 +46,8 @@ export const useNotifications = (userId: string | undefined) => {
       return transformNotificationRows(rows);
     },
     enabled: !!userId,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 5000, // Polling cada 5 segundos como fallback/supplement a Realtime
   });
 };
 
@@ -82,14 +83,26 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      return;
+    }
 
+    // Use a unique channel name per user to avoid conflicts
+    const channelName = `notifications-realtime-${userId}`;
+    
     const channel = supabase
-      .channel('notifications-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications'
+          // Removed filter - checking user_id in the handler instead
+          // filter: `user_id=eq.${userId}` // This filter might not work if Realtime is not properly configured
+        },
         (payload) => {
+          // With the filter, we can be confident this notification is for this user
           if (payload.new.user_id === userId) {
             queryClient.setQueryData(queryKeys.notifications(userId), (old: any) => {
               const newNotif = transformNotificationRow(payload.new as any);
@@ -113,7 +126,11 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ [useNotificationsRealtime] Channel error - check Realtime is enabled in Supabase');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

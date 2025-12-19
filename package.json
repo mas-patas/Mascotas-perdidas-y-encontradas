@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.86.2",
     "@tanstack/react-query": "^5.90.10",
+    "date-fns": "^4.1.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-helmet-async": "2.0.5",

@@ -229,6 +229,40 @@ export const getPetBasicInfo = async (id: string): Promise<{ user_id: string; an
 };
 
 /**
+ * Fetch a reunited pet story by ID
+ * Only returns pets with REUNIDO status
+ */
+export const getReunionStoryById = async (id: string): Promise<Pet | null> => {
+  const { PET_STATUS } = await import('../../constants');
+  
+  const { data, error } = await supabase
+    .from('pets')
+    .select(PET_COLUMNS)
+    .eq('id', id)
+    .eq('status', PET_STATUS.REUNIDO)
+    .single();
+  
+  if (error) throw error;
+  if (!data) return null;
+  
+  // Fetch profile for this pet's owner
+  let profiles: ProfileRow[] = [];
+  if (data.user_id) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user_id)
+      .single();
+    
+    if (!profileError && profileData) {
+      profiles = [profileData];
+    }
+  }
+  
+  return mapPetFromDb(data, profiles);
+};
+
+/**
  * Fetch pets by user ID
  */
 export const getPetsByUserId = async (userId: string): Promise<Pet[]> => {
@@ -348,6 +382,32 @@ export const createPet = async (data: CreatePetData): Promise<string> => {
         },
         created_at: now.toISOString()
       });
+    }
+  }
+
+  // Trigger proximity alerts by calling Edge Function directly from frontend
+  // This is a workaround since pg_net is not available in the trigger
+  if (data.lat && data.lng && data.status === 'Perdido') {
+    try {
+      // Get the complete pet data to send to Edge Function
+      const { data: petData, error: fetchError } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('id', newPetId)
+        .single();
+
+      if (!fetchError && petData) {
+        // Call Edge Function asynchronously (fire and forget)
+        supabase.functions.invoke('send-proximity-alerts', {
+          body: petData
+        }).catch((err) => {
+          // Silently fail - we don't want to block pet creation if alerts fail
+          console.warn('Failed to trigger proximity alerts:', err);
+        });
+      }
+    } catch (err) {
+      // Silently fail - we don't want to block pet creation if alerts fail
+      console.warn('Error triggering proximity alerts:', err);
     }
   }
 

@@ -28,7 +28,7 @@ import { Layout, FlyerModal, ErrorBoundary, WarningIcon, OnboardingTour, ReportS
 import type { TourStep } from '@/shared';
 
 // Pages
-import { AboutPage, TipsPage, TermsPage } from '@/pages';
+import { AboutPage, TipsPage, TermsPage, PrivacyPage, DataDeletionPage } from '@/pages';
 
 // Types & Constants
 import type { Pet, PetRow, PetStatus, ChatRow, User, UserRole, PotentialMatch, UserStatus, ReportRow, ReportReason, ReportType, ReportStatus as ReportStatusType, SupportTicketRow, SupportTicketCategory, CampaignRow, CommentRow, Notification } from './types';
@@ -43,6 +43,7 @@ import { usePetFilters } from './hooks/usePetFilters';
 import { usePets as usePetsHook } from './hooks/usePets';
 import { sendPageView, trackPetReunited } from './services/analytics';
 import { queryKeys as chatsQueryKeys } from './api/chats/chats.keys';
+import { useUserLocation } from './hooks/useUserLocation';
 
 // API Hooks
 import {
@@ -175,6 +176,21 @@ const App: React.FC = () => {
     useEffect(() => localStorage.setItem('platform_aiSearchEnabled', JSON.stringify(isAiSearchEnabled)), [isAiSearchEnabled]);
     useEffect(() => localStorage.setItem('platform_locationAlertsEnabled', JSON.stringify(isLocationAlertsEnabled)), [isLocationAlertsEnabled]);
     useEffect(() => localStorage.setItem('platform_locationAlertRadius', JSON.stringify(locationAlertRadius)), [locationAlertRadius]);
+
+    // Listen for location alerts changes from ProfilePage
+    useEffect(() => {
+        const handleLocationAlertsChanged = (event: CustomEvent) => {
+            setIsLocationAlertsEnabled(event.detail);
+        };
+        
+        window.addEventListener('locationAlertsChanged', handleLocationAlertsChanged as EventListener);
+        return () => {
+            window.removeEventListener('locationAlertsChanged', handleLocationAlertsChanged as EventListener);
+        };
+    }, []);
+
+    // Auto-update user location when alerts are enabled
+    useUserLocation({ enabled: isLocationAlertsEnabled && !!currentUser });
 
     // --- IP Check Effect ---
     useEffect(() => {
@@ -791,6 +807,8 @@ const App: React.FC = () => {
                     <Route path="reunidos" element={<ErrorBoundary name="Reunited"><ReunitedPetsPage /></ErrorBoundary>} />
                     <Route path="tips" element={<TipsPage />} />
                     <Route path="terminos" element={<TermsPage />} />
+                    <Route path="privacidad" element={<PrivacyPage />} />
+                    <Route path="eliminacion-datos" element={<DataDeletionPage />} />
 
                     <Route path="mascota/:id" element={<ErrorBoundary name="PetDetail"><PetDetailPage pet={undefined} onClose={() => navigate('/')} onStartChat={handleStartChat} onEdit={(pet) => { setReportStatus(pet.status); setSelectedPetForModal(pet); setIsReportModalOpen(true); }} onDelete={handleDeletePet} onGenerateFlyer={(pet) => { setSelectedPetForModal(pet); setIsFlyerModalOpen(true); }} onUpdateStatus={handleUpdatePetStatus} users={users} onViewUser={handleViewPublicProfile} onReport={handleReport} onRecordContactRequest={handleRecordContactRequest} onAddComment={handleAddComment} onLikeComment={handleLikeComment} /></ErrorBoundary>} />
                     <Route path="chat/:id" element={<ProtectedRoute><ErrorBoundary name="Chat"><ChatPage chat={undefined} pet={undefined} users={users} currentUser={currentUser!} onSendMessage={handleSendMessage} onBack={() => navigate('/mensajes')} onMarkAsRead={handleMarkChatAsRead} /></ErrorBoundary></ProtectedRoute>} />
