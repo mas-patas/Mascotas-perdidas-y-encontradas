@@ -580,6 +580,68 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                                 <img src={qrCodeUrl} style={{ width: '140px', height: '140px', borderRadius: '15px', backgroundColor: 'white', padding: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }} alt="QR" crossOrigin="anonymous" />
                                 <p style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '6px', color: '#1f2937', letterSpacing: '0.05em' }}>ESCANEAR QR</p>
                             </div>
+                            <img src={qrCodeUrl} style={{ width: '140px', height: '140px', borderRadius: '10px', mixBlendMode: 'multiply' }} alt="QR" crossOrigin="anonymous" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* POST TEMPLATE (1080x1080) */}
+            <div 
+                id="social-post-template" 
+                style={{ 
+                    width: '1080px', 
+                    height: '1080px', 
+                    position: 'fixed', 
+                    top: '-3000px', 
+                    left: '-3000px',
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    backgroundColor: 'white'
+                }}
+            >
+                {/* Top Bar */}
+                <div style={{ 
+                    height: '120px', 
+                    backgroundColor: statusColor, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    color: 'white'
+                }}>
+                    <h2 style={{ fontSize: '50px', fontWeight: '900', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{displayStatus}</h2>
+                </div>
+
+                {/* Image Area */}
+                <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                    <img src={pet.imageUrls[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="post-img" crossOrigin="anonymous" />
+                    
+                    {/* Reward Badge if exists */}
+                    {pet.reward && pet.reward > 0 && (
+                        <div style={{ 
+                            position: 'absolute', 
+                            top: '40px', 
+                            right: '40px', 
+                            backgroundColor: '#D4AF37', 
+                            color: 'white', 
+                            padding: '15px 30px', 
+                            borderRadius: '50px', 
+                            fontSize: '30px', 
+                            fontWeight: 'bold',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+                        }}>
+                            RECOMPENSA
+                        </div>
+                    )}
+                </div>
+
+                {/* Bottom Info */}
+                <div style={{ padding: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
+                    <div style={{ maxWidth: '70%' }}>
+                        <h1 style={{ fontSize: '70px', fontWeight: '900', color: '#1F2937', lineHeight: '1', marginBottom: '10px' }}>{pet.name}</h1>
+                        <p style={{ fontSize: '30px', color: '#4B5563', marginBottom: '10px' }}>{pet.breed} • {pet.color}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: statusColor, fontSize: '24px', fontWeight: 'bold' }}>
+                            <span>📍</span> <span>{pet.location}</span>
                         </div>
                     </div>
                 </div>

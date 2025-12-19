@@ -73,7 +73,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             neighbourhood: '',
             date: new Date().toISOString().split('T')[0],
             shareContactInfo: true,
-            createAlert: true,
+            createAlert: false,
             currency: 'S/',
             imageUrls: [],
             ... (isEditMode && petToEdit ? {
@@ -384,23 +384,33 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         const deptMatch = departments.find(d => normalizeLocationName(d) === apiState);
         
         if (deptMatch) {
-            setValue('department', deptMatch);
             const newProvs = getProvinces(deptMatch);
-            setProvinces(newProvs); // Force update state immediately
-
+            
             // 2. Find Province
             const apiProv = normalizeLocationName(addr.province || addr.region || addr.city || '');
             const provMatch = newProvs.find(p => normalizeLocationName(p) === apiProv);
 
+            let newDists: string[] = [];
+            let distMatch: string | null = null;
+
+            if (provMatch) {
+                newDists = getDistricts(deptMatch, provMatch);
+                
+                // 3. Find District
+                const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || addr.suburb || '');
+                distMatch = newDists.find(d => normalizeLocationName(d) === apiDist) || null;
+            }
+
+            // Update provinces and districts lists first
+            setProvinces(newProvs);
+            if (newDists.length > 0) {
+                setDistricts(newDists);
+            }
+
+            // Then update all form values at once
+            setValue('department', deptMatch);
             if (provMatch) {
                 setValue('province', provMatch);
-                const newDists = getDistricts(deptMatch, provMatch);
-                setDistricts(newDists); // Force update state immediately
-
-                // 3. Find District
-                const apiDist = normalizeLocationName(addr.city_district || addr.district || addr.town || '');
-                const distMatch = newDists.find(d => normalizeLocationName(d) === apiDist);
-                
                 if (distMatch) {
                     setValue('district', distMatch);
                     
@@ -468,7 +478,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
         }
     };
 
-    const performReverseGeocoding = async (latitude: number, longitude: number) => {
+    const performReverseGeocoding = async (latitude: number, longitude: number, isRetry = false) => {
         isUpdatingFromMapRef.current = true;
         
         if (reverseGeocodingAbortController.current) reverseGeocodingAbortController.current.abort();
@@ -505,6 +515,14 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
                 // Update Hierarchy
                 parseAndSetHierarchy(addr);
+                
+                // If this is the first call (not a retry), make a second call after 1.5 seconds
+                // to ensure district is set correctly after lists are updated
+                if (!isRetry) {
+                    setTimeout(() => {
+                        performReverseGeocoding(latitude, longitude, true);
+                    }, 1500);
+                }
             }
         } catch (err: any) { 
             // Ignore aborts
@@ -917,9 +935,8 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                                 <input type="date" {...register('date', { required: true })} className={inputClass} max={new Date().toISOString().split('T')[0]} />
                             </div>
                             <div>
-                                <label className={labelClass}>Teléfono de Contacto <span className="text-red-500">*</span></label>
-                                <input type="tel" {...register('contact', { required: "El contacto es obligatorio" })} className={inputClass} placeholder="999888777" />
-                                {errors.contact && <span className="text-red-500 text-xs">{errors.contact.message}</span>}
+                                <label className={labelClass}>Teléfono de Contacto (Opcional)</label>
+                                <input type="tel" {...register('contact')} className={inputClass} placeholder="999888777" />
                                 <div className="flex items-center mt-2">
                                     <input type="checkbox" {...register('shareContactInfo')} className="mr-2 h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded" />
                                     <label className="text-sm text-gray-600">Mostrar número públicamente</label>

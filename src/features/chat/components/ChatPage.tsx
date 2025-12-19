@@ -6,6 +6,7 @@ import { SendIcon } from '@/shared/components/icons';
 import { formatTime } from '@/utils/formatters';
 import { useAppData } from '@/hooks/useAppData';
 import { usePets } from '@/hooks/usePets';
+import { useChat } from '@/api/chats/chats.query';
 
 interface ChatPageProps {
     chat?: ChatRow; // Optional, we'll find it if missing
@@ -21,17 +22,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     
-    // In a real app we'd use a context or fetch for single chat
-    // For now we'll assume the list passed from parent is fresh enough or reuse the hook
+    // Try to get chat from props or from the list
     const { chats } = useAppData();
     const { pets } = usePets({ filters: { status: 'Todos', type: 'Todos', breed: 'Todos', color1: 'Todos', color2: 'Todos', size: 'Todos', department: 'Todos' } });
-
-    const chat = propChat || chats.find(c => c.id === id);
+    
+    // Find chat in list first
+    const chatFromList = propChat || chats.find(c => c.id === id);
+    
+    // Only use useChat hook if chat is not found in the list (e.g., newly created chat)
+    // This prevents infinite loops by avoiding unnecessary queries
+    const shouldFetchChat = !chatFromList && !!id;
+    const { data: fetchedChat, isLoading: isLoadingChat } = useChat(shouldFetchChat ? id : undefined);
+    
+    // Prefer propChat, then chat from list, then fetched chat
+    const chat = chatFromList || fetchedChat || null;
     const pet = propPet || (chat && chat.pet_id ? pets.find(p => p.id === chat.pet_id) : undefined);
 
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastProcessedReadTimeRef = useRef<string>('');
+    const isMarkingAsReadRef = useRef<boolean>(false);
+    const lastChatIdRef = useRef<string | null>(null);
     
     const participantEmails = chat?.participant_emails || [];
     
@@ -61,6 +72,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
     useEffect(() => {
         if (!chat || !currentUser) return;
         
+        // Reset marking flag if chat ID changed
+        if (lastChatIdRef.current !== chat.id) {
+            lastChatIdRef.current = chat.id;
+            isMarkingAsReadRef.current = false;
+            lastProcessedReadTimeRef.current = '';
+        }
+        
+        // Don't mark as read if already in process
+        if (isMarkingAsReadRef.current) return;
+        
         const messages = (chat.messages as MessageRow[] | null) || [];
         if (messages.length === 0) return;
 
@@ -68,6 +89,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
         const lastReadTimestamps = (chat.last_read_timestamps as Record<string, string> | null) || {};
         const myLastRead = lastReadTimestamps[currentUser.email];
         
+        // Prevent infinite loops by checking if we've already processed this read time
         if (lastProcessedReadTimeRef.current === myLastRead && lastProcessedReadTimeRef.current !== '') {
              const lastMsgTime = new Date(lastMessage.created_at).getTime();
              const processedTime = new Date(lastProcessedReadTimeRef.current).getTime();
@@ -77,17 +99,36 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
         const lastMsgTime = new Date(lastMessage.created_at).getTime();
         const myReadTime = myLastRead ? new Date(myLastRead).getTime() : 0;
 
+        // Only mark as read if it's not our message and we haven't read it yet
         if (lastMessage.sender_email !== currentUser.email && lastMsgTime > myReadTime) {
-            lastProcessedReadTimeRef.current = new Date().toISOString();
+            const newReadTime = new Date().toISOString();
+            // Update refs immediately to prevent multiple calls
+            lastProcessedReadTimeRef.current = newReadTime;
+            isMarkingAsReadRef.current = true;
+            
+            // Mark as read and reset flag after a delay
             onMarkAsRead(chat.id);
+            setTimeout(() => {
+                isMarkingAsReadRef.current = false;
+            }, 1000);
         }
-    }, [chat, currentUser, onMarkAsRead]);
+    }, [chat?.id, chat?.messages?.length, currentUser?.email, onMarkAsRead]);
 
     useEffect(() => {
         if(chat) scrollToBottom();
     }, [chat?.messages]);
 
-    if (!chat) return <div className="flex justify-center items-center h-full">Cargando chat...</div>;
+    // Show loading state while fetching chat (especially for newly created chats)
+    if (isLoadingChat || !chat) {
+        return (
+            <div className="flex justify-center items-center h-full min-h-[400px]">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mb-4"></div>
+                    <p className="text-gray-600">Cargando chat...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();

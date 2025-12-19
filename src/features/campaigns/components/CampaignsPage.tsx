@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import type { Campaign } from '@/types';
 import { CAMPAIGN_TYPES } from '@/constants';
 import CampaignCard from './CampaignCard';
-import { ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons';
+import CampaignReportModal from './CampaignReportModal';
+import { ChevronLeftIcon, ChevronRightIcon, MegaphoneIcon } from '@/shared/components/icons';
 
 interface CampaignsPageProps {
     campaigns: Campaign[];
@@ -116,16 +117,45 @@ const CampaignSection: React.FC<{
 };
 
 const CampaignsPage: React.FC<CampaignsPageProps> = ({ campaigns, onNavigate }) => {
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    
     // Filter active campaigns only for public view
     const now = new Date();
     const yesterday = new Date();
     yesterday.setDate(now.getDate() - 1);
     const yesterdayISO = yesterday.toISOString().split('T')[0];
 
-    const activeCampaigns = campaigns.filter(c => c.date >= yesterdayISO);
+    const activeCampaigns = campaigns.filter(c => c.date && c.date >= yesterdayISO);
 
-    const sterilizationCampaigns = activeCampaigns.filter(c => c.type === CAMPAIGN_TYPES.ESTERILIZACION);
-    const adoptionCampaigns = activeCampaigns.filter(c => c.type === CAMPAIGN_TYPES.ADOPCION);
+    // Group campaigns by type dynamically
+    const campaignsByType = activeCampaigns.reduce((acc, campaign) => {
+        const type = campaign.type || 'Otro';
+        if (!acc[type]) {
+            acc[type] = [];
+        }
+        acc[type].push(campaign);
+        return acc;
+    }, {} as Record<string, Campaign[]>);
+
+    // Get all unique types, sorted with known types first
+    const knownTypes: string[] = [CAMPAIGN_TYPES.ESTERILIZACION, CAMPAIGN_TYPES.VACUNACION, CAMPAIGN_TYPES.ADOPCION];
+    const allTypes = [
+        ...knownTypes.filter(type => campaignsByType[type]?.length > 0),
+        ...Object.keys(campaignsByType).filter(type => !knownTypes.includes(type))
+    ];
+
+    // Helper function to get section title based on type
+    const getSectionTitle = (type: string): string => {
+        if (type === CAMPAIGN_TYPES.ESTERILIZACION) return 'Campañas de Esterilización';
+        if (type === CAMPAIGN_TYPES.VACUNACION) return 'Campañas de Vacunación';
+        if (type === CAMPAIGN_TYPES.ADOPCION) return 'Campañas de Adopción';
+        return `Campañas de ${type}`;
+    };
+    
+    // Type guard to check if type is a known campaign type
+    const isKnownCampaignType = (type: string): type is typeof CAMPAIGN_TYPES[keyof typeof CAMPAIGN_TYPES] => {
+        return Object.values(CAMPAIGN_TYPES).includes(type as any);
+    };
 
     return (
         <div className="space-y-8">
@@ -133,23 +163,41 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({ campaigns, onNavigate }) 
                 <h1 className="text-4xl font-extrabold text-brand-dark mb-2">
                     Campañas Comunitarias
                 </h1>
-                <p className="text-gray-600 max-w-2xl mx-auto">
-                    Entérate de los últimos eventos de esterilización y ferias de adopción cerca de ti. 
+                <p className="text-gray-600 max-w-2xl mx-auto mb-4">
+                    Entérate de los últimos eventos de esterilización, vacunación y ferias de adopción cerca de ti. 
                     ¡Participa y ayuda a mejorar la vida de nuestras mascotas!
                 </p>
+                <button
+                    onClick={() => setIsReportModalOpen(true)}
+                    className="inline-flex items-center gap-2 bg-brand-primary text-white font-bold py-2 px-6 rounded-full shadow-lg hover:shadow-xl hover:bg-brand-dark transition-all transform hover:scale-105"
+                >
+                    <MegaphoneIcon className="h-5 w-5" />
+                    Informar de Campaña
+                </button>
             </div>
-
-            <CampaignSection 
-                title="Campañas de Esterilización" 
-                campaigns={sterilizationCampaigns} 
-                onNavigate={onNavigate} 
-            />
             
-            <CampaignSection 
-                title="Campañas de Adopción" 
-                campaigns={adoptionCampaigns} 
-                onNavigate={onNavigate} 
+            <CampaignReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                onSuccess={() => {
+                    // Optionally show success message or refresh data
+                }}
             />
+
+            {allTypes.length === 0 ? (
+                <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">No hay campañas activas en este momento.</p>
+                </div>
+            ) : (
+                allTypes.map(type => (
+                    <CampaignSection
+                        key={type}
+                        title={getSectionTitle(type)}
+                        campaigns={campaignsByType[type] || []}
+                        onNavigate={onNavigate}
+                    />
+                ))
+            )}
         </div>
     );
 };

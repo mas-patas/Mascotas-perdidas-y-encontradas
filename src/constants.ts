@@ -65,7 +65,9 @@ export const SUPPORT_TICKET_CATEGORIES = {
 
 export const CAMPAIGN_TYPES = {
     ESTERILIZACION: 'Esterilización',
+    VACUNACION: 'Vacunación',
     ADOPCION: 'Adopción',
+    OTRO: 'Otro',
 } as const;
 
 export const BUSINESS_TYPES = {

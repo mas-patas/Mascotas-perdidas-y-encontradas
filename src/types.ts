@@ -276,3 +276,21 @@ export interface Notification {
   isRead: boolean;
   timestamp: string;
 }
+
+/**
+ * Campaign type with camelCase fields (used in UI)
+ * Note: CampaignRow uses snake_case (user_email, image_urls, contact_phone, etc.)
+ */
+export interface Campaign {
+  id: string;
+  userEmail: string | null;
+  type: string | null;
+  title: string | null;
+  description: string | null;
+  location: string | null;
+  date: string | null;
+  imageUrls: string[];
+  contactPhone: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
