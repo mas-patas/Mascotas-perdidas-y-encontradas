@@ -5,7 +5,7 @@ import type { PetStatus, AnimalType, PetSize } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES, SIZES, USER_ROLES } from '@/constants';
 import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
-import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon, XCircleIcon, ChevronDownIcon } from '@/shared/components/icons';
+import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon, XCircleIcon, ChevronDownIcon, UsersIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/auth';
 
 type Filters = {
