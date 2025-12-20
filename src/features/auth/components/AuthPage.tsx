@@ -266,9 +266,9 @@ const AuthPage: React.FC = () => {
                                 <InfoIcon className="h-8 w-8 text-blue-600" />
                             </div>
                         </div>
-                        <h3 className="text-lg font-bold text-blue-900 mb-2">Registro con Redes Sociales</h3>
+                        <h3 className="text-lg font-bold text-blue-900 mb-2">Registro con Google</h3>
                         <p className="text-sm text-blue-700 leading-relaxed mb-4">
-                            Para verificar tu identidad, el registro inicial es mediante Google o Facebook.
+                            Para verificar tu identidad, el registro inicial es mediante Google.
                         </p>
                         <p className="text-xs text-blue-600 italic font-medium">
                             * Podrás crear una contraseña para tu cuenta en el siguiente paso para tener un acceso alternativo.
