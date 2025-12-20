@@ -294,7 +294,7 @@ const AuthPage: React.FC = () => {
                                 {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <GoogleIcon />}
                                 <span className="font-medium text-gray-900">Google</span>
                             </button>
-                            <button onClick={handleFacebookLogin} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
+                            <button onClick={handleFacebookLogin} disabled={loading || !!lockoutTime || socialLoading} className={`${socialButtonClass} hidden`}>
                                 {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <FacebookIcon />}
                                 <span className="font-medium text-gray-900">Facebook</span>
                             </button>
