@@ -217,17 +217,17 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                 // Restaurar console.error y console.warn
                 console.error = originalError;
                 console.warn = originalWarn;
+                
+                // Restaurar estilos originales - siempre ejecutar, incluso si hay errores
+                element.style.position = originalStyles.position || '';
+                element.style.left = originalStyles.left || '';
+                element.style.top = originalStyles.top || '';
+                element.style.visibility = originalStyles.visibility || '';
+                element.style.opacity = originalStyles.opacity || '';
+                element.style.zIndex = originalStyles.zIndex || '';
+                element.style.display = originalStyles.display || '';
+                element.style.pointerEvents = '';
             }
-
-            // Restaurar estilos originales
-            element.style.position = originalStyles.position || '';
-            element.style.left = originalStyles.left || '';
-            element.style.top = originalStyles.top || '';
-            element.style.visibility = originalStyles.visibility || '';
-            element.style.opacity = originalStyles.opacity || '';
-            element.style.zIndex = originalStyles.zIndex || '';
-            element.style.display = originalStyles.display || '';
-            element.style.pointerEvents = '';
 
         } catch (error) {
             console.error("Error generating share image:", error);
