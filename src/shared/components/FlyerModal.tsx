@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Pet } from '@/types';
-import { LocationMarkerIcon, CalendarIcon, PrinterIcon, PhoneIcon, DogIcon, SparklesIcon } from './icons';
+import { LocationMarkerIcon, CalendarIcon, PrinterIcon, PhoneIcon, DogIcon, DownloadIcon } from './icons';
 import { toJpeg } from 'html-to-image';
 
 interface FlyerModalProps {
@@ -177,40 +177,6 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
         <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex justify-center items-start sm:items-center p-4 overflow-y-auto">
             <div className="relative w-full max-w-2xl my-4 flex flex-col items-center">
                 
-                {/* Controls Header */}
-                <div className="bg-white p-3 rounded-xl flex flex-wrap justify-between items-center no-print shadow-lg mb-4 w-full gap-2">
-                    <h3 className="text-md font-bold text-brand-dark pl-2">Vista Previa del Afiche</h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                         <button 
-                            onClick={handleDownloadImage} 
-                            disabled={isGenerating}
-                            className="flex items-center gap-2 py-2 px-4 bg-brand-secondary text-brand-dark font-bold rounded-lg hover:bg-amber-400 transition-colors shadow-sm text-sm disabled:opacity-50"
-                        >
-                            {isGenerating ? (
-                                <span className="animate-pulse">Generando...</span>
-                            ) : (
-                                <>
-                                    <SparklesIcon />
-                                    <span>Descargar Imagen</span>
-                                </>
-                            )}
-                        </button>
-                         <button 
-                            onClick={handlePrint} 
-                            className="flex items-center gap-2 py-2 px-4 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors shadow-sm text-sm"
-                        >
-                            <PrinterIcon />
-                            <span className="hidden sm:inline">Imprimir PDF</span>
-                        </button>
-                        <button 
-                            onClick={onClose} 
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 font-bold text-xl transition-colors"
-                        >
-                            &times;
-                        </button>
-                    </div>
-                </div>
-                
                 {/* --- VISIBLE PREVIEW (Responsive) --- */}
                 {/* This one adapts to the screen size for the user to see */}
                 <div 
@@ -218,6 +184,29 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                     className="bg-white w-full mx-auto border-[8px] sm:border-[12px] border-[#EF4444] shadow-2xl overflow-hidden relative flex flex-col"
                     style={{ aspectRatio: '3 / 4' }} 
                 >
+                    {/* Download Button - Top Right Corner */}
+                    <button 
+                        onClick={handleDownloadImage} 
+                        disabled={isGenerating}
+                        className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex items-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2 sm:px-3 bg-brand-secondary text-brand-dark font-bold rounded-lg hover:bg-amber-400 transition-colors shadow-lg text-xs sm:text-sm disabled:opacity-50 no-print"
+                    >
+                        {isGenerating ? (
+                            <span className="animate-pulse text-[10px] sm:text-xs">Generando...</span>
+                        ) : (
+                            <>
+                                <DownloadIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span>Descargar</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Close Button - Top Left Corner */}
+                    <button 
+                        onClick={onClose} 
+                        className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm text-gray-500 hover:bg-red-100 hover:text-red-600 font-bold text-lg sm:text-xl transition-colors shadow-lg no-print"
+                    >
+                        &times;
+                    </button>
                     {/* Responsive Header */}
                     <div className="bg-[#EF4444] pt-3 sm:pt-6 pb-2 sm:pb-4 px-2 sm:px-4 shrink-0 relative">
                         {/* Logo en la parte superior izquierda */}

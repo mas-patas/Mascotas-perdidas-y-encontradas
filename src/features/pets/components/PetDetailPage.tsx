@@ -677,21 +677,21 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         </div>
                         
                         {/* Mobile Actions - Compact buttons */}
-                        <div className="flex gap-1.5 mt-3 pt-3 border-t border-card-border">
+                        <div className="flex gap-3 mt-3 pt-3 border-t border-card-border">
                             <Tooltip text="Compartir publicación">
-                                <button onClick={() => setIsShareModalOpen(true)} className="flex-1 py-2 text-text-sub bg-brand-light rounded-lg text-[11px] sm:text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-1.5 border border-card-border">
+                                <button onClick={() => setIsShareModalOpen(true)} className="flex-1 min-h-[44px] py-2.5 px-4 text-text-sub bg-brand-light rounded-2xl text-base font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-2 border border-card-border">
                                     COMPARTIR
                                 </button>
                             </Tooltip>
                             <Tooltip text="Generar afiche para imprimir">
-                                <button onClick={() => onGenerateFlyer(pet)} className="flex-1 py-2 text-brand-dark bg-brand-secondary rounded-lg text-[11px] sm:text-xs font-bold hover:bg-amber-500 transition-colors flex items-center justify-center gap-1.5 shadow-sm">
-                                    <PrinterIcon className="h-3.5 w-3.5" /> Afiche
+                                <button onClick={() => onGenerateFlyer(pet)} className="flex-1 min-h-[44px] py-2.5 px-4 text-brand-dark bg-brand-secondary rounded-2xl text-base font-bold hover:bg-amber-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                                    <PrinterIcon className="h-5 w-5" /> Crear Afiche
                                 </button>
                             </Tooltip>
                             {!isOwner && (
                                 <Tooltip text="Reportar publicación">
-                                    <button onClick={() => setIsReportModalOpen(true)} className="py-2 px-2.5 text-icon-gray hover:text-status-lost bg-white rounded-lg hover:bg-red-50 border border-card-border transition-colors">
-                                        <FlagIcon className="h-3.5 w-3.5" />
+                                    <button onClick={() => setIsReportModalOpen(true)} className="min-h-[44px] min-w-[44px] py-2.5 px-2.5 text-icon-gray hover:text-status-lost bg-white rounded-2xl hover:bg-red-50 border border-card-border transition-colors">
+                                        <FlagIcon className="h-5 w-5" />
                                     </button>
                                 </Tooltip>
                             )}
