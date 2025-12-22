@@ -6,7 +6,7 @@ import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment 
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { useAuth } from '@/contexts/auth';
-import { ConfirmationModal, InfoModal } from '@/shared';
+import { ConfirmationModal, InfoModal, SecurityDisclaimer } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
@@ -1040,7 +1040,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         )
                     )}
 
-                    <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg">
+                    {/* Security Disclaimer before chat */}
+                    <SecurityDisclaimer 
+                        variant="compact" 
+                        type="warning"
+                        customMessage="Ten cuidado al interactuar con desconocidos. Verifica la identidad de las personas y realiza encuentros en lugares públicos. Puedes reportar contenido sospechoso."
+                        showReportInfo={true}
+                        showSupportLink={true}
+                    />
+                    
+                    <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg mt-4">
                         <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
                     </button>
                 </div>

@@ -7,6 +7,7 @@ import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '@/data/locations';
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon, CameraIcon, SearchIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
+import { SecurityDisclaimer } from '@/shared';
 
 interface ReportPetFormProps {
     onClose: () => void;
@@ -106,6 +107,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const watchedImageUrls = watch('imageUrls');
     const watchedLat = watch('lat');
     const watchedLng = watch('lng');
+    const watchedReward = watch('reward');
 
     // Local State for Non-Form UI interactions
     const mapRef = useRef<HTMLDivElement>(null);
@@ -973,6 +975,17 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                             </div>
                         )}
                     </section>
+
+                    {/* Security Disclaimer */}
+                    <SecurityDisclaimer 
+                        variant="inline" 
+                        type="warning"
+                        customMessage={watchedStatus === PET_STATUS.PERDIDO && watchedReward ? 
+                            "Ten cuidado con estafas. Nunca pagues por adelantado para recuperar una mascota. La información que publiques será visible para todos los usuarios. Más Patas es solo una plataforma intermediaria." :
+                            "Ten cuidado con estafas. La información que publiques será visible para todos los usuarios. Más Patas es solo una plataforma intermediaria y no nos responsabilizamos por las interacciones entre usuarios."}
+                        showReportInfo={true}
+                        showSupportLink={true}
+                    />
 
                     <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0 -mx-6 -mb-6">
                         <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>

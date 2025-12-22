@@ -7,6 +7,7 @@ import { formatTime } from '@/utils/formatters';
 import { useAppData } from '@/hooks/useAppData';
 import { usePets } from '@/hooks/usePets';
 import { useChat } from '@/api/chats/chats.query';
+import { SecurityDisclaimer } from '@/shared';
 
 interface ChatPageProps {
     chat?: ChatRow; // Optional, we'll find it if missing
@@ -164,6 +165,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                     <p className="font-bold text-brand-dark text-sm">{pet ? `Conversación sobre ${pet.name}` : `Conversación con ${displayName}`}</p>
                     <p className="text-xs text-gray-500">con @{displayName}</p>
                 </div>
+            </div>
+
+            {/* Security Disclaimer */}
+            <div className="px-4 pt-2 pb-1">
+                <SecurityDisclaimer 
+                    variant="compact" 
+                    type="warning"
+                    customMessage="Ten cuidado al compartir información personal. Verifica la identidad de la persona con la que estás hablando. Puedes reportar usuarios sospechosos."
+                    showReportInfo={true}
+                    showSupportLink={true}
+                    dismissible={true}
+                />
             </div>
 
             {/* Messages Area */}

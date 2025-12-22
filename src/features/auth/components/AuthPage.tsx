@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { GoogleIcon, FacebookIcon, WarningIcon, EyeIcon, EyeOffIcon, InfoIcon, CheckCircleIcon, ChevronLeftIcon } from '@/shared/components/icons';
+import { Link } from 'react-router-dom';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
@@ -315,6 +316,21 @@ const AuthPage: React.FC = () => {
                         </div>
                     </>
                 )}
+
+                {/* Terms and Conditions Disclaimer */}
+                <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+                    <p className="text-xs text-gray-500">
+                        Al {view === 'login' ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros{' '}
+                        <Link to="/terminos" className="text-brand-primary hover:underline font-medium">
+                            Términos y Condiciones
+                        </Link>
+                        {' '}y nuestra{' '}
+                        <Link to="/privacidad" className="text-brand-primary hover:underline font-medium">
+                            Política de Privacidad
+                        </Link>
+                        . Más Patas es una plataforma intermediaria. No nos responsabilizamos por las interacciones entre usuarios.
+                    </p>
+                </div>
             </div>
         </div>
     );
