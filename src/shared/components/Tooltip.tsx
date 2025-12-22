@@ -7,12 +7,12 @@ interface TooltipProps {
     delay?: number;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ 
+export const Tooltip = ({ 
     text, 
     children, 
     position = 'top',
     delay = 300 
-}) => {
+}: TooltipProps): JSX.Element => {
     const [isVisible, setIsVisible] = useState(false);
     const [calculatedPosition, setCalculatedPosition] = useState(position);
     const tooltipRef = useRef<HTMLDivElement>(null);

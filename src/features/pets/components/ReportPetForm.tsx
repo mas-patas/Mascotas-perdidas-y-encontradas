@@ -42,6 +42,7 @@ interface FormValues {
     contact: string;
     reward: number | '';
     currency: string;
+    hasReward: boolean;
     shareContactInfo: boolean;
     createAlert: boolean;
     imageUrls: string[]; 
@@ -76,6 +77,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             shareContactInfo: true,
             createAlert: false,
             currency: 'S/',
+            hasReward: false,
             imageUrls: [],
             ... (isEditMode && petToEdit ? {
                 status: petToEdit.status,
@@ -88,6 +90,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                 shareContactInfo: petToEdit.shareContactInfo,
                 reward: petToEdit.reward,
                 currency: petToEdit.currency || 'S/',
+                hasReward: !!petToEdit.reward,
                 lat: petToEdit.lat,
                 lng: petToEdit.lng,
                 imageUrls: petToEdit.imageUrls || []
@@ -108,6 +111,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
     const watchedLat = watch('lat');
     const watchedLng = watch('lng');
     const watchedReward = watch('reward');
+    const watchedHasReward = watch('hasReward');
 
     // Local State for Non-Form UI interactions
     const mapRef = useRef<HTMLDivElement>(null);
@@ -686,7 +690,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             description: finalDescription,
             imageUrls: data.imageUrls,
             shareContactInfo: data.shareContactInfo,
-            reward: data.reward ? Number(data.reward) : undefined,
+            reward: data.hasReward ? (data.reward ? Number(data.reward) : 0) : undefined,
             currency: data.currency,
             lat: finalLat,
             lng: finalLng,
@@ -948,17 +952,34 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
 
                         {watchedStatus === PET_STATUS.PERDIDO && (
                             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-xl">💰</span>
-                                    <h4 className="font-bold text-yellow-800 text-sm">Recompensa (Opcional)</h4>
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl">💰</span>
+                                        <h4 className="font-bold text-yellow-800 text-sm">Ofrecer Recompensa</h4>
+                                    </div>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            {...register('hasReward')} 
+                                            className="h-5 w-5 text-brand-primary border-gray-300 rounded focus:ring-brand-primary" 
+                                        />
+                                        <span className="text-sm font-medium text-yellow-800">Activar recompensa</span>
+                                    </label>
                                 </div>
-                                <div className="flex gap-2">
-                                    <select {...register('currency')} className="w-24 p-2 border border-yellow-300 rounded-lg bg-white font-bold text-gray-700">
-                                        <option value="S/">S/</option>
-                                        <option value="$">$</option>
-                                    </select>
-                                    <input type="number" {...register('reward')} className="flex-1 p-2 border border-yellow-300 rounded-lg" placeholder="Monto" />
-                                </div>
+                                {watchedHasReward && (
+                                    <div className="flex gap-2">
+                                        <select {...register('currency')} className="w-24 p-2 border border-yellow-300 rounded-lg bg-white font-bold text-gray-700">
+                                            <option value="S/">S/</option>
+                                            <option value="$">$</option>
+                                        </select>
+                                        <input 
+                                            type="number" 
+                                            {...register('reward')} 
+                                            className="flex-1 p-2 border border-yellow-300 rounded-lg" 
+                                            placeholder="Monto (opcional)" 
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -980,7 +1001,7 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     <SecurityDisclaimer 
                         variant="inline" 
                         type="warning"
-                        customMessage={watchedStatus === PET_STATUS.PERDIDO && watchedReward ? 
+                        customMessage={watchedStatus === PET_STATUS.PERDIDO && watchedHasReward ? 
                             "Ten cuidado con estafas. Nunca pagues por adelantado para recuperar una mascota. La información que publiques será visible para todos los usuarios. Más Patas es solo una plataforma intermediaria." :
                             "Ten cuidado con estafas. La información que publiques será visible para todos los usuarios. Más Patas es solo una plataforma intermediaria y no nos responsabilizamos por las interacciones entre usuarios."}
                         showReportInfo={true}

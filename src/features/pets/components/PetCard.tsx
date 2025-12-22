@@ -71,7 +71,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
                 </div>
 
                 {/* Reward Badge - Bottom Right (Gold) */}
-                {pet.reward && pet.reward > 0 && !isReunited && (
+                {pet.reward !== undefined && pet.reward !== null && !isReunited && (
                     <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#D4AF37] text-white text-[9px] sm:text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-0.5 sm:gap-1">
                         <span>💵 Recompensa</span>
                     </div>

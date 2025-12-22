@@ -16,7 +16,7 @@ interface SecurityDisclaimerProps {
     customMessage?: string;
 }
 
-export const SecurityDisclaimer: React.FC<SecurityDisclaimerProps> = ({
+export const SecurityDisclaimer = ({
     variant = 'full',
     type = 'warning',
     dismissible = false,
@@ -24,7 +24,7 @@ export const SecurityDisclaimer: React.FC<SecurityDisclaimerProps> = ({
     showReportInfo = true,
     showSupportLink = true,
     customMessage
-}) => {
+}: SecurityDisclaimerProps): JSX.Element | null => {
     const [isDismissed, setIsDismissed] = useState(false);
 
     if (isDismissed) return null;

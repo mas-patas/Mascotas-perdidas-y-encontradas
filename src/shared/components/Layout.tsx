@@ -93,6 +93,8 @@ export const Layout: React.FC<LayoutProps> = ({
                                 <div className="mt-2 flex gap-4">
                                     <Link to="/terminos" className="hover:text-brand-primary transition-colors">Términos y Condiciones</Link>
                                     <span>|</span>
+                                    <Link to="/privacidad" className="hover:text-brand-primary transition-colors">Política de Privacidad</Link>
+                                    <span>|</span>
                                     <p>Hecho con <span className="text-red-500">♥</span> en Perú</p>
                                 </div>
                             </div>

@@ -723,11 +723,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
 
                     {/* Row 4: Buttons (Horizontal) */}
-                    <div className="flex items-center justify-center gap-3 w-full max-w-lg">
+                    <div className="flex items-center justify-center gap-2.5 w-full max-w-2xl">
                         <Tooltip text="Compartir publicación">
                             <button 
                                 onClick={() => setIsShareModalOpen(true)} 
-                                className="px-4 py-3 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors font-bold text-sm"
+                                className="px-5 py-2.5 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors font-bold text-sm whitespace-nowrap"
                             >
                                 COMPARTIR
                             </button>
@@ -736,9 +736,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         <Tooltip text="Generar afiche para imprimir">
                             <button 
                                 onClick={() => onGenerateFlyer(pet)} 
-                                className="flex-grow py-3 px-6 bg-brand-secondary text-brand-dark font-black rounded-full hover:bg-amber-500 shadow-md transition-transform hover:scale-105 flex items-center justify-center gap-2 text-base lg:text-lg"
+                                className="py-2.5 px-5 bg-brand-secondary text-brand-dark font-black rounded-full hover:bg-amber-500 shadow-md transition-transform hover:scale-105 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
                             >
-                                <PrinterIcon className="h-6 w-6" />
+                                <PrinterIcon className="h-5 w-5" />
                                 Crear Afiche
                             </button>
                         </Tooltip>
@@ -747,9 +747,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             <Tooltip text="Reportar publicación">
                                 <button 
                                     onClick={() => setIsReportModalOpen(true)} 
-                                    className="p-3 bg-white text-icon-gray rounded-full hover:bg-red-50 border border-card-border shadow-sm hover:text-status-lost transition-colors"
+                                    className="p-2.5 bg-white text-icon-gray rounded-full hover:bg-red-50 border border-card-border shadow-sm hover:text-status-lost transition-colors flex-shrink-0"
                                 >
-                                    <FlagIcon className="h-6 w-6" />
+                                    <FlagIcon className="h-5 w-5" />
                                 </button>
                             </Tooltip>
                         )}
@@ -846,12 +846,14 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     </div>
                 </div>
 
-                {pet.reward && (
+                {pet.reward !== undefined && pet.reward !== null && (
                     <div className="mt-3 sm:mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm">
                         <span className="text-2xl sm:text-3xl">💰</span>
                         <div>
                             <p className="text-[10px] sm:text-xs text-brand-secondary font-black uppercase tracking-wider">Recompensa</p>
-                            <p className="text-brand-dark font-black text-base sm:text-lg lg:text-xl">{pet.currency} {pet.reward}</p>
+                            <p className="text-brand-dark font-black text-base sm:text-lg lg:text-xl">
+                                {pet.reward > 0 ? `${pet.currency || 'S/'} ${pet.reward}` : 'Recompensa disponible'}
+                            </p>
                         </div>
                     </div>
                 )}
@@ -992,13 +994,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                             )}
                             <div className="flex gap-2 sm:gap-3">
                                 <Tooltip text="Editar publicación">
-                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                                        <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
+                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-sm">
+                                        <EditIcon className="h-5 w-5" /> Editar
                                     </button>
                                 </Tooltip>
                                 <Tooltip text="Eliminar publicación">
-                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                                        <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar
+                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-sm">
+                                        <TrashIcon className="h-5 w-5" /> Eliminar
                                     </button>
                                 </Tooltip>
                             </div>
@@ -1009,13 +1011,13 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     {isAdmin && !isOwner && (
                         <div className="flex gap-2 sm:gap-3 border-t border-card-border pt-2 sm:pt-3">
                             <Tooltip text="Editar publicación (Admin)">
-                                <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                                    <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar (Admin)
+                                <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-sm">
+                                    <EditIcon className="h-5 w-5" /> Editar (Admin)
                                 </button>
                             </Tooltip>
                             <Tooltip text="Eliminar publicación (Admin)">
-                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                                    <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar (Admin)
+                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-sm">
+                                    <TrashIcon className="h-5 w-5" /> Eliminar (Admin)
                                 </button>
                             </Tooltip>
                         </div>
@@ -1058,18 +1060,20 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         )
                     )}
 
-                    {/* Security Disclaimer before chat */}
-                    <SecurityDisclaimer 
-                        variant="compact" 
-                        type="warning"
-                        customMessage="Ten cuidado al interactuar con desconocidos. Verifica la identidad de las personas y realiza encuentros en lugares públicos. Puedes reportar contenido sospechoso."
-                        showReportInfo={true}
-                        showSupportLink={true}
-                    />
+                    {/* Security Disclaimer before chat - only show if pet is not reunited */}
+                    {pet.status !== PET_STATUS.REUNIDO && (
+                        <SecurityDisclaimer 
+                            variant="compact" 
+                            type="warning"
+                            customMessage="Ten cuidado al interactuar con desconocidos. Verifica la identidad de las personas y realiza encuentros en lugares públicos. Puedes reportar contenido sospechoso."
+                            showReportInfo={true}
+                            showSupportLink={true}
+                        />
+                    )}
                     
                     <Tooltip text="Enviar mensaje al dueño">
-                        <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg mt-4">
-                            <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
+                        <button onClick={() => onStartChat(pet)} className="w-full py-3 px-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-base mt-4">
+                            <ChatBubbleIcon className="h-5 w-5" /> Enviar Mensaje
                         </button>
                     </Tooltip>
                 </div>
