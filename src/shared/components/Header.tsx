@@ -9,6 +9,7 @@ import { NotificationDropdown } from '@/features/notifications';
 import { useGamification } from '@/hooks/useGamification';
 import { getLevelFromPoints } from '@/features/gamification';
 import { ChihuahuaIcon, PugIcon, BeagleIcon, BorderCollieIcon, GoldenIcon, GreatDaneIcon } from './BreedBadges';
+import { Tooltip } from './Tooltip';
 
 interface HeaderProps {
     onReportPet: (status: PetStatus) => void;
@@ -125,13 +126,15 @@ export const Header: React.FC<HeaderProps> = ({
                 
                 {/* LEFT: Logo & Home */}
                 <div className="flex items-center gap-1 sm:gap-2 md:gap-4 flex-1 min-w-0">
-                     <button 
-                         onClick={onToggleSidebar} 
-                         className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
-                         aria-label="Abrir menú de navegación"
-                     >
-                         <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                     </button>
+                     <Tooltip text="Menú de navegación">
+                         <button 
+                             onClick={onToggleSidebar} 
+                             className="lg:hidden text-gray-600 hover:text-brand-primary p-1 flex-shrink-0" 
+                             aria-label="Abrir menú de navegación"
+                         >
+                             <MenuIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                         </button>
+                     </Tooltip>
                      <div 
                         className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-black tracking-tighter cursor-pointer flex items-center gap-0.5 sm:gap-1 md:gap-2 text-brand-dark hover:opacity-80 transition-opacity mr-0.5 sm:mr-1 md:mr-2 lg:mr-4 flex-shrink-0" 
                         onClick={handleHomeClick}
@@ -161,13 +164,15 @@ export const Header: React.FC<HeaderProps> = ({
                 
                 {/* CENTER: Report Button (Primary Call to Action) */}
                 <div className="relative flex-shrink-0" ref={reportDropdownRef} data-tour="header-report-btn">
-                    <button
-                        onClick={() => setIsReportDropdownOpen(prev => !prev)}
-                        className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-[#FF4F4F] to-red-600 text-white font-bold py-1.5 px-2 sm:py-2 sm:px-4 md:py-3 md:px-8 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all transform text-[9px] sm:text-xs md:text-sm uppercase tracking-wider whitespace-nowrap"
-                    >
-                        <PlusIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                        <span>REPORTAR</span>
-                    </button>
+                    <Tooltip text="Reportar mascota perdida, encontrada o en adopción">
+                        <button
+                            onClick={() => setIsReportDropdownOpen(prev => !prev)}
+                            className="flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-[#FF4F4F] to-red-600 text-white font-bold py-1.5 px-2 sm:py-2 sm:px-4 md:py-3 md:px-8 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all transform text-[9px] sm:text-xs md:text-sm uppercase tracking-wider whitespace-nowrap"
+                        >
+                            <PlusIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                            <span>REPORTAR</span>
+                        </button>
+                    </Tooltip>
                     {isReportDropdownOpen && (
                         <div className="absolute left-1/2 transform -translate-x-1/2 mt-2 sm:mt-3 w-[calc(100vw-2rem)] max-w-[280px] sm:w-72 bg-white rounded-xl shadow-2xl py-2 z-50 ring-1 ring-black ring-opacity-5 animate-fade-in-up origin-top overflow-hidden">
                             <div className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider text-center">¿Qué deseas reportar?</div>
@@ -200,29 +205,33 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                     
                     {currentUser && (
-                        <button 
-                            onClick={() => navigate('/mensajes')} 
-                            className={`${navButtonClass} px-1 sm:px-2`} 
-                            aria-label="Mensajes"
-                            data-tour="header-messages-btn"
-                        >
-                            <ChatBubbleIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                            {hasUnreadMessages && (
-                                <span className="absolute top-0.5 right-0.5 sm:top-1.5 sm:right-1.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-red-500 ring-1 sm:ring-2 ring-white"></span>
-                            )}
-                        </button>
+                        <Tooltip text="Mensajes">
+                            <button 
+                                onClick={() => navigate('/mensajes')} 
+                                className={`${navButtonClass} px-1 sm:px-2`} 
+                                aria-label="Mensajes"
+                                data-tour="header-messages-btn"
+                            >
+                                <ChatBubbleIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                                {hasUnreadMessages && (
+                                    <span className="absolute top-0.5 right-0.5 sm:top-1.5 sm:right-1.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-red-500 ring-1 sm:ring-2 ring-white"></span>
+                                )}
+                            </button>
+                        </Tooltip>
                     )}
 
                     {currentUser && (
                         <div className="relative" ref={notificationsRef} data-tour="header-notifications-btn">
-                            <button onClick={handleToggleNotifications} className={`${navButtonClass} px-1 sm:px-2`} aria-label="Notificaciones">
-                                <BellIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                                {unreadNotificationsCount > 0 && (
-                                    <span className="absolute top-0 right-0 sm:top-1 sm:right-1 inline-flex items-center justify-center px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none text-white bg-red-500 rounded-full border-1 sm:border-2 border-white min-w-[0.875rem] sm:min-w-[1rem]">
-                                        {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
-                                    </span>
-                                )}
-                            </button>
+                            <Tooltip text="Notificaciones">
+                                <button onClick={handleToggleNotifications} className={`${navButtonClass} px-1 sm:px-2`} aria-label="Notificaciones">
+                                    <BellIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    {unreadNotificationsCount > 0 && (
+                                        <span className="absolute top-0 right-0 sm:top-1 sm:right-1 inline-flex items-center justify-center px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none text-white bg-red-500 rounded-full border-1 sm:border-2 border-white min-w-[0.875rem] sm:min-w-[1rem]">
+                                            {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </Tooltip>
                             {isNotificationsOpen && (
                                 <NotificationDropdown 
                                     notifications={notifications}
@@ -235,14 +244,16 @@ export const Header: React.FC<HeaderProps> = ({
 
                     {currentUser ? (
                         <div className="relative ml-1 sm:ml-2 flex-shrink-0" ref={accountDropdownRef} data-tour="header-account-btn">
-                            <button 
-                                onClick={() => setIsAccountDropdownOpen(prev => !prev)} 
-                                className="flex items-center gap-1 sm:gap-2 hover:bg-gray-100 p-0.5 sm:p-1 rounded-full transition-colors border border-transparent hover:border-gray-200"
-                                aria-label="Mi Cuenta"
-                            >
-                                <Avatar user={currentUser} size="sm" />
-                                <ChevronDownIcon className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 hidden sm:block" />
-                            </button>
+                            <Tooltip text="Mi cuenta">
+                                <button 
+                                    onClick={() => setIsAccountDropdownOpen(prev => !prev)} 
+                                    className="flex items-center gap-1 sm:gap-2 hover:bg-gray-100 p-0.5 sm:p-1 rounded-full transition-colors border border-transparent hover:border-gray-200"
+                                    aria-label="Mi Cuenta"
+                                >
+                                    <Avatar user={currentUser} size="sm" />
+                                    <ChevronDownIcon className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 hidden sm:block" />
+                                </button>
+                            </Tooltip>
                             {isAccountDropdownOpen && (
                                 <div className="absolute right-0 mt-2 sm:mt-3 w-[calc(100vw-2rem)] max-w-[240px] sm:w-64 bg-white rounded-xl shadow-2xl py-1 z-30 ring-1 ring-black ring-opacity-5 animate-fade-in border border-gray-100 overflow-hidden">
                                     <div className={`px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r ${level.gradient} text-white`}>

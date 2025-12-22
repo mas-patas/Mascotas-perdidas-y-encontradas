@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth';
 import { GoogleIcon, FacebookIcon, WarningIcon, EyeIcon, EyeOffIcon, InfoIcon, CheckCircleIcon, ChevronLeftIcon } from '@/shared/components/icons';
 import { Link } from 'react-router-dom';
+import { Tooltip } from '@/shared';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
@@ -210,14 +211,16 @@ const AuthPage: React.FC = () => {
                                         placeholder="••••••••"
                                         required
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                                    >
-                                        {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                                    </button>
+                                    <Tooltip text={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                        >
+                                            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                                        </button>
+                                    </Tooltip>
                                 </div>
                                 <div className="mt-2 text-right">
                                     <button 
@@ -291,14 +294,18 @@ const AuthPage: React.FC = () => {
                         </div>
 
                         <div className="space-y-3">
-                            <button onClick={handleSocialLogin} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
-                                {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <GoogleIcon />}
-                                <span className="font-medium text-gray-900">Google</span>
-                            </button>
-                            <button onClick={handleFacebookLogin} disabled={loading || !!lockoutTime || socialLoading} className={`${socialButtonClass} hidden`}>
-                                {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <FacebookIcon />}
-                                <span className="font-medium text-gray-900">Facebook</span>
-                            </button>
+                            <Tooltip text="Iniciar sesión con Google">
+                                <button onClick={handleSocialLogin} disabled={loading || !!lockoutTime || socialLoading} className={socialButtonClass}>
+                                    {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <GoogleIcon />}
+                                    <span className="font-medium text-gray-900">Google</span>
+                                </button>
+                            </Tooltip>
+                            <Tooltip text="Iniciar sesión con Facebook">
+                                <button onClick={handleFacebookLogin} disabled={loading || !!lockoutTime || socialLoading} className={`${socialButtonClass} hidden`}>
+                                    {socialLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-primary"></div> : <FacebookIcon />}
+                                    <span className="font-medium text-gray-900">Facebook</span>
+                                </button>
+                            </Tooltip>
                         </div>
 
                         <div className="mt-6 text-center">

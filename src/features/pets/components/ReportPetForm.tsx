@@ -7,7 +7,7 @@ import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '@/data/locations';
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon, CameraIcon, SearchIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
-import { SecurityDisclaimer } from '@/shared';
+import { SecurityDisclaimer, Tooltip } from '@/shared';
 
 interface ReportPetFormProps {
     onClose: () => void;
@@ -988,10 +988,14 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
                     />
 
                     <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0 -mx-6 -mb-6">
-                        <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
-                        <button type="submit" disabled={isUploading || isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
-                            {isSubmitting ? 'Publicando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
-                        </button>
+                        <Tooltip text="Cancelar y cerrar formulario">
+                            <button type="button" onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+                        </Tooltip>
+                        <Tooltip text={isEditMode ? "Guardar cambios en la publicación" : "Publicar reporte de mascota"}>
+                            <button type="submit" disabled={isUploading || isSubmitting} className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50">
+                                {isSubmitting ? 'Publicando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Publicar Reporte')}
+                            </button>
+                        </Tooltip>
                     </div>
                 </form>
             </div>

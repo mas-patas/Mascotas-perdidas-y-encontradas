@@ -6,7 +6,7 @@ import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment 
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { useAuth } from '@/contexts/auth';
-import { ConfirmationModal, InfoModal, SecurityDisclaimer } from '@/shared';
+import { ConfirmationModal, InfoModal, SecurityDisclaimer, Tooltip } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
@@ -678,16 +678,22 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         
                         {/* Mobile Actions - Compact buttons */}
                         <div className="flex gap-1.5 mt-3 pt-3 border-t border-card-border">
-                            <button onClick={() => setIsShareModalOpen(true)} className="flex-1 py-2 text-text-sub bg-brand-light rounded-lg text-[11px] sm:text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-1.5 border border-card-border">
-                                COMPARTIR
-                            </button>
-                            <button onClick={() => onGenerateFlyer(pet)} className="flex-1 py-2 text-brand-dark bg-brand-secondary rounded-lg text-[11px] sm:text-xs font-bold hover:bg-amber-500 transition-colors flex items-center justify-center gap-1.5 shadow-sm">
-                                <PrinterIcon className="h-3.5 w-3.5" /> Afiche
-                            </button>
-                            {!isOwner && (
-                                <button onClick={() => setIsReportModalOpen(true)} className="py-2 px-2.5 text-icon-gray hover:text-status-lost bg-white rounded-lg hover:bg-red-50 border border-card-border transition-colors">
-                                    <FlagIcon className="h-3.5 w-3.5" />
+                            <Tooltip text="Compartir publicación">
+                                <button onClick={() => setIsShareModalOpen(true)} className="flex-1 py-2 text-text-sub bg-brand-light rounded-lg text-[11px] sm:text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center justify-center gap-1.5 border border-card-border">
+                                    COMPARTIR
                                 </button>
+                            </Tooltip>
+                            <Tooltip text="Generar afiche para imprimir">
+                                <button onClick={() => onGenerateFlyer(pet)} className="flex-1 py-2 text-brand-dark bg-brand-secondary rounded-lg text-[11px] sm:text-xs font-bold hover:bg-amber-500 transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+                                    <PrinterIcon className="h-3.5 w-3.5" /> Afiche
+                                </button>
+                            </Tooltip>
+                            {!isOwner && (
+                                <Tooltip text="Reportar publicación">
+                                    <button onClick={() => setIsReportModalOpen(true)} className="py-2 px-2.5 text-icon-gray hover:text-status-lost bg-white rounded-lg hover:bg-red-50 border border-card-border transition-colors">
+                                        <FlagIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                </Tooltip>
                             )}
                         </div>
                     </div>
@@ -718,30 +724,34 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
 
                     {/* Row 4: Buttons (Horizontal) */}
                     <div className="flex items-center justify-center gap-3 w-full max-w-lg">
-                        <button 
-                            onClick={() => setIsShareModalOpen(true)} 
-                            className="px-4 py-3 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors font-bold text-sm"
-                            title="Compartir"
-                        >
-                            COMPARTIR
-                        </button>
+                        <Tooltip text="Compartir publicación">
+                            <button 
+                                onClick={() => setIsShareModalOpen(true)} 
+                                className="px-4 py-3 bg-white text-icon-gray rounded-full hover:bg-brand-light border border-card-border shadow-sm hover:text-brand-primary transition-colors font-bold text-sm"
+                            >
+                                COMPARTIR
+                            </button>
+                        </Tooltip>
                         
-                        <button 
-                            onClick={() => onGenerateFlyer(pet)} 
-                            className="flex-grow py-3 px-6 bg-brand-secondary text-brand-dark font-black rounded-full hover:bg-amber-500 shadow-md transition-transform hover:scale-105 flex items-center justify-center gap-2 text-base lg:text-lg"
-                        >
-                            <PrinterIcon className="h-6 w-6" />
-                            Crear Afiche
-                        </button>
+                        <Tooltip text="Generar afiche para imprimir">
+                            <button 
+                                onClick={() => onGenerateFlyer(pet)} 
+                                className="flex-grow py-3 px-6 bg-brand-secondary text-brand-dark font-black rounded-full hover:bg-amber-500 shadow-md transition-transform hover:scale-105 flex items-center justify-center gap-2 text-base lg:text-lg"
+                            >
+                                <PrinterIcon className="h-6 w-6" />
+                                Crear Afiche
+                            </button>
+                        </Tooltip>
                         
                         {!isOwner && (
-                            <button 
-                                onClick={() => setIsReportModalOpen(true)} 
-                                className="p-3 bg-white text-icon-gray rounded-full hover:bg-red-50 border border-card-border shadow-sm hover:text-status-lost transition-colors"
-                                title="Reportar"
-                            >
-                                <FlagIcon className="h-6 w-6" />
-                            </button>
+                            <Tooltip text="Reportar publicación">
+                                <button 
+                                    onClick={() => setIsReportModalOpen(true)} 
+                                    className="p-3 bg-white text-icon-gray rounded-full hover:bg-red-50 border border-card-border shadow-sm hover:text-status-lost transition-colors"
+                                >
+                                    <FlagIcon className="h-6 w-6" />
+                                </button>
+                            </Tooltip>
                         )}
                     </div>
                 </div>
@@ -981,12 +991,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 </button>
                             )}
                             <div className="flex gap-2 sm:gap-3">
-                                <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                                    <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
-                                </button>
-                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                                    <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar
-                                </button>
+                                <Tooltip text="Editar publicación">
+                                    <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
+                                        <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar
+                                    </button>
+                                </Tooltip>
+                                <Tooltip text="Eliminar publicación">
+                                    <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
+                                        <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar
+                                    </button>
+                                </Tooltip>
                             </div>
                         </>
                     )}
@@ -994,12 +1008,16 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                     {/* Admin actions - show if admin but not owner */}
                     {isAdmin && !isOwner && (
                         <div className="flex gap-2 sm:gap-3 border-t border-card-border pt-2 sm:pt-3">
-                            <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
-                                <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar (Admin)
-                            </button>
-                            <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
-                                <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar (Admin)
-                            </button>
+                            <Tooltip text="Editar publicación (Admin)">
+                                <button onClick={() => onEdit(pet)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-brand-light text-brand-primary font-bold rounded-lg hover:bg-blue-100 transition-colors border border-card-border btn-press text-xs sm:text-sm">
+                                    <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Editar (Admin)
+                                </button>
+                            </Tooltip>
+                            <Tooltip text="Eliminar publicación (Admin)">
+                                <button onClick={() => setIsDeleteModalOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 bg-red-50 text-status-lost font-bold rounded-lg hover:bg-red-100 transition-colors border border-red-200 btn-press text-xs sm:text-sm">
+                                    <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Eliminar (Admin)
+                                </button>
+                            </Tooltip>
                         </div>
                     )}
                 </div>
@@ -1049,9 +1067,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         showSupportLink={true}
                     />
                     
-                    <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg mt-4">
-                        <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
-                    </button>
+                    <Tooltip text="Enviar mensaje al dueño">
+                        <button onClick={() => onStartChat(pet)} className="w-full py-3 sm:py-4 bg-white border-2 border-brand-primary text-brand-primary font-bold rounded-lg hover:bg-brand-light transition-colors flex items-center justify-center gap-2 btn-press text-sm sm:text-base lg:text-lg mt-4">
+                            <ChatBubbleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> Enviar Mensaje
+                        </button>
+                    </Tooltip>
                 </div>
             )}
         </div>

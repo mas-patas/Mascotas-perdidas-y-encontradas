@@ -7,6 +7,7 @@ import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
 import { MegaphoneIcon, MapIcon, StoreIcon, HeartIcon, LightbulbIcon, FilterIcon, XCircleIcon, ChevronDownIcon, UsersIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/auth';
+import { Tooltip } from '@/shared';
 
 type Filters = {
     status: PetStatus | 'Todos';
@@ -199,28 +200,40 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     
                     <nav className="space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
                         {/* Removed Home button from Sidebar as requested */}
-                        <button onClick={() => { navigate('/reunidos'); onClose(); }} className={navLinkReunitedClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
-                            <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5 fill-current text-red-500 animate-pulse" /> 
-                            <span className="text-sm sm:text-base">
-                                Reencuentros
-                            </span>
-                        </button>
-                        <button onClick={() => { navigate('/nosotros'); onClose(); }} className={navLinkClass(location.pathname === '/nosotros')}>
-                            <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Nosotros</span>
-                        </button>
-                        <button onClick={() => { navigate('/mapa'); onClose(); }} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
-                            <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa de mascotas</span>
-                        </button>
-                        <button onClick={() => { navigate('/campanas'); onClose(); }} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
-                            <MegaphoneIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Campañas</span>
-                        </button>
-                        <button onClick={() => { navigate('/tips'); onClose(); }} className={navLinkClass(location.pathname === '/tips')}>
-                            <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Tips y Consejos</span>
-                        </button>
-                        {currentUser?.role === USER_ROLES.SUPERADMIN && (
-                            <button onClick={() => { navigate('/servicios'); onClose(); }} className={navLinkClass(location.pathname === '/servicios')}>
-                                <StoreIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Servicios</span>
+                        <Tooltip text="Ver mascotas reunidas">
+                            <button onClick={() => { navigate('/reunidos'); onClose(); }} className={navLinkReunitedClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
+                                <HeartIcon className="h-4 w-4 sm:h-5 sm:w-5 fill-current text-red-500 animate-pulse" /> 
+                                <span className="text-sm sm:text-base">
+                                    Reencuentros
+                                </span>
                             </button>
+                        </Tooltip>
+                        <Tooltip text="Conoce más sobre nosotros">
+                            <button onClick={() => { navigate('/nosotros'); onClose(); }} className={navLinkClass(location.pathname === '/nosotros')}>
+                                <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Nosotros</span>
+                            </button>
+                        </Tooltip>
+                        <Tooltip text="Ver mascotas en el mapa">
+                            <button onClick={() => { navigate('/mapa'); onClose(); }} className={navLinkClass(location.pathname === '/mapa')} data-tour="nav-map">
+                                <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Mapa de mascotas</span>
+                            </button>
+                        </Tooltip>
+                        <Tooltip text="Campañas de esterilización y adopción">
+                            <button onClick={() => { navigate('/campanas'); onClose(); }} className={navLinkClass(location.pathname === '/campanas')} data-tour="nav-campaigns">
+                                <MegaphoneIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Campañas</span>
+                            </button>
+                        </Tooltip>
+                        <Tooltip text="Consejos y tips útiles">
+                            <button onClick={() => { navigate('/tips'); onClose(); }} className={navLinkClass(location.pathname === '/tips')}>
+                                <LightbulbIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Tips y Consejos</span>
+                            </button>
+                        </Tooltip>
+                        {currentUser?.role === USER_ROLES.SUPERADMIN && (
+                            <Tooltip text="Servicios y negocios">
+                                <button onClick={() => { navigate('/servicios'); onClose(); }} className={navLinkClass(location.pathname === '/servicios')}>
+                                    <StoreIcon className="h-4 w-4 sm:h-5 sm:w-5" /> <span className="text-sm sm:text-base">Servicios</span>
+                                </button>
+                            </Tooltip>
                         )}
                     </nav>
                 </div>
@@ -233,12 +246,14 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                 <FilterIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-200" /> <span>Filtros</span>
                             </h3>
                             {activeFiltersCount > 0 && (
-                                <button 
-                                    onClick={onClearFilters}
-                                    className="text-[9px] sm:text-[10px] uppercase font-bold text-sky-200 hover:text-white transition-colors px-1 py-0.5"
-                                >
-                                    Limpiar
-                                </button>
+                                <Tooltip text="Limpiar todos los filtros">
+                                    <button 
+                                        onClick={onClearFilters}
+                                        className="text-[9px] sm:text-[10px] uppercase font-bold text-sky-200 hover:text-white transition-colors px-1 py-0.5"
+                                    >
+                                        Limpiar
+                                    </button>
+                                </Tooltip>
                             )}
                         </div>
                         
