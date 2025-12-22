@@ -4,6 +4,7 @@ import type { Pet } from '@/types';
 import { FacebookIcon, WhatsAppIcon, XCircleIcon, InstagramIcon, DownloadIcon, TikTokIcon } from './icons';
 import { PET_STATUS } from '@/constants';
 import { formatDate } from '@/utils/date.utils';
+import { toJpeg } from 'html-to-image';
 
 // Share Icon Component
 const ShareIcon: React.FC<{className?: string}> = ({ className }) => (
@@ -61,6 +62,7 @@ const formatDisplayDate = (dateString: string): string => {
 const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
     const [activeTab, setActiveTab] = useState<'visual' | 'link'>('visual');
     const [isGenerating, setIsGenerating] = useState(false);
+    const exportRef = React.useRef<HTMLDivElement>(null);
 
     if (!isOpen) return null;
 
@@ -82,41 +84,150 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
     const formattedDate = formatDisplayDate(pet.date);
 
     const handleDownloadImage = async () => {
+        const element = exportRef.current;
+        if (!element) {
+            alert('Error: No se pudo encontrar el elemento para exportar.');
+            return;
+        }
+
         setIsGenerating(true);
         try {
-            const elementId = 'social-story-template';
-            const element = document.getElementById(elementId);
-            const html2canvas = (window as any).html2canvas;
+            // Guardar estilos originales
+            const originalStyles = {
+                position: element.style.position,
+                left: element.style.left,
+                top: element.style.top,
+                visibility: element.style.visibility,
+                opacity: element.style.opacity,
+                zIndex: element.style.zIndex,
+                display: element.style.display
+            };
 
-            if (!element || !html2canvas) {
-                alert('Error: No se pudo iniciar el generador de imágenes.');
-                return;
-            }
+            // Mover el elemento a una posición visible para html-to-image
+            // Usar z-index muy bajo para que quede detrás de todo
+            element.style.position = 'fixed';
+            element.style.left = '0px';
+            element.style.top = '0px';
+            element.style.visibility = 'visible';
+            element.style.opacity = '1';
+            element.style.zIndex = '-9999';
+            element.style.display = 'flex';
+            element.style.pointerEvents = 'none';
+            element.style.width = '1080px';
+            element.style.height = '1920px';
 
-            // Wait for DOM to paint and images to load
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // Forzar un reflow para asegurar que el navegador renderice el elemento
+            void element.offsetHeight;
 
-            const canvas = await html2canvas(element, {
-                scale: 2, // High Res
-                useCORS: true,
-                allowTaint: true,
-                logging: false,
-                backgroundColor: '#000000',
-                onclone: (clonedDoc: Document) => {
-                    const el = clonedDoc.getElementById(elementId);
-                    if (el) {
-                        el.style.display = 'flex'; 
-                        el.style.left = '0px';
-                        el.style.top = '0px';
-                    }
+            // Esperar a que todas las imágenes se carguen completamente
+            const images = element.querySelectorAll('img');
+            const imagePromises = Array.from(images).map((img: HTMLImageElement) => {
+                if (img.complete && img.naturalHeight !== 0) {
+                    return Promise.resolve();
                 }
+                return new Promise<void>((resolve) => {
+                    const timeout = setTimeout(() => resolve(), 3000); // Timeout de 3 segundos
+                    img.onload = () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        clearTimeout(timeout);
+                        resolve(); // Continuar incluso si hay error
+                    };
+                });
             });
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `MAS_PATAS_STORY_${pet.name ? pet.name.toUpperCase() : 'MASCOTA'}.jpg`;
-            link.click();
+            await Promise.all(imagePromises);
+            
+            // Delay adicional para asegurar que el DOM se actualice completamente
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Silenciar temporalmente los errores de consola relacionados con CSS cross-origin
+            // Estos errores son normales cuando html-to-image intenta leer estilos de CDNs externos
+            // (Google Fonts, Tailwind CDN, Leaflet, etc.) y el navegador bloquea el acceso por CORS
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            const errorFilter = (...args: any[]) => {
+                const message = args[0]?.toString() || '';
+                // Filtrar errores de CSS cross-origin que son normales y no afectan la funcionalidad
+                if (message.includes('cssRules') || 
+                    message.includes('CSSStyleSheet') || 
+                    message.includes('SecurityError') ||
+                    message.includes('Error inlining remote css') ||
+                    message.includes('Error while reading CSS rules') ||
+                    message.includes('Manifest:')) {
+                    return; // No mostrar estos errores - son esperados y no afectan la generación
+                }
+                originalError.apply(console, args);
+            };
+            console.error = errorFilter;
+            console.warn = errorFilter;
+
+            try {
+                // Crear un overlay temporal para ocultar el elemento durante la captura
+                const overlay = document.createElement('div');
+                overlay.id = 'image-generation-overlay';
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    z-index: 9998;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(overlay);
+
+                try {
+                    // Convertir a JPEG con alta calidad
+                    const dataUrl = await toJpeg(element, {
+                        quality: 0.95,
+                        backgroundColor: '#000000',
+                        pixelRatio: 2,
+                        useCORS: true,
+                        allowTaint: false,
+                        cacheBust: true,
+                        imagePlaceholder: undefined,
+                        filter: (node) => {
+                            // Ignorar el overlay y otros elementos no deseados
+                            if (node instanceof HTMLElement) {
+                                return node.id !== 'image-generation-overlay';
+                            }
+                            return true;
+                        }
+                    });
+
+                    // Crear y descargar el archivo
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `MAS_PATAS_STORY_${pet.name ? pet.name.toUpperCase() : 'MASCOTA'}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } finally {
+                    // Remover el overlay
+                    const overlayElement = document.getElementById('image-generation-overlay');
+                    if (overlayElement && overlayElement.parentNode) {
+                        document.body.removeChild(overlayElement);
+                    }
+                }
+            } finally {
+                // Restaurar console.error y console.warn
+                console.error = originalError;
+                console.warn = originalWarn;
+            }
+
+            // Restaurar estilos originales
+            element.style.position = originalStyles.position || '';
+            element.style.left = originalStyles.left || '';
+            element.style.top = originalStyles.top || '';
+            element.style.visibility = originalStyles.visibility || '';
+            element.style.opacity = originalStyles.opacity || '';
+            element.style.zIndex = originalStyles.zIndex || '';
+            element.style.display = originalStyles.display || '';
+            element.style.pointerEvents = '';
 
         } catch (error) {
             console.error("Error generating share image:", error);
@@ -244,8 +355,27 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
 
                                             {/* Content */}
                                             <div className="relative z-10 h-full flex flex-col text-white text-center" style={{ padding: '12px 10px', boxSizing: 'border-box' }}>
+                                                {/* Top Header - Logo */}
+                                                <div style={{ position: 'absolute', top: '8px', left: '8px', zIndex: 20 }}>
+                                                    {/* Logo */}
+                                                    <img 
+                                                        src="/assets/images/logo.png" 
+                                                        alt="Más Patas Logo" 
+                                                        style={{ 
+                                                            height: '60px',
+                                                            width: 'auto',
+                                                            maxWidth: '160px',
+                                                            objectFit: 'contain',
+                                                            filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))'
+                                                        }}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                        }}
+                                                    />
+                                                </div>
+                                                
                                                 {/* Top Badge */}
-                                                <div className="flex justify-center" style={{ marginBottom: '8px', flexShrink: 0 }}>
+                                                <div className="flex justify-center" style={{ marginTop: '70px', marginBottom: '8px', flexShrink: 0 }}>
                                                     <div 
                                                         className="uppercase"
                                                         style={{ 
@@ -304,16 +434,17 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
 
                                                     {/* Footer Call to Action */}
                                                     <div 
-                                                        className="flex items-center justify-between text-gray-800"
+                                                        className="flex flex-col items-center text-gray-800"
                                                         style={{ 
                                                             backgroundColor: 'white', 
                                                             borderRadius: '6px', 
                                                             padding: '6px 8px', 
                                                             boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                                                            flexShrink: 0
+                                                            flexShrink: 0,
+                                                            gap: '4px'
                                                         }}
                                                     >
-                                                        <div className="text-left flex-1" style={{ paddingRight: '4px' }}>
+                                                        <div className="text-center">
                                                             <p 
                                                                 className="uppercase font-black"
                                                                 style={{ 
@@ -330,13 +461,13 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                                                             <p className="font-bold" style={{ fontSize: '7px', color: '#374151', marginBottom: '1px', lineHeight: '1.2', fontWeight: '700' }}>
                                                                 Si tienes información contáctame
                                                             </p>
-                                                            <p className="font-bold" style={{ fontSize: '6px', color: '#4b5563', fontWeight: '700' }}>
-                                                                o ingresa a www.maspatas.com
-                                                            </p>
                                                         </div>
-                                                        <div className="text-center flex-shrink-0" style={{ marginLeft: '4px' }}>
-                                                            <img src={qrCodeUrl} className="rounded-lg bg-white" alt="QR" style={{ width: '30px', height: '30px', borderRadius: '3px', padding: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
-                                                            <p className="font-bold" style={{ fontSize: '5px', fontWeight: 'bold', marginTop: '2px', color: '#1f2937', letterSpacing: '0.05em' }}>ESCANEAR QR</p>
+                                                        <p className="font-bold" style={{ fontSize: '7px', color: '#1f2937', fontWeight: '700' }}>
+                                                            www.maspatas.com
+                                                        </p>
+                                                        <div className="text-center flex-shrink-0">
+                                                            <img src={qrCodeUrl} className="rounded-lg bg-white" alt="QR" style={{ width: '50px', height: '50px', borderRadius: '3px', padding: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                                                            <p className="font-bold" style={{ fontSize: '5px', fontWeight: 'bold', marginTop: '2px', color: '#1f2937', letterSpacing: '0.05em' }}>ESCANEA EL CODIGO QR PARA MAS INFORMACIÓN</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -434,6 +565,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
             {/* STORY TEMPLATE (1080x1920) */}
             <div 
                 id="social-story-template" 
+                ref={exportRef}
                 style={{ 
                     width: '1080px', 
                     height: '1920px', 
@@ -470,16 +602,16 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                 {/* Content */}
                 <div style={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column', padding: '40px 35px 50px 35px', color: 'white', textAlign: 'center', boxSizing: 'border-box', overflow: 'hidden' }}>
                     
-                    {/* Top Header - Logo and Website */}
-                    <div style={{ position: 'absolute', top: '30px', left: '35px', right: '35px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 20 }}>
+                    {/* Top Header - Logo */}
+                    <div style={{ position: 'absolute', top: '30px', left: '35px', zIndex: 20 }}>
                         {/* Logo */}
                         <img 
                             src="/assets/images/logo.png" 
                             alt="Más Patas Logo" 
                             style={{ 
-                                height: '150px',
+                                height: '300px',
                                 width: 'auto',
-                                maxWidth: '350px',
+                                maxWidth: '700px',
                                 objectFit: 'contain',
                                 filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))'
                             }}
@@ -487,20 +619,10 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
                             }}
                         />
-                        {/* Website */}
-                        <p style={{ 
-                            fontSize: '32px', 
-                            fontWeight: '900', 
-                            color: 'white', 
-                            textShadow: '0 2px 8px rgba(0,0,0,0.7)',
-                            letterSpacing: '0.05em'
-                        }}>
-                            www.maspatas.com
-                        </p>
                     </div>
                     
                     {/* Top Badge - SE BUSCA / PERDIDO */}
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '120px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '240px', marginBottom: '20px' }}>
                         <div style={{ 
                             color: statusColor, 
                             fontSize: '90px', 
@@ -558,29 +680,29 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                             borderRadius: '30px', 
                             padding: '25px 35px', 
                             display: 'flex', 
+                            flexDirection: 'column',
                             alignItems: 'center', 
                             justifyContent: 'center',
-                            gap: '25px',
+                            gap: '15px',
                             color: '#1f2937',
                             boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
                             marginBottom: '0'
                         }}>
-                            <div style={{ textAlign: 'center', flex: 1, maxWidth: '550px' }}>
+                            <div style={{ textAlign: 'center' }}>
                                 <p style={{ fontSize: '32px', fontWeight: '900', color: statusColor, textTransform: 'uppercase', marginBottom: '8px', lineHeight: '1.2', letterSpacing: '0.05em' }}>
                                     Ayúdame a volver
                                 </p>
                                 <p style={{ fontSize: '26px', color: '#374151', marginBottom: '5px', lineHeight: '1.4', fontWeight: '700' }}>
                                     Si tienes información contáctame
                                 </p>
-                                <p style={{ fontSize: '22px', color: '#4b5563', fontWeight: '700' }}>
-                                    o ingresa a www.maspatas.com
-                                </p>
                             </div>
+                            <p style={{ fontSize: '24px', color: '#1f2937', fontWeight: '700' }}>
+                                www.maspatas.com
+                            </p>
                             <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                                <img src={qrCodeUrl} style={{ width: '140px', height: '140px', borderRadius: '15px', backgroundColor: 'white', padding: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }} alt="QR" crossOrigin="anonymous" />
-                                <p style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '6px', color: '#1f2937', letterSpacing: '0.05em' }}>ESCANEAR QR</p>
+                                <img src={qrCodeUrl} style={{ width: '200px', height: '200px', borderRadius: '15px', backgroundColor: 'white', padding: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }} alt="QR" crossOrigin="anonymous" />
+                                <p style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '6px', color: '#1f2937', letterSpacing: '0.05em' }}>ESCANEA EL CODIGO QR PARA MAS INFORMACIÓN</p>
                             </div>
-                            <img src={qrCodeUrl} style={{ width: '140px', height: '140px', borderRadius: '10px', mixBlendMode: 'multiply' }} alt="QR" crossOrigin="anonymous" />
                         </div>
                     </div>
                 </div>
@@ -614,7 +736,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
 
                 {/* Image Area */}
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                    <img src={pet.imageUrls[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="post-img" crossOrigin="anonymous" />
+                    <img src={pet.imageUrls[0]} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="post-img" crossOrigin="anonymous" />
                     
                     {/* Reward Badge if exists */}
                     {pet.reward && pet.reward > 0 && (
