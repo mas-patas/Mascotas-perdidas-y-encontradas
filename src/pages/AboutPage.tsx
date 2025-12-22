@@ -60,7 +60,7 @@ const AboutPage: React.FC = () => {
                             {/* Slogan Updated Typography to match Heading (Extrabold, Sans, Tight) */}
                             <FadeInWhenVisible>
                                 <p className="text-xl md:text-3xl font-extrabold tracking-tight uppercase mb-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                                    "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERIAN IRSE"
+                                    "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERÍAN IRSE"
                                 </p>
                             </FadeInWhenVisible>
                             
@@ -132,7 +132,7 @@ const AboutPage: React.FC = () => {
                                     Más que una App, <br/>somos esperanza.
                                 </h2>
                                 <p className="text-lg text-text-sub leading-relaxed">
-                                    En <strong>Mas Patas</strong>, entendemos que una mascota no es solo un animal, es un miembro amado de la familia. La angustia de perder a un compañero es abrumadora, y las herramientas tradicionales ya no son suficientes.
+                                    En <strong>Más Patas</strong>, entendemos que una mascota no es solo un animal, es un miembro amado de la familia. La angustia de perder a un compañero es abrumadora, y las herramientas tradicionales ya no son suficientes.
                                 </p>
                                 <p className="text-lg text-text-sub leading-relaxed">
                                     Nacimos en Perú con una misión clara: <strong>centralizar, agilizar y potenciar</strong> la búsqueda de mascotas perdidas utilizando Inteligencia Artificial y geolocalización.

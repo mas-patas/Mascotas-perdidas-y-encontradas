@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
                      >
                         <img 
                             src="/assets/images/logo.png" 
-                            alt="Mas Patas Logo" 
+                            alt="Más Patas Logo" 
                             className="object-contain flex-shrink-0"
                             style={{ 
                                 height: '85%',
@@ -151,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 (e.target as HTMLImageElement).style.display = 'none';
                             }}
                         />
-                        <span className="hidden sm:inline whitespace-nowrap">MAS PATAS</span><span className="hidden sm:inline text-[#FF4F4F]">.</span>
+                        <span className="hidden sm:inline whitespace-nowrap">MÁS PATAS</span><span className="hidden sm:inline text-[#FF4F4F]">.</span>
                     </div>
                     
                     <button onClick={handleHomeClick} className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-brand-primary font-bold text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-full hover:bg-gray-100 transition-colors">

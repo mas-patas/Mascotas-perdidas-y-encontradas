@@ -1,4 +1,4 @@
-# Logo de Mas Patas
+# Logo de Más Patas
 
 ## Ubicación del archivo
 Coloca el archivo del logo en esta carpeta con el nombre: `logo.png`
@@ -15,4 +15,4 @@ Coloca el archivo del logo en esta carpeta con el nombre: `logo.png`
 ## Notas
 - El logo se mostrará automáticamente en el navbar
 - En dispositivos móviles solo se mostrará el logo (sin texto)
-- En desktop se mostrará el logo junto al texto "MAS PATAS"
+- En desktop se mostrará el logo junto al texto "MÁS PATAS"

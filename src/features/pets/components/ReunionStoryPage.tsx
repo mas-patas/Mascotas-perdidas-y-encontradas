@@ -38,7 +38,7 @@ const ReunionStoryPage: React.FC = () => {
     return (
         <div className="bg-brand-light min-h-screen pb-20">
             <Helmet>
-                <title>{pet.name} - Historia de Reencuentro | Mas Patas</title>
+                <title>{pet.name} - Historia de Reencuentro | Más Patas</title>
                 <meta name="description" content={`Historia completa del reencuentro de ${pet.name}`} />
             </Helmet>
 

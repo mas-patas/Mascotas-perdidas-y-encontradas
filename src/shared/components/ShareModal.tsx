@@ -155,7 +155,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
 
     const copyCaption = () => {
         const petNameText = pet.name ? `${pet.name} está ` : 'Una mascota está ';
-        const text = `🚨 ¡AYUDA! ${petNameText}${pet.status.toLowerCase()} 🚨\n\n📍 Ubicación: ${locationDisplay}\n📅 Fecha: ${formattedDate}\n\nAyúdame a volver, si tienes información contáctame o ingresa a www.maspatas.com\n\n#MascotasPerdidas #Ayuda${pet.animalType} #${pet.status.replace(/\s/g, '')} #MasPatas`;
+        const text = `🚨 ¡AYUDA! ${petNameText}${pet.status.toLowerCase()} 🚨\n\n📍 Ubicación: ${locationDisplay}\n📅 Fecha: ${formattedDate}\n\nAyúdame a volver, si tienes información contáctame o ingresa a www.maspatas.com\n\n#MascotasPerdidas #Ayuda${pet.animalType} #${pet.status.replace(/\s/g, '')} #MásPatas`;
         navigator.clipboard.writeText(text);
         alert('Texto copiado. Listo para pegar en redes sociales.');
     };
@@ -475,7 +475,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ pet, isOpen, onClose }) => {
                         {/* Logo */}
                         <img 
                             src="/assets/images/logo.png" 
-                            alt="Mas Patas Logo" 
+                            alt="Más Patas Logo" 
                             style={{ 
                                 height: '150px',
                                 width: 'auto',

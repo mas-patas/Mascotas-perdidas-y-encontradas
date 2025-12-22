@@ -24,7 +24,7 @@ const PrivacyPage: React.FC = () => {
                         <section>
                             <h2 className="text-xl font-bold text-gray-900">1. Información que Recopilamos</h2>
                             <p>
-                                En Mas Patas (Mascotas Perdidas y Encontradas), recopilamos la siguiente información para proporcionar nuestros servicios:
+                                En Más Patas (Mascotas Perdidas y Encontradas), recopilamos la siguiente información para proporcionar nuestros servicios:
                             </p>
                             <ul className="list-disc pl-5 mt-2 space-y-2">
                                 <li><strong>Información de cuenta:</strong> Nombre, email, número de teléfono (opcional), y foto de perfil.</li>

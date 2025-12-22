@@ -122,7 +122,7 @@ export const useNotificationsRealtime = (userId: string | undefined) => {
               link = '#/mensajes';
             }
             
-            sendSystemNotification('Mas Patas: Nueva Notificación', payload.new.message, link);
+            sendSystemNotification('Más Patas: Nueva Notificación', payload.new.message, link);
           }
         }
       )

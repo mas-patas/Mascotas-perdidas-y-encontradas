@@ -1051,7 +1051,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
     return (
         <div className="max-w-5xl mx-auto pb-6 sm:pb-10 px-3 sm:px-4 md:px-6">
             <Helmet>
-                <title>{displayName} - {pet.status} | Mas Patas</title>
+                <title>{displayName} - {pet.status} | Más Patas</title>
                 <meta name="description" content={`${pet.status}: ${pet.animalType} ${pet.breed} en ${pet.location}.`} />
             </Helmet>
 

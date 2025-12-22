@@ -24,14 +24,14 @@ const TermsPage: React.FC = () => {
                         <section>
                             <h2 className="text-xl font-bold text-gray-900">1. Aceptación de los Términos</h2>
                             <p>
-                                Al acceder y utilizar la plataforma "Mas Patas" (Mascotas Perdidas y Encontradas), aceptas cumplir con los siguientes términos y condiciones. Si no estás de acuerdo con alguna parte de estos términos, te recomendamos no utilizar nuestros servicios.
+                                Al acceder y utilizar la plataforma "Más Patas" (Mascotas Perdidas y Encontradas), aceptas cumplir con los siguientes términos y condiciones. Si no estás de acuerdo con alguna parte de estos términos, te recomendamos no utilizar nuestros servicios.
                             </p>
                         </section>
 
                         <section>
                             <h2 className="text-xl font-bold text-gray-900">2. Propósito de la Plataforma</h2>
                             <p>
-                                Mas Patas es una herramienta comunitaria diseñada para facilitar el reencuentro de mascotas perdidas con sus dueños, promover la adopción responsable y difundir campañas de bienestar animal. No somos una agencia de seguridad, ni garantizamos la recuperación de ninguna mascota.
+                                Más Patas es una herramienta comunitaria diseñada para facilitar el reencuentro de mascotas perdidas con sus dueños, promover la adopción responsable y difundir campañas de bienestar animal. No somos una agencia de seguridad, ni garantizamos la recuperación de ninguna mascota.
                             </p>
                         </section>
 
@@ -60,7 +60,7 @@ const TermsPage: React.FC = () => {
                         <section>
                             <h2 className="text-xl font-bold text-gray-900">5. Limitación de Responsabilidad</h2>
                             <p>
-                                Mas Patas actúa como intermediario tecnológico. No nos hacemos responsables por:
+                                Más Patas actúa como intermediario tecnológico. No nos hacemos responsables por:
                             </p>
                             <ul className="list-disc pl-5 mt-2 space-y-2">
                                 <li>La veracidad de la información publicada por otros usuarios.</li>
