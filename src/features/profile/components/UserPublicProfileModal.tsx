@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/services/supabaseClient';
 import type { User, UserRating } from '@/types';
 import { XCircleIcon, TrashIcon, UserIcon, WarningIcon, AdminIcon } from '@/shared/components/icons';
-import { StarRating } from '@/shared';
+import { StarRating, VerifiedBadge } from '@/shared';
 import { useAuth } from '@/contexts/auth';
 import { USER_ROLES } from '@/constants';
 import { generateUUID } from '@/utils/uuid';
@@ -182,8 +182,9 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                         </div>
                         
                         {/* User Info - Dark Text for Contrast */}
-                        <div>
+                        <div className="flex items-center justify-center gap-2">
                             <h2 className="text-2xl font-black text-purple-900">@{targetUser.username || 'Usuario'}</h2>
+                            <VerifiedBadge user={targetUser} size="md" />
                         </div>
 
                         {/* Badge Section - In between Name and Score */}
@@ -280,7 +281,14 @@ const UserPublicProfileModal: React.FC<UserPublicProfileModalProps> = ({ isOpen,
                                                 )}
                                             </div>
                                             <div>
-                                                <span className="font-semibold text-sm text-gray-800 block leading-none">@{rating.raterName}</span>
+                                                <span className="font-semibold text-sm text-gray-800 block leading-none flex items-center gap-1">
+                                                    @{rating.raterName}
+                                                    <VerifiedBadge user={(() => {
+                                                        // We need to find the user by raterId, but we don't have access to users array here
+                                                        // For now, we'll check if the rater is the targetUser (which would be admin)
+                                                        return targetUser.id === rating.raterId ? targetUser : null;
+                                                    })()} size="sm" />
+                                                </span>
                                                 <span className="text-[10px] text-gray-400">{new Date(rating.createdAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>

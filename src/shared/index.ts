@@ -23,4 +23,5 @@ export { BannerCarousel } from './components/BannerCarousel';
 export { SecurityDisclaimer } from './components/SecurityDisclaimer';
 export type { DisclaimerVariant, DisclaimerType } from './components/SecurityDisclaimer';
 export { Tooltip } from './components/Tooltip';
+export { VerifiedBadge, isVerifiedUser } from './components/VerifiedBadge';
 export * from './components/icons';

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { User } from '@/types';
+import { VerifiedBadge } from '@/shared';
 
 interface ContactRequestersModalProps {
     isOpen: boolean;
@@ -52,7 +53,7 @@ const ContactRequestersModal: React.FC<ContactRequestersModalProps> = ({ isOpen,
                                         )}
                                     </div>
                                     <button onClick={() => handleViewProfile(user)} className="text-left w-full p-2 bg-gray-50 rounded-md border hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                                        <p className="font-semibold text-brand-primary">@{user.username || 'N/A'}</p>
+                                        <p className="font-semibold text-brand-primary flex items-center gap-1">@{user.username || 'N/A'} <VerifiedBadge user={user} size="sm" /></p>
                                         <p className="text-sm text-gray-600">{user.firstName} {user.lastName}</p>
                                         <p className="text-xs text-gray-400">{user.email}</p>
                                     </button>

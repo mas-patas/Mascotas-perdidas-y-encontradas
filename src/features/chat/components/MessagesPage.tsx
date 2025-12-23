@@ -2,6 +2,7 @@
 import React from 'react';
 import type { ChatRow, PetRow, User, MessageRow } from '@/types';
 import { formatTime } from '@/utils/formatters';
+import { VerifiedBadge } from '@/shared';
 
 interface MessagesPageProps {
     chats: (ChatRow & { isUnread: boolean })[];
@@ -78,8 +79,9 @@ const MessagesPage: React.FC<MessagesPageProps> = ({ chats, pets, users, current
                                                 <p className="text-xs text-gray-400 whitespace-nowrap ml-2">{formatTime(lastMessage.created_at)}</p>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-1 font-medium">
+                                        <p className="text-xs text-gray-500 mb-1 font-medium flex items-center gap-1">
                                             {otherUser ? `@${displayName}` : (otherUserEmail ? `@${otherUserEmail.split('@')[0]}` : '@Usuario')}
+                                            <VerifiedBadge user={otherUser} size="sm" />
                                         </p>
                                         {lastMessage ? (
                                             <p className={`text-sm truncate ${chat.isUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>

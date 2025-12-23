@@ -7,7 +7,7 @@ import { formatTime } from '@/utils/formatters';
 import { useAppData } from '@/hooks/useAppData';
 import { usePets } from '@/hooks/usePets';
 import { useChat } from '@/api/chats/chats.query';
-import { SecurityDisclaimer } from '@/shared';
+import { SecurityDisclaimer, VerifiedBadge } from '@/shared';
 
 interface ChatPageProps {
     chat?: ChatRow; // Optional, we'll find it if missing
@@ -204,7 +204,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chat: propChat, pet: propPet
                                 )}
                                 <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${isCurrentUser ? 'bg-brand-primary text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'}`}>
                                     {!isCurrentUser && (
-                                        <p className="text-xs font-semibold text-gray-600 mb-1">@{senderName}</p>
+                                        <p className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
+                                            @{senderName}
+                                            <VerifiedBadge user={messageSender} size="sm" />
+                                        </p>
                                     )}
                                     <p className="text-sm">{message.text}</p>
                                     <p className={`text-[10px] mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-gray-400'} text-right`}>

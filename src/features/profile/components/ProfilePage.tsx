@@ -11,7 +11,7 @@ import { OwnedPetDetailModal } from '@/shared';
 import { ConfirmationModal } from '@/shared';
 import { uploadImage } from '@/utils/imageUtils';
 import { mapPetFromDb } from '@/utils/mappers';
-import { StarRating } from '@/shared';
+import { StarRating, VerifiedBadge } from '@/shared';
 import { useDeleteSavedSearch, useBusinessByOwner, useUpdateUserLocation } from '@/api';
 import { GamificationBadge } from '@/features/gamification';
 import { GamificationDashboard } from '@/features/gamification';
@@ -584,7 +584,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                 </div>
                                 <div className="text-center md:text-left space-y-2 sm:space-y-3 text-text-sub w-full flex flex-col items-center md:items-start">
                                     <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Nombre Completo:</span> {user.firstName} {user.lastName}</p>
-                                    <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Usuario:</span> @{user.username}</p>
+                                    <p className="w-full text-sm sm:text-base flex items-center gap-1.5"><span className="font-semibold text-text-main">Usuario:</span> <span className="flex items-center gap-1">@{user.username} <VerifiedBadge user={user} size="sm" /></span></p>
                                     <p className="w-full text-sm sm:text-base break-all"><span className="font-semibold text-text-main">Email:</span> {user.email}</p>
                                     {user.dni && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">DNI:</span> {user.dni}</p>}
                                     {user.phone && <p className="w-full text-sm sm:text-base"><span className="font-semibold text-text-main">Teléfono:</span> {user.phone}</p>}
@@ -829,7 +829,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
                                             {rating.raterAvatar ? <img src={rating.raterAvatar} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0" /> : <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-200 rounded-full flex items-center justify-center text-icon-gray font-bold text-[10px] sm:text-xs flex-shrink-0">{rating.raterName.charAt(0).toUpperCase()}</div>}
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs sm:text-sm font-bold text-text-main truncate">@{rating.raterName}</p>
+                                                <p className="text-xs sm:text-sm font-bold text-text-main truncate flex items-center gap-1">
+                                                    @{rating.raterName || 'Usuario'}
+                                                    {(() => {
+                                                        const raterUser = users.find(u => u.id === rating.raterId);
+                                                        return <VerifiedBadge user={raterUser} size="sm" />;
+                                                    })()}
+                                                </p>
                                                 <p className="text-[10px] sm:text-xs text-icon-gray">{new Date(rating.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>

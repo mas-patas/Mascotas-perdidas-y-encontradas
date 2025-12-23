@@ -6,7 +6,7 @@ import type { Pet, User, PetStatus, UserRole, ReportType, ReportReason, Comment 
 import { CalendarIcon, LocationMarkerIcon, PhoneIcon, ChevronLeftIcon, ChevronRightIcon, TagIcon, ChatBubbleIcon, EditIcon, TrashIcon, PrinterIcon, FlagIcon, GoogleMapsIcon, WazeIcon, SendIcon, XCircleIcon, HeartIcon, VerticalDotsIcon, SparklesIcon, LockIcon, WarningIcon } from '@/shared/components/icons';
 import { PET_STATUS, USER_ROLES } from '@/constants';
 import { useAuth } from '@/contexts/auth';
-import { ConfirmationModal, InfoModal, SecurityDisclaimer, Tooltip } from '@/shared';
+import { ConfirmationModal, InfoModal, SecurityDisclaimer, Tooltip, VerifiedBadge } from '@/shared';
 import { ReportModal } from '@/features/reports';
 import { formatTime } from '@/utils/formatters';
 import { UserPublicProfileModal } from '@/features/profile';
@@ -46,7 +46,8 @@ const CommentItem: React.FC<{
     depth?: number;
     postOwnerEmail?: string;
     onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
-}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail, onShowInfo }) => {
+    users?: User[];
+}> = ({ comment, allComments, onReply, onLike, onReportComment, onDeleteComment, currentUser, depth = 0, postOwnerEmail, onShowInfo, users = [] }) => {
     const replies = allComments.filter(c => c.parentId === comment.id).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
     const isLiked = currentUser && comment.likes?.includes(currentUser.id || '');
@@ -91,7 +92,13 @@ const CommentItem: React.FC<{
             <div className="flex-1 min-w-0 group relative">
                 <div className="bg-gray-50 p-3 rounded-2xl shadow-sm border border-gray-200 pr-8 relative">
                     <div className="flex justify-between items-baseline mb-1">
-                        <span className="font-bold text-sm text-brand-dark">@{comment.userName}</span>
+                        <span className="font-bold text-sm text-brand-dark flex items-center gap-1">
+                            @{comment.userName}
+                            {(() => {
+                                const commentUser = users.find(u => (u.id === comment.userId) || (u.email === comment.userEmail));
+                                return <VerifiedBadge user={commentUser} size="sm" />;
+                            })()}
+                        </span>
                         <span className="text-xs text-gray-500 font-medium">{dateStr} {timeStr}</span>
                     </div>
                     <p className="text-sm text-gray-800 break-words font-medium">{comment.text}</p>
@@ -159,6 +166,7 @@ const CommentItem: React.FC<{
                         depth={depth + 1}
                         postOwnerEmail={postOwnerEmail}
                         onShowInfo={onShowInfo}
+                        users={users}
                     />
                 ))}
             </div>
@@ -176,7 +184,8 @@ const CommentListAndInput: React.FC<{
     onDeleteComment?: (commentId: string) => void,
     currentUser: User | null;
     onShowInfo?: (message: string, type?: 'success' | 'error' | 'info') => void;
-}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser, onShowInfo }) => {
+    users?: User[];
+}> = ({ petId, postOwnerEmail, comments, onAddComment, onLikeComment, onReportComment, onDeleteComment, currentUser, onShowInfo, users = [] }) => {
     const [newComment, setNewComment] = useState('');
     const [replyTo, setReplyTo] = useState<{ id: string, userName: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -227,6 +236,7 @@ const CommentListAndInput: React.FC<{
                             currentUser={currentUser}
                             postOwnerEmail={postOwnerEmail}
                             onShowInfo={onShowInfo}
+                            users={users}
                         />
                     ))
                 ) : (
@@ -915,6 +925,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                                 currentUser={currentUser}
                                 postOwnerEmail={pet.userEmail}
                                 onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
+                                users={users}
                             />
                         ))}
                     </div>
@@ -1038,8 +1049,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-[10px] sm:text-xs text-icon-gray font-bold uppercase">Publicado por</p>
-                            <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-black text-text-main hover:text-brand-primary text-sm sm:text-base hover:underline">
+                            <button onClick={() => petOwner && setPublicProfileUser(petOwner)} className="font-black text-text-main hover:text-brand-primary text-sm sm:text-base hover:underline flex items-center gap-1.5">
                                 @{ownerName}
+                                <VerifiedBadge user={petOwner} size="sm" />
                             </button>
                         </div>
                     </div>
@@ -1211,6 +1223,7 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
                 onDeleteComment={handleDeleteComment}
                 currentUser={currentUser}
                 onShowInfo={(message: string, type?: 'success' | 'error' | 'info') => setInfoModal({ isOpen: true, message, type: type || 'info' })}
+                users={users}
             />
 
             {publicProfileUser && (
