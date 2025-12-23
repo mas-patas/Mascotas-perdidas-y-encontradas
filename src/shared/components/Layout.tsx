@@ -85,13 +85,15 @@ export const Layout: React.FC<LayoutProps> = ({
                         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
                             <div className="max-w-lg">
                                 <p className="font-serif italic text-text-sub text-xs md:text-sm leading-relaxed opacity-80">
-                                    "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERIAN IRSE"
+                                    "POR LOS QUE NUNCA VOLVIERON, POR LOS QUE NECESITAN VOLVER Y POR LOS QUE NUNCA DEBERÍAN IRSE"
                                 </p>
                             </div>
                             <div className="flex flex-col items-center md:items-end text-sm text-text-sub">
-                                <p>&copy; {new Date().getFullYear()} Mas Patas. Todos los derechos reservados.</p>
+                                <p>&copy; {new Date().getFullYear()} Más Patas. Todos los derechos reservados.</p>
                                 <div className="mt-2 flex gap-4">
                                     <Link to="/terminos" className="hover:text-brand-primary transition-colors">Términos y Condiciones</Link>
+                                    <span>|</span>
+                                    <Link to="/privacidad" className="hover:text-brand-primary transition-colors">Política de Privacidad</Link>
                                     <span>|</span>
                                     <p>Hecho con <span className="text-red-500">♥</span> en Perú</p>
                                 </div>

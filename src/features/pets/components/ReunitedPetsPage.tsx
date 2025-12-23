@@ -122,7 +122,7 @@ const ReunitedPetsPage: React.FC = () => {
     return (
         <div className="bg-brand-light min-h-screen pb-20 font-sans">
             <Helmet>
-                <title>Reencuentros | Mas Patas</title>
+                <title>Reencuentros | Más Patas</title>
                 <meta name="description" content="Historias reales de reencuentros." />
             </Helmet>
 

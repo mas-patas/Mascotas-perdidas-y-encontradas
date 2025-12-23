@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import type { Pet } from '@/types';
-import { LocationMarkerIcon, CalendarIcon, PrinterIcon, PhoneIcon, DogIcon, SparklesIcon } from './icons';
+import { LocationMarkerIcon, CalendarIcon, PrinterIcon, PhoneIcon, DogIcon, DownloadIcon } from './icons';
+import { toJpeg } from 'html-to-image';
 
 interface FlyerModalProps {
     pet: Pet;
@@ -10,57 +11,157 @@ interface FlyerModalProps {
 
 export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
     const [isGenerating, setIsGenerating] = useState(false);
+    const exportRef = React.useRef<HTMLDivElement>(null);
 
     const handlePrint = () => {
         window.print();
     };
 
     const handleDownloadImage = async () => {
+        const element = exportRef.current;
+        if (!element) {
+            alert('Error: No se pudo encontrar el elemento para exportar.');
+            return;
+        }
+
         setIsGenerating(true);
         try {
-            // We target the hidden export template which has fixed dimensions and high-res styling
-            const element = document.getElementById('flyer-export');
-            const html2canvas = (window as any).html2canvas;
-            
-            if (!element || !html2canvas) {
-                alert('Error: No se pudo iniciar el generador de imágenes.');
-                return;
-            }
+            // Guardar estilos originales
+            const originalStyles = {
+                position: element.style.position,
+                left: element.style.left,
+                top: element.style.top,
+                visibility: element.style.visibility,
+                opacity: element.style.opacity,
+                zIndex: element.style.zIndex,
+                display: element.style.display
+            };
 
-            // Small delay to ensure images in the hidden div are painted
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // Mover el elemento a una posición visible para html-to-image
+            // Usar z-index muy bajo para que quede detrás de todo
+            element.style.position = 'fixed';
+            element.style.left = '0px';
+            element.style.top = '0px';
+            element.style.visibility = 'visible';
+            element.style.opacity = '1';
+            element.style.zIndex = '-9999';
+            element.style.display = 'flex';
+            element.style.pointerEvents = 'none';
+            element.style.width = '800px';
+            element.style.height = '1067px';
 
-            const canvas = await html2canvas(element, {
-                scale: 2, // High resolution
-                useCORS: true, 
-                allowTaint: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                width: 800, // Force fixed width
-                height: 1067, // Force fixed height (3:4 ratio)
-                windowWidth: 800,
-                windowHeight: 1067,
-                x: 0,
-                y: 0,
-                scrollX: 0,
-                scrollY: 0,
-                // Critical: Move the element into view within the cloned document context
-                onclone: (clonedDoc: Document) => {
-                    const el = clonedDoc.getElementById('flyer-export');
-                    if (el) {
-                        el.style.left = '0px';
-                        el.style.top = '0px';
-                        el.style.visibility = 'visible';
-                        el.style.display = 'flex';
-                    }
+            // Forzar un reflow para asegurar que el navegador renderice el elemento
+            void element.offsetHeight;
+
+            // Esperar a que todas las imágenes se carguen completamente
+            const images = element.querySelectorAll('img');
+            const imagePromises = Array.from(images).map((img: HTMLImageElement) => {
+                if (img.complete && img.naturalHeight !== 0) {
+                    return Promise.resolve();
                 }
+                return new Promise<void>((resolve) => {
+                    const timeout = setTimeout(() => resolve(), 3000); // Timeout de 3 segundos
+                    img.onload = () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        clearTimeout(timeout);
+                        resolve(); // Continuar incluso si hay error
+                    };
+                });
             });
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `SE_BUSCA_${pet.name.toUpperCase()}.jpg`;
-            link.click();
+            await Promise.all(imagePromises);
+            
+            // Delay adicional para asegurar que el DOM se actualice completamente
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Silenciar temporalmente los errores de consola relacionados con CSS cross-origin
+            // Estos errores son normales cuando html-to-image intenta leer estilos de CDNs externos
+            // (Google Fonts, Tailwind CDN, Leaflet, etc.) y el navegador bloquea el acceso por CORS
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            const errorFilter = (...args: any[]) => {
+                const message = args[0]?.toString() || '';
+                // Filtrar errores de CSS cross-origin que son normales y no afectan la funcionalidad
+                if (message.includes('cssRules') || 
+                    message.includes('CSSStyleSheet') || 
+                    message.includes('SecurityError') ||
+                    message.includes('Error inlining remote css') ||
+                    message.includes('Error while reading CSS rules') ||
+                    message.includes('Manifest:')) {
+                    return; // No mostrar estos errores - son esperados y no afectan la generación
+                }
+                originalError.apply(console, args);
+            };
+            console.error = errorFilter;
+            console.warn = errorFilter;
+
+            try {
+                // Crear un overlay temporal para ocultar el elemento durante la captura
+                const overlay = document.createElement('div');
+                overlay.id = 'image-generation-overlay';
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    z-index: 9998;
+                    pointer-events: none;
+                `;
+                document.body.appendChild(overlay);
+
+                try {
+                    // Convertir a JPEG con alta calidad
+                    const dataUrl = await toJpeg(element, {
+                        quality: 0.95,
+                        backgroundColor: '#ffffff',
+                        pixelRatio: 2,
+                        useCORS: true,
+                        allowTaint: false,
+                        cacheBust: true,
+                        imagePlaceholder: undefined,
+                        filter: (node) => {
+                            // Ignorar el overlay y otros elementos no deseados
+                            if (node instanceof HTMLElement) {
+                                return node.id !== 'image-generation-overlay';
+                            }
+                            return true;
+                        }
+                    });
+
+                    // Crear y descargar el archivo
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `SE_BUSCA_${pet.name.toUpperCase()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } finally {
+                    // Remover el overlay
+                    const overlayElement = document.getElementById('image-generation-overlay');
+                    if (overlayElement && overlayElement.parentNode) {
+                        document.body.removeChild(overlayElement);
+                    }
+                }
+            } finally {
+                // Restaurar console.error y console.warn
+                console.error = originalError;
+                console.warn = originalWarn;
+                
+                // Restaurar estilos originales - siempre ejecutar, incluso si hay errores
+                element.style.position = originalStyles.position || '';
+                element.style.left = originalStyles.left || '';
+                element.style.top = originalStyles.top || '';
+                element.style.visibility = originalStyles.visibility || '';
+                element.style.opacity = originalStyles.opacity || '';
+                element.style.zIndex = originalStyles.zIndex || '';
+                element.style.display = originalStyles.display || '';
+                element.style.pointerEvents = '';
+            }
 
         } catch (error) {
             console.error("Error generating image:", error);
@@ -76,40 +177,6 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
         <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex justify-center items-start sm:items-center p-4 overflow-y-auto">
             <div className="relative w-full max-w-2xl my-4 flex flex-col items-center">
                 
-                {/* Controls Header */}
-                <div className="bg-white p-3 rounded-xl flex flex-wrap justify-between items-center no-print shadow-lg mb-4 w-full gap-2">
-                    <h3 className="text-md font-bold text-brand-dark pl-2">Vista Previa del Afiche</h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                         <button 
-                            onClick={handleDownloadImage} 
-                            disabled={isGenerating}
-                            className="flex items-center gap-2 py-2 px-4 bg-brand-secondary text-brand-dark font-bold rounded-lg hover:bg-amber-400 transition-colors shadow-sm text-sm disabled:opacity-50"
-                        >
-                            {isGenerating ? (
-                                <span className="animate-pulse">Generando...</span>
-                            ) : (
-                                <>
-                                    <SparklesIcon />
-                                    <span>Descargar Imagen</span>
-                                </>
-                            )}
-                        </button>
-                         <button 
-                            onClick={handlePrint} 
-                            className="flex items-center gap-2 py-2 px-4 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors shadow-sm text-sm"
-                        >
-                            <PrinterIcon />
-                            <span className="hidden sm:inline">Imprimir PDF</span>
-                        </button>
-                        <button 
-                            onClick={onClose} 
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 font-bold text-xl transition-colors"
-                        >
-                            &times;
-                        </button>
-                    </div>
-                </div>
-                
                 {/* --- VISIBLE PREVIEW (Responsive) --- */}
                 {/* This one adapts to the screen size for the user to see */}
                 <div 
@@ -117,14 +184,52 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                     className="bg-white w-full mx-auto border-[8px] sm:border-[12px] border-[#EF4444] shadow-2xl overflow-hidden relative flex flex-col"
                     style={{ aspectRatio: '3 / 4' }} 
                 >
+                    {/* Download Button - Top Right Corner */}
+                    <button 
+                        onClick={handleDownloadImage} 
+                        disabled={isGenerating}
+                        className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex items-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2 sm:px-3 bg-brand-secondary text-brand-dark font-bold rounded-lg hover:bg-amber-400 transition-colors shadow-lg text-xs sm:text-sm disabled:opacity-50 no-print"
+                    >
+                        {isGenerating ? (
+                            <span className="animate-pulse text-[10px] sm:text-xs">Generando...</span>
+                        ) : (
+                            <>
+                                <DownloadIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span>Descargar</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Close Button - Top Left Corner */}
+                    <button 
+                        onClick={onClose} 
+                        className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm text-gray-500 hover:bg-red-100 hover:text-red-600 font-bold text-lg sm:text-xl transition-colors shadow-lg no-print"
+                    >
+                        &times;
+                    </button>
                     {/* Responsive Header */}
-                    <div className="bg-[#EF4444] pt-3 sm:pt-6 pb-2 sm:pb-4 text-center px-2 sm:px-4 shrink-0">
-                        <h1 className="text-3xl sm:text-6xl font-black text-white tracking-wider leading-none uppercase mb-1 drop-shadow-md">
-                            SE BUSCA
-                        </h1>
-                        <p className="text-[10px] sm:text-xl font-bold text-white uppercase tracking-[0.15em]">
-                            AYÚDAME A REGRESAR A CASA
-                        </p>
+                    <div className="bg-[#EF4444] pt-3 sm:pt-6 pb-2 sm:pb-4 px-2 sm:px-4 shrink-0 relative">
+                        {/* Logo en la parte superior izquierda */}
+                        <div className="absolute top-2 sm:top-4 left-2 sm:left-4">
+                            <img 
+                                src="/assets/images/logo.png" 
+                                alt="Más Patas Logo" 
+                                className="h-16 w-16 sm:h-24 sm:w-24 object-contain"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                            />
+                        </div>
+                        {/* Contenido centrado */}
+                        <div className="text-center">
+                            <h1 className="text-3xl sm:text-6xl font-black text-white tracking-wider leading-none uppercase mb-1 drop-shadow-md">
+                                SE BUSCA
+                            </h1>
+                            <p className="text-[10px] sm:text-xl font-bold text-white uppercase tracking-[0.15em]">
+                                AYÚDAME A REGRESAR A CASA
+                            </p>
+                        </div>
                     </div>
 
                     {/* Responsive Body */}
@@ -138,11 +243,11 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                             <DogIcon className="h-5 w-5 sm:h-8 sm:w-8 text-[#EF4444] transform -scale-x-100" />
                         </div>
 
-                        <div className="w-full flex-1 min-h-[120px] sm:min-h-[200px] mx-auto mb-2 sm:mb-6 overflow-hidden border-4 border-gray-900 rounded-sm shadow-lg bg-gray-100 relative shrink">
+                        <div className="w-full flex-1 min-h-[120px] sm:min-h-[200px] mx-auto mb-2 sm:mb-6 overflow-hidden border-4 border-gray-900 rounded-sm shadow-lg bg-gray-100 relative shrink flex items-center justify-center">
                             <img 
                                 src={pet.imageUrls[0]} 
                                 alt={pet.name} 
-                                className="w-full h-full object-cover absolute inset-0"
+                                className="w-full h-full object-contain"
                                 crossOrigin="anonymous"
                             />
                         </div>
@@ -191,14 +296,11 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex justify-between items-end mt-1 sm:mt-4 pt-1 sm:pt-2 border-t border-dashed border-gray-300">
-                                <div className="text-left">
-                                    <p className="text-[8px] sm:text-xs font-bold text-gray-400 uppercase">¡Ayúdanos a encontrarlo!</p>
-                                    <p className="text-[8px] sm:text-[10px] text-gray-400">Comparte esta imagen.</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-[8px] sm:text-[10px] font-bold text-gray-400 uppercase text-right leading-tight">Escanear<br/>para ver más</p>
-                                    <img src={qrCodeUrl} alt="QR" className="w-10 h-10 sm:w-12 sm:h-12 mix-blend-multiply" crossOrigin="anonymous" />
+                            <div className="flex flex-col items-center gap-1 sm:gap-2 mt-1 sm:mt-4 pt-1 sm:pt-2 border-t border-dashed border-gray-300">
+                                <p className="text-[8px] sm:text-xs font-bold text-gray-600">www.maspatas.com</p>
+                                <div className="flex flex-col items-center gap-1 sm:gap-2">
+                                    <img src={qrCodeUrl} alt="QR" className="w-16 h-16 sm:w-20 sm:h-20 mix-blend-multiply" crossOrigin="anonymous" />
+                                    <p className="text-[7px] sm:text-[9px] font-bold text-gray-400 uppercase text-center leading-tight">ESCANEA EL CODIGO QR PARA MAS INFORMACIÓN</p>
                                 </div>
                             </div>
                         </div>
@@ -209,17 +311,33 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                 {/* Positioned off-screen but close enough to be safe from aggressive browser culling */}
                 <div 
                     id="flyer-export" 
+                    ref={exportRef}
                     className="fixed top-0 bg-white border-[16px] border-[#EF4444] flex flex-col z-[-50]"
                     style={{ width: '800px', height: '1067px', left: '-1000px' }}
                 >
                     {/* Header */}
-                    <div className="bg-[#EF4444] pt-6 pb-4 text-center px-6 shrink-0">
-                        <h1 className="text-6xl font-black text-white tracking-wider leading-none uppercase mb-2 drop-shadow-lg">
-                            SE BUSCA
-                        </h1>
-                        <p className="text-xl font-bold text-white uppercase tracking-[0.2em]">
-                            AYÚDAME A REGRESAR A CASA
-                        </p>
+                    <div className="bg-[#EF4444] pt-6 pb-4 px-6 shrink-0 relative">
+                        {/* Logo en la parte superior izquierda */}
+                        <div className="absolute top-4 left-6">
+                            <img 
+                                src="/assets/images/logo.png" 
+                                alt="Más Patas Logo" 
+                                style={{ height: '120px', width: 'auto', objectFit: 'contain' }}
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                            />
+                        </div>
+                        {/* Contenido centrado */}
+                        <div className="text-center">
+                            <h1 className="text-6xl font-black text-white tracking-wider leading-none uppercase mb-2 drop-shadow-lg">
+                                SE BUSCA
+                            </h1>
+                            <p className="text-xl font-bold text-white uppercase tracking-[0.2em]">
+                                AYÚDAME A REGRESAR A CASA
+                            </p>
+                        </div>
                     </div>
 
                     {/* Body */}
@@ -235,11 +353,11 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                         </div>
 
                         {/* Photo - Reduced min-height (200px) to allow it to shrink if text is huge, preventing footer push-off */}
-                        <div className="w-full flex-1 min-h-[200px] mx-auto mb-2 overflow-hidden border-4 border-gray-900 rounded-sm shadow-lg bg-gray-100 relative shrink">
+                        <div className="w-full flex-1 min-h-[200px] mx-auto mb-2 overflow-hidden border-4 border-gray-900 rounded-sm shadow-lg bg-gray-100 relative shrink flex items-center justify-center">
                             <img 
                                 src={pet.imageUrls[0]} 
                                 alt={pet.name} 
-                                className="w-full h-full object-cover absolute inset-0"
+                                className="w-full h-full object-contain"
                                 crossOrigin="anonymous"
                             />
                         </div>
@@ -291,14 +409,11 @@ export const FlyerModal: React.FC<FlyerModalProps> = ({ pet, onClose }) => {
                                 </p>
                             </div>
                             
-                            <div className="flex justify-between items-end mt-2 pt-2 border-t-2 border-dashed border-gray-300">
-                                <div className="text-left">
-                                    <p className="text-sm font-bold text-gray-400 uppercase">¡Ayúdanos a encontrarlo!</p>
-                                    <p className="text-xs text-gray-400">Comparte esta imagen en tus redes.</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <p className="text-xs font-bold text-gray-400 uppercase text-right leading-tight">Escanear<br/>para ver más</p>
-                                    <img src={qrCodeUrl} alt="QR" className="w-14 h-14 mix-blend-multiply" crossOrigin="anonymous" />
+                            <div className="flex flex-col items-center gap-2 mt-2 pt-2 border-t-2 border-dashed border-gray-300">
+                                <p className="text-sm font-bold text-gray-600">www.maspatas.com</p>
+                                <div className="flex flex-col items-center gap-2">
+                                    <img src={qrCodeUrl} alt="QR" className="w-20 h-20 mix-blend-multiply" crossOrigin="anonymous" />
+                                    <p className="text-xs font-bold text-gray-400 uppercase text-center leading-tight">ESCANEA EL CODIGO QR PARA MAS INFORMACIÓN</p>
                                 </div>
                             </div>
                         </div>

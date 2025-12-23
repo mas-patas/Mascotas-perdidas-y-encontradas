@@ -52,7 +52,7 @@ const CompleteProfileModal: React.FC = () => {
                     <div className="mx-auto bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mb-3 backdrop-blur-sm">
                         <UserIcon className="h-8 w-8 text-white" />
                     </div>
-                    <h2 className="text-xl font-bold mb-1">¡Bienvenido a Mas Patas!</h2>
+                    <h2 className="text-xl font-bold mb-1">¡Bienvenido a Más Patas!</h2>
                     <p className="text-blue-100 text-sm">Para continuar, es obligatorio completar tu perfil.</p>
                 </div>
                 

@@ -5,7 +5,7 @@ import type { Pet, User } from '@/types';
 import { PET_STATUS, ANIMAL_TYPES } from '@/constants';
 import { LocationMarkerIcon, CalendarIcon, DogIcon, CatIcon, InfoIcon, BookmarkIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/auth';
-import { LazyImage } from '@/shared';
+import { LazyImage, Tooltip } from '@/shared';
 
 interface PetCardProps {
     pet: Pet;
@@ -71,7 +71,7 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
                 </div>
 
                 {/* Reward Badge - Bottom Right (Gold) */}
-                {pet.reward && pet.reward > 0 && !isReunited && (
+                {pet.reward !== undefined && pet.reward !== null && !isReunited && (
                     <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#D4AF37] text-white text-[9px] sm:text-[10px] font-bold rounded-md shadow-md z-10 flex items-center gap-0.5 sm:gap-1">
                         <span>💵 Recompensa</span>
                     </div>
@@ -79,17 +79,19 @@ export const PetCard: React.FC<PetCardProps> = ({ pet }) => {
 
                 {/* Save Button */}
                 {currentUser && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            isSaved ? unsavePet(pet.id) : savePet(pet.id);
-                        }}
-                        className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1 sm:p-1.5 rounded-full transition-all duration-200 z-10 shadow-sm ${isSaved ? 'bg-[#FF4F4F] text-white' : 'bg-white/80 text-gray-400 hover:text-[#FF4F4F] hover:bg-white'}`}
-                        aria-label={isSaved ? "Quitar de guardados" : "Guardar mascota"}
-                    >
-                        <BookmarkIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" filled={isSaved} />
-                    </button>
+                    <Tooltip text={isSaved ? "Quitar de guardados" : "Guardar mascota"}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                isSaved ? unsavePet(pet.id) : savePet(pet.id);
+                            }}
+                            className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1 sm:p-1.5 rounded-full transition-all duration-200 z-10 shadow-sm ${isSaved ? 'bg-[#FF4F4F] text-white' : 'bg-white/80 text-gray-400 hover:text-[#FF4F4F] hover:bg-white'}`}
+                            aria-label={isSaved ? "Quitar de guardados" : "Guardar mascota"}
+                        >
+                            <BookmarkIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" filled={isSaved} />
+                        </button>
+                    </Tooltip>
                 )}
             </div>
             

@@ -5,6 +5,7 @@ import { CAMPAIGN_TYPES } from '@/constants';
 import { useCreateCampaign, useUpdateCampaign } from '@/api';
 import type { Campaign } from '@/types';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
+import { Tooltip } from '@/shared';
 
 // Helper function to normalize location names for matching
 const normalizeLocationName = (name: string) => {
@@ -809,21 +810,25 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
                     
                     {/* Footer */}
                     <div className="p-6 bg-gray-50 border-t flex justify-end gap-4 rounded-b-xl shrink-0 -mx-6 -mb-6">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors"
-                            disabled={createCampaign.isPending || updateCampaign.isPending}
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isUploading || createCampaign.isPending || updateCampaign.isPending}
-                            className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50"
-                        >
-                            {(createCampaign.isPending || updateCampaign.isPending) ? 'Guardando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Crear Campaña')}
-                        </button>
+                        <Tooltip text="Cancelar y cerrar formulario">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg transition-colors"
+                                disabled={createCampaign.isPending || updateCampaign.isPending}
+                            >
+                                Cancelar
+                            </button>
+                        </Tooltip>
+                        <Tooltip text={isEditMode ? "Guardar cambios en la campaña" : "Crear nueva campaña"}>
+                            <button
+                                type="submit"
+                                disabled={isUploading || createCampaign.isPending || updateCampaign.isPending}
+                                className="px-8 py-3 bg-brand-primary text-white font-bold rounded-lg shadow-lg hover:bg-brand-dark transition-all transform hover:-translate-y-0.5 disabled:opacity-50"
+                            >
+                                {(createCampaign.isPending || updateCampaign.isPending) ? 'Guardando...' : isUploading ? 'Subiendo...' : (isEditMode ? 'Guardar Cambios' : 'Crear Campaña')}
+                            </button>
+                        </Tooltip>
                     </div>
                 </form>
             </div>

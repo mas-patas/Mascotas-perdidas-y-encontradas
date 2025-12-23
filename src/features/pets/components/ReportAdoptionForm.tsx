@@ -6,6 +6,7 @@ import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { departments, getProvinces, getDistricts, locationCoordinates } from '@/data/locations';
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
+import { SecurityDisclaimer } from '@/shared';
 
 
 interface ReportAdoptionFormProps {
@@ -803,6 +804,15 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* Security Disclaimer for Adoptions */}
+                        <SecurityDisclaimer 
+                            variant="inline" 
+                            type="warning"
+                            customMessage="Adopción responsable: Verifica la identidad de los adoptantes y realiza encuentros en lugares públicos. Ten cuidado con estafas. Más Patas es solo una plataforma intermediaria y no nos responsabilizamos por las interacciones entre usuarios. La información que publiques será visible para todos."
+                            showReportInfo={true}
+                            showSupportLink={true}
+                        />
                         
                         <div className="pt-4 flex justify-end gap-3">
                             <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>

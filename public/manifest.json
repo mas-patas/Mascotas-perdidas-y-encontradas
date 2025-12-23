@@ -1,6 +1,6 @@
 {
   "name": "Mascotas Perdidas y Encontradas",
-  "short_name": "Mas Patas",
+  "short_name": "Más Patas",
   "description": "Ayuda a reunir a las mascotas perdidas con sus dueños.",
   "start_url": "/",
   "display": "standalone",

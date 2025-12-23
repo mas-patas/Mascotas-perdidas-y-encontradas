@@ -20,4 +20,7 @@ export { OnboardingTour } from './components/OnboardingTour';
 export type { TourStep } from './components/OnboardingTour';
 export { CelebrationEffect } from './components/CelebrationEffect';
 export { BannerCarousel } from './components/BannerCarousel';
+export { SecurityDisclaimer } from './components/SecurityDisclaimer';
+export type { DisclaimerVariant, DisclaimerType } from './components/SecurityDisclaimer';
+export { Tooltip } from './components/Tooltip';
 export * from './components/icons';

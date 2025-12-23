@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { User, SupportTicket, SupportTicketCategory, SupportTicketStatus, Report, ReportStatus } from '@/types';
 import { SUPPORT_TICKET_CATEGORIES, SUPPORT_TICKET_STATUS, REPORT_STATUS } from '@/constants';
 import { FlagIcon, ChatBubbleIcon, UserIcon, CheckCircleIcon, XCircleIcon, InfoIcon, TrashIcon, WarningIcon } from '@/shared/components/icons';
+import { SecurityDisclaimer } from '@/shared';
 
 interface SupportPageProps {
     currentUser: User;
@@ -86,6 +87,24 @@ const SupportPage: React.FC<SupportPageProps> = ({ currentUser, userTickets, use
                 <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50">
                     <h2 className="text-3xl font-bold text-brand-dark mb-2">Centro de Soporte</h2>
                     <p className="text-gray-500">Estamos aquí para ayudarte. Crea un ticket o revisa tus reportes.</p>
+                </div>
+
+                {/* Information Banner */}
+                <div className="p-4 bg-blue-50 border-b border-blue-200">
+                    <div className="flex items-start gap-3">
+                        <InfoIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 text-sm text-blue-800">
+                            <p className="font-semibold mb-2">¿Qué puedes reportar?</p>
+                            <ul className="list-disc list-inside space-y-1 ml-2">
+                                <li><strong>Publicaciones:</strong> Contenido inapropiado, información falsa, o publicaciones que violen nuestros términos.</li>
+                                <li><strong>Comentarios:</strong> Comentarios ofensivos, spam, o que no cumplan con nuestras normas.</li>
+                                <li><strong>Usuarios:</strong> Comportamiento sospechoso, acoso, o actividad fraudulenta.</li>
+                            </ul>
+                            <p className="mt-2">
+                                <strong>Proceso:</strong> Todos los reportes son revisados por nuestro equipo de moderación. El tiempo de respuesta estimado es de 24-48 horas. Te notificaremos sobre el resultado de tu reporte.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Navigation Tabs */}
