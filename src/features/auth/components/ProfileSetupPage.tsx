@@ -158,6 +158,9 @@ const ProfileSetupPage: React.FC = () => {
                 setError('El DNI ingresado ya existe.');
             } else if (err.message?.includes('profiles_phone_key')) {
                 setError('El teléfono ingresado ya existe.');
+            } else if (err.message?.includes('palabra reservada') || err.message?.includes('reserved')) {
+                // Error de nombre de usuario con palabra reservada
+                setError('El nombre de usuario contiene una palabra reservada (admin, administrador, maspatas). Por favor, elige otro nombre.');
             } else {
                 const message = err.message || 'Ocurrió un error al guardar el perfil.';
                 setError(message);

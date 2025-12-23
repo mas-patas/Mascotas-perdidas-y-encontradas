@@ -282,7 +282,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, reportedPets: propRepor
             await updateUserProfile(editableUser);
             setIsEditing(false);
         } catch (err: any) {
-            setError(err.message || 'Error al actualizar el perfil.');
+            // Handle reserved username error
+            if (err.message?.includes('palabra reservada') || err.message?.includes('reserved')) {
+                setError('El nombre de usuario contiene una palabra reservada (admin, administrador, maspatas). Por favor, elige otro nombre.');
+            } else {
+                setError(err.message || 'Error al actualizar el perfil.');
+            }
         } finally {
             setLoadingProfile(false);
         }
