@@ -71,6 +71,87 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
     const mapPets = mapData?.pets || [];
     const mapCampaigns = mapData?.campaigns || [];
 
+    // Helper function to format location as "distrito, urbanizacion" or "distrito, calle"
+    const formatLocation = (location: string): string => {
+        if (!location) return '';
+        
+        const parts = location.split(',').map(p => p.trim()).filter(Boolean);
+        
+        // Location format from ReportPetForm: [address, neighbourhood, district, province, department]
+        // After filter(Boolean), empty values are removed
+        // Format: "address, neighbourhood, district, province, department"
+        
+        if (parts.length === 0) return '';
+        
+        let district = '';
+        let urbanization = '';
+        let street = '';
+        
+        // The district is always the 3rd from the end when we have at least 3 parts
+        // (since the last 3 are: district, province, department)
+        if (parts.length >= 3) {
+            district = parts[parts.length - 3] || '';
+            
+            // Determine if we have urbanization or street based on number of parts
+            if (parts.length === 5) {
+                // Full format: [address, neighbourhood, district, province, department]
+                urbanization = parts[1] || '';  // neighbourhood (urbanization)
+                street = parts[0] || '';        // address (street)
+            } else if (parts.length === 4) {
+                // Either: [address, district, province, department] (no neighbourhood)
+                // Or: [neighbourhood, district, province, department] (no address)
+                // We'll check the first part to determine if it's likely an address or urbanization
+                const firstPart = parts[0] || '';
+                // Common address indicators
+                const isAddress = firstPart.toLowerCase().includes('av') || 
+                                firstPart.toLowerCase().includes('avenida') ||
+                                firstPart.toLowerCase().includes('calle') ||
+                                firstPart.toLowerCase().includes('jr') ||
+                                firstPart.toLowerCase().includes('jiron') ||
+                                firstPart.toLowerCase().includes('pasaje') ||
+                                firstPart.match(/\d/); // Contains numbers (common in addresses)
+                
+                if (isAddress) {
+                    street = firstPart;
+                } else {
+                    // Likely an urbanization/neighbourhood name
+                    urbanization = firstPart;
+                }
+            }
+            // If parts.length === 3: [district, province, department] - no address or urbanization
+        } else if (parts.length === 2) {
+            // Fallback: could be [street, district] or [district, province]
+            // Check if second part is a common province name
+            const secondPart = parts[1] || '';
+            const commonProvinces = ['lima', 'callao', 'cusco', 'arequipa', 'trujillo', 'piura', 'chiclayo'];
+            if (commonProvinces.some(p => secondPart.toLowerCase().includes(p.toLowerCase()))) {
+                // Likely [district, province]
+                district = parts[0] || '';
+            } else {
+                // Likely [street, district]
+                street = parts[0] || '';
+                district = secondPart;
+            }
+        } else if (parts.length === 1) {
+            // Only one part, use it as district
+            district = parts[0];
+        }
+        
+        // Format: "distrito, urbanizacion" if urbanization exists, otherwise "distrito, calle"
+        if (district) {
+            if (urbanization) {
+                return `${district}, ${urbanization}`;
+            } else if (street) {
+                return `${district}, ${street}`;
+            } else {
+                return district;
+            }
+        }
+        
+        // Fallback: return first part if we can't parse
+        return parts[0] || location;
+    };
+
     // Helper to add small random offset to prevent stacking
     const getJitteredCoords = (lat: number, lng: number) => {
         const jitter = 0.0005;
@@ -223,15 +304,21 @@ const MapPage: React.FC<MapPageProps> = ({ onNavigate }) => {
         mapPets.forEach(pet => {
             if (!visibleStatuses[pet.status as keyof typeof visibleStatuses] || !pet.lat || !pet.lng) return;
             const iconSVG = pet.animal_type === 'Perro' ? dogIconSVG : (pet.animal_type === 'Gato' ? catIconSVG : otherIconSVG);
+            
+            // Don't show name if it's "Desconocido" or empty/null
+            const shouldShowName = pet.name && pet.name.trim() !== '' && pet.name !== 'Desconocido';
+            const formattedLocation = formatLocation(pet.location || '');
+            
             const popupContent = `
                     <div class="text-center min-w-[150px]">
-                        <img src="${pet.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name}" class="w-full h-28 object-cover rounded-md mb-2" />
-                        <strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>
+                        <img src="${pet.image_urls?.[0] || 'https://placehold.co/400x400/CCCCCC/FFFFFF?text=Sin+Imagen'}" alt="${pet.name || pet.animal_type}" class="w-full h-28 object-cover rounded-md mb-2" />
+                        ${shouldShowName ? `<strong class="block text-lg font-bold text-gray-800">${pet.name}</strong>` : ''}
                         <div class="flex flex-wrap justify-center gap-1 mb-2">
                             <span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full text-white ${pet.status === PET_STATUS.PERDIDO ? 'bg-red-500' : pet.status === PET_STATUS.ENCONTRADO ? 'bg-green-500' : pet.status === PET_STATUS.AVISTADO ? 'bg-blue-500' : 'bg-purple-500'}">${pet.status}</span>
                             ${pet.reward ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-yellow-900 bg-yellow-100 border border-yellow-300 rounded-full shadow-sm">💵 Recompensa</span>` : ''}
                         </div>
                         <p class="text-sm text-gray-600 mb-2">${pet.breed}</p>
+                        ${formattedLocation ? `<p class="text-xs text-gray-500 mb-2">📍 ${formattedLocation}</p>` : ''}
                         <button onclick="window.navigateToPath('/mascota/${pet.id}')" class="block w-full bg-brand-primary text-white text-sm py-1.5 px-3 rounded hover:bg-brand-dark transition-colors">Ver Detalles</button>
                     </div>
                 `;
