@@ -174,8 +174,8 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
     // Styling
     const selectClass = "w-full p-1.5 sm:p-2 bg-white/10 border border-white/20 rounded-lg text-[10px] sm:text-xs text-white placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-transparent block transition-colors option:text-gray-900";
     const labelClass = "block mb-1 sm:mb-1.5 text-[9px] sm:text-[10px] font-bold text-white/90 uppercase tracking-wider";
-    const navLinkClass = (isActive: boolean) => `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-200 font-medium text-sm sm:text-base ${isActive ? 'bg-white/20 text-white shadow-lg' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
-    const navLinkReunitedClass = (isActive: boolean) => `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-bold text-sm sm:text-base ${isActive ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:shadow-[0_6px_25px_rgba(251,191,36,0.6)] hover:scale-105' : 'text-blue-100 hover:bg-gradient-to-r hover:from-amber-400 hover:to-yellow-400 hover:text-amber-900 hover:shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:scale-105'}`;
+    const navLinkClass = (isActive: boolean) => `w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-200 font-medium text-sm sm:text-base ${isActive ? 'bg-white/20 text-white shadow-lg' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
+    const navLinkReunitedClass = (isActive: boolean) => `w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-bold text-sm sm:text-base ${isActive ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:shadow-[0_6px_25px_rgba(251,191,36,0.6)] hover:scale-105' : 'text-blue-100 hover:bg-gradient-to-r hover:from-amber-400 hover:to-yellow-400 hover:text-amber-900 hover:shadow-[0_4px_20px_rgba(251,191,36,0.5)] hover:scale-105'}`;
 
     return (
         <>
@@ -187,18 +187,20 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                     transition-transform duration-300 ease-in-out
                     fixed inset-y-0 left-0 w-[85vw] max-w-[320px] sm:w-[75vw] sm:max-w-[360px] lg:w-[250px] lg:max-w-none z-40 transform lg:relative lg:translate-x-0 lg:flex-shrink-0
                     pt-14 sm:pt-16 md:pt-20 lg:pt-0
+                    h-full overflow-hidden
                     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                     ${showDesktopSidebar ? 'lg:flex' : 'lg:hidden'}
                 `}
                 data-tour="sidebar-menu"
             >
-                <div className="p-3 sm:p-4 md:p-6 pb-2">
-                    <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
-                        <h2 className="text-xs sm:text-sm font-bold text-white/70 uppercase tracking-widest">Navegación</h2>
-                        <button onClick={onClose} className="lg:hidden text-white hover:text-gray-200 text-xl sm:text-2xl p-1" aria-label="Cerrar menú">&times;</button>
-                    </div>
-                    
-                    <nav className="space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
+                <div className="flex flex-col h-full overflow-hidden">
+                    <div className="flex-shrink-0 p-3 sm:p-4 md:p-6 pb-2">
+                        <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
+                            <h2 className="text-xs sm:text-sm font-bold text-white/70 uppercase tracking-widest">Navegación</h2>
+                            <button onClick={onClose} className="lg:hidden text-white hover:text-gray-200 text-xl sm:text-2xl p-1 flex-shrink-0" aria-label="Cerrar menú">&times;</button>
+                        </div>
+                        
+                        <nav className="flex flex-col space-y-0.5 sm:space-y-1" data-tour="sidebar-navigation">
                         {/* Removed Home button from Sidebar as requested */}
                         <Tooltip text="Ver mascotas reunidas">
                             <button onClick={() => { navigate('/reunidos'); onClose(); }} className={navLinkReunitedClass(location.pathname === '/reunidos')} data-tour="nav-reunited">
@@ -236,11 +238,11 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                             </Tooltip>
                         )}
                     </nav>
-                </div>
+                    </div>
 
-                {/* Filters Section for HOME */}
-                {isHome && (
-                    <div className="flex-grow px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 border-t border-white/10 overflow-y-auto custom-scrollbar">
+                    {/* Filters Section for HOME */}
+                    {isHome && (
+                        <div className="flex-1 min-h-0 px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 border-t border-white/10 overflow-y-auto custom-scrollbar">
                         <div className="flex justify-between items-center mb-4 sm:mb-5">
                             <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 sm:gap-2">
                                 <FilterIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-200" /> <span>Filtros</span>
@@ -563,11 +565,12 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
                                 )}
                             </div>
                         </div>
+                        </div>
+                    )}
+                    
+                    <div className="flex-shrink-0 p-3 sm:p-4 border-t border-white/10 text-center">
+                        <p className="text-[9px] sm:text-[10px] text-blue-200">&copy; {new Date().getFullYear()} Más Patas v2.0</p>
                     </div>
-                )}
-                
-                <div className="p-3 sm:p-4 border-t border-white/10 text-center">
-                    <p className="text-[9px] sm:text-[10px] text-blue-200">&copy; {new Date().getFullYear()} Más Patas v2.0</p>
                 </div>
             </aside>
         </>
