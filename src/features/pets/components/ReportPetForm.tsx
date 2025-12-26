@@ -8,6 +8,7 @@ import { departments, getProvinces, getDistricts, locationCoordinates } from '@/
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon, CameraIcon, SearchIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { SecurityDisclaimer, Tooltip } from '@/shared';
+import { useImagePaste } from '@/hooks/useImagePaste';
 
 interface ReportPetFormProps {
     onClose: () => void;
@@ -634,6 +635,33 @@ export const ReportPetForm: React.FC<ReportPetFormProps> = ({ onClose, onSubmit,
             }
         }
     };
+
+    const handlePasteImage = async (file: File) => {
+        if (watchedImageUrls.length >= 3) {
+            setUploadError('Puedes subir un máximo de 3 fotos.');
+            return;
+        }
+        setIsUploading(true);
+        setUploadError('');
+        try {
+            const url = await uploadImage(file);
+            setValue('imageUrls', [...watchedImageUrls, url]);
+        } catch (err) {
+            console.error(err);
+            setUploadError('Error al subir imagen. Por favor intenta de nuevo.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Enable paste functionality
+    useImagePaste({
+        enabled: true,
+        onImagePaste: handlePasteImage,
+        maxImages: 3,
+        currentImageCount: watchedImageUrls.length,
+        onError: (error) => setUploadError(error)
+    });
 
     const removeImage = (index: number) => {
         setValue('imageUrls', watchedImageUrls.filter((_, i) => i !== index));

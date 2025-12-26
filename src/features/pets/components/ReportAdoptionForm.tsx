@@ -7,6 +7,7 @@ import { departments, getProvinces, getDistricts, locationCoordinates } from '@/
 import { XCircleIcon, LocationMarkerIcon, CrosshairIcon, DogIcon, CatIcon, InfoIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { SecurityDisclaimer } from '@/shared';
+import { useImagePaste } from '@/hooks/useImagePaste';
 
 
 interface ReportAdoptionFormProps {
@@ -475,6 +476,56 @@ export const ReportAdoptionForm: React.FC<ReportAdoptionFormProps> = ({ onClose,
         }
     };
     
+    const handlePasteImage = async (file: File) => {
+        if (imagePreviews.length >= 3) {
+            if (isMounted.current) {
+                setError('Puedes subir un máximo de 3 fotos.');
+            }
+            return;
+        }
+        
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+            if (isMounted.current) {
+                setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+            }
+            return;
+        }
+        
+        if (isMounted.current) {
+            setIsUploading(true);
+            setError('');
+        }
+        
+        try {
+            const publicUrl = await uploadImage(file);
+            if (isMounted.current) {
+                setImagePreviews(prev => [...prev, publicUrl]);
+            }
+        } catch (err: any) {
+            if (isMounted.current) {
+                setError("Error al subir la imagen. Intenta de nuevo.");
+            }
+        } finally {
+            if (isMounted.current) {
+                setIsUploading(false);
+            }
+        }
+    };
+
+    // Enable paste functionality
+    useImagePaste({
+        enabled: true,
+        onImagePaste: handlePasteImage,
+        maxImages: 3,
+        currentImageCount: imagePreviews.length,
+        onError: (error) => {
+            if (isMounted.current) {
+                setError(error);
+            }
+        }
+    });
+
     const handleRemoveImage = (indexToRemove: number) => {
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
     };

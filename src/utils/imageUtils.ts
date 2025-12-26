@@ -125,6 +125,57 @@ export const ensurePublicImageUrls = (urls: string[]): string[] => {
     return urls.map(url => ensurePublicImageUrl(url)).filter(url => url !== '');
 };
 
+/**
+ * Converts a ClipboardItem to a File object.
+ * Validates that the clipboard item contains an image (JPEG, PNG, WEBP).
+ * @param item - The ClipboardItem from the clipboard API
+ * @returns A File object or null if the item is not a valid image
+ */
+export const clipboardItemToFile = async (item: ClipboardItem): Promise<File | null> => {
+    try {
+        // Get available types from the clipboard item
+        const types = item.types;
+        
+        // Look for image types
+        const imageTypes = types.filter(type => type.startsWith('image/'));
+        if (imageTypes.length === 0) {
+            return null;
+        }
+        
+        // Get the first image type (prefer PNG, then JPEG, then others)
+        const preferredTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+        let selectedType = imageTypes.find(type => preferredTypes.includes(type));
+        if (!selectedType) {
+            selectedType = imageTypes[0];
+        }
+        
+        // Get the blob from the clipboard item
+        const blob = await item.getType(selectedType);
+        if (!blob) {
+            return null;
+        }
+        
+        // Validate that it's a supported image type
+        const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!supportedTypes.includes(blob.type)) {
+            return null;
+        }
+        
+        // Convert blob to File
+        // Generate a filename with timestamp
+        const timestamp = Date.now();
+        const extension = blob.type === 'image/png' ? 'png' : 
+                         blob.type === 'image/webp' ? 'webp' : 'jpg';
+        const fileName = `pasted-image-${timestamp}.${extension}`;
+        
+        const file = new File([blob], fileName, { type: blob.type });
+        return file;
+    } catch (error) {
+        console.error('Error converting clipboard item to file:', error);
+        return null;
+    }
+};
+
 // --- MAIN UPLOAD FUNCTION (Simplified) ---
 export const uploadImage = async (file: File): Promise<string> => {
     try {

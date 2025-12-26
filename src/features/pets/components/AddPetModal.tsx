@@ -5,6 +5,7 @@ import type { OwnedPet } from '@/types';
 import { dogBreeds, catBreeds, petColors } from '@/data/breeds';
 import { XCircleIcon, DogIcon, CatIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
+import { useImagePaste } from '@/hooks/useImagePaste';
 
 
 interface AddPetModalProps {
@@ -93,6 +94,41 @@ const AddPetModal: React.FC<AddPetModalProps> = ({ onClose, onSubmit, onUpdate, 
         }
     };
     
+    const handlePasteImage = async (file: File) => {
+        if (imagePreviews.length >= 3) {
+            setError('Puedes subir un máximo de 3 fotos.');
+            return;
+        }
+        
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+            setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+            return;
+        }
+        
+        setIsUploading(true);
+        setError('');
+        
+        try {
+            const publicUrl = await uploadImage(file);
+            setImagePreviews(prev => [...prev, publicUrl]);
+        } catch (err: any) {
+            console.error("Error uploading image:", err);
+            setError("Error al subir la imagen. Intenta de nuevo.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Enable paste functionality
+    useImagePaste({
+        enabled: true,
+        onImagePaste: handlePasteImage,
+        maxImages: 3,
+        currentImageCount: imagePreviews.length,
+        onError: (error) => setError(error)
+    });
+
     const handleRemoveImage = (indexToRemove: number) => {
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
     };

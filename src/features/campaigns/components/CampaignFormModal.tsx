@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { XCircleIcon, LocationMarkerIcon, CameraIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { CAMPAIGN_TYPES } from '@/constants';
+import { useImagePaste } from '@/hooks/useImagePaste';
 import { useCreateCampaign, useUpdateCampaign } from '@/api';
 import type { Campaign } from '@/types';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
@@ -445,6 +446,41 @@ const CampaignFormModal: React.FC<CampaignFormModalProps> = ({
         }
     };
     
+    const handlePasteImage = async (file: File) => {
+        if (imageUrls.length >= 5) {
+            setError('Puedes subir un máximo de 5 fotos.');
+            return;
+        }
+        
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+            setError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+            return;
+        }
+        
+        setIsUploading(true);
+        setError('');
+        
+        try {
+            const publicUrl = await uploadImage(file);
+            setImageUrls(prev => [...prev, publicUrl]);
+        } catch (err: any) {
+            console.error("Error uploading image:", err);
+            setError("Error al subir la imagen. Intenta de nuevo.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Enable paste functionality
+    useImagePaste({
+        enabled: isOpen,
+        onImagePaste: handlePasteImage,
+        maxImages: 5,
+        currentImageCount: imageUrls.length,
+        onError: (error) => setError(error)
+    });
+
     const handleRemoveImage = (indexToRemove: number) => {
         setImageUrls(prev => prev.filter((_, index) => index !== indexToRemove));
     };

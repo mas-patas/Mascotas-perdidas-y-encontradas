@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { XCircleIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
+import { useImagePaste } from '@/hooks/useImagePaste';
 
 // Schema de validación con Zod
 const campaignReportSchema = z.object({
@@ -94,6 +95,42 @@ export const CampaignReportForm: React.FC<CampaignReportFormProps> = ({
       setIsUploading(false);
     }
   };
+
+  const handlePasteImage = async (file: File) => {
+    if (imagePreview) {
+      setUploadError('Solo puedes subir una imagen.');
+      return;
+    }
+
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!supportedTypes.includes(file.type)) {
+      setUploadError('Formato de archivo no soportado. Por favor, usa JPEG, PNG, o WEBP.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+
+    try {
+      const publicUrl = await uploadImage(file);
+      setImagePreview(publicUrl);
+      setValue('imageUrl', publicUrl);
+    } catch (err: any) {
+      console.error('Error uploading image:', err);
+      setUploadError('Error al subir la imagen. Intenta de nuevo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Enable paste functionality
+  useImagePaste({
+    enabled: true,
+    onImagePaste: handlePasteImage,
+    maxImages: 1,
+    currentImageCount: imagePreview ? 1 : 0,
+    onError: (error) => setUploadError(error)
+  });
 
   const handleRemoveImage = () => {
     setImagePreview(null);

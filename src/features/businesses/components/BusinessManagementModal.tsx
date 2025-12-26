@@ -5,6 +5,7 @@ import { useBusiness, useBusinessProducts, useUpdateBusiness, useAddProduct, use
 import { XCircleIcon, PlusIcon, TrashIcon, StoreIcon, LocationMarkerIcon, CrosshairIcon, FacebookIcon, InstagramIcon, ExternalLinkIcon, InfoIcon } from '@/shared/components/icons';
 import { uploadImage } from '@/utils/imageUtils';
 import { departments, getProvinces, getDistricts } from '@/data/locations';
+import { useImagePaste } from '@/hooks/useImagePaste';
 
 interface BusinessManagementModalProps {
     isOpen: boolean;
@@ -454,6 +455,33 @@ const BusinessManagementModal: React.FC<BusinessManagementModalProps> = ({ isOpe
             setIsUploading(false);
         }
     };
+
+    const handlePasteProductImage = async (file: File) => {
+        const currentImageCount = newProduct.imageUrls?.length || 0;
+        if (currentImageCount >= 3) {
+            alert('Máximo 3 imágenes por producto');
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const url = await uploadImage(file);
+            setNewProduct(prev => ({ ...prev, imageUrls: [...(prev.imageUrls || []), url] }));
+        } catch (e) {
+            alert('Error subiendo imagen');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // Enable paste functionality for products (only when on products tab)
+    useImagePaste({
+        enabled: isOpen && activeTab === 'products',
+        onImagePaste: handlePasteProductImage,
+        maxImages: 3,
+        currentImageCount: newProduct.imageUrls?.length || 0,
+        onError: (error) => alert(error)
+    });
 
     const removeProductImage = (index: number) => {
         setNewProduct((prev) => ({
