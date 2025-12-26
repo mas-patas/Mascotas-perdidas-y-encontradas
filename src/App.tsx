@@ -371,6 +371,9 @@ const App: React.FC = () => {
             // No need to create it again here to avoid duplicates
             
             setIsReportModalOpen(false); setIsAdoptionModalOpen(false); setIsMatchModalOpen(false); setPendingPetToSubmit(null); setPetToPrefill(null);
+            
+            // Redirigir a la publicación recién creada
+            navigate(`/mascota/${newPetId}`);
         } catch (err: any) { 
             setErrorModal({ isOpen: true, message: "Error al publicar: " + err.message }); 
         } finally {
