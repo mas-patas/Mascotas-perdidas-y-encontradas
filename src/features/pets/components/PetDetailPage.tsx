@@ -776,11 +776,11 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
         const currentImage = imageUrls[safeImageIndex] || 'https://placehold.co/600x400?text=Sin+Imagen';
         
         return (
-            <div className="relative bg-gray-200 rounded-xl overflow-hidden h-[250px] sm:h-[300px] md:h-[500px] shadow-md border border-card-border group w-full">
+            <div className="relative bg-gray-200 rounded-xl overflow-hidden h-[250px] sm:h-[300px] md:h-[500px] shadow-md border border-card-border group w-full flex items-center justify-center">
                 <img 
                     src={currentImage} 
                     alt={pet?.name || 'Mascota'} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="max-h-full max-w-full w-auto h-auto object-contain transition-transform duration-700 group-hover:scale-105"
                 />
                 {imageUrls.length > 1 && (
                     <>
