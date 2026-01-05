@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { calculateDistance } from './utils.ts';
+import { sendPushNotificationsToUsers } from './pushNotifications.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -176,9 +177,36 @@ serve(async (req: Request) => {
       throw notifError;
     }
 
+    // Send push notifications to users with push subscriptions
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+    
+    let pushSuccessful = 0;
+    let pushFailed = 0;
+    
+    if (vapidPublicKey && vapidPrivateKey) {
+      const userIds = eligibleUsers.map((u: any) => u.id);
+      const pushResult = await sendPushNotificationsToUsers(
+        userIds,
+        {
+          title: 'Más Patas: Alerta de Proximidad',
+          body: notificationBody,
+          link: `#/mascota/${pet.id}`,
+        },
+        supabase,
+        vapidPublicKey,
+        vapidPrivateKey
+      );
+      pushSuccessful = pushResult.successful;
+      pushFailed = pushResult.failed;
+    } else {
+      console.warn('VAPID keys not configured. Push notifications will not be sent from backend.');
+      console.warn('Users will only receive notifications if they have the app open (realtime).');
+    }
+
     // Notifications are created in database
     // The existing realtime subscription system (useNotificationsRealtime) will handle
-    // sending push notifications to users via their service worker subscriptions
+    // sending push notifications to users who have the app open
     const successful = notificationInserts.length;
     const failed = 0;
 
@@ -187,9 +215,12 @@ serve(async (req: Request) => {
         message: 'Proximity alerts processed',
         sent: successful,
         failed,
+        pushNotificationsSent: pushSuccessful,
+        pushNotificationsFailed: pushFailed,
         totalNearbyUsers: nearbyUsers.length,
         eligibleUsers: eligibleUsers.length,
         rateLimitedUsers: notifiedUserIds.size,
+        vapidConfigured: !!(vapidPublicKey && vapidPrivateKey),
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

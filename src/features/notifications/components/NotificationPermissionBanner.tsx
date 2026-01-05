@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BellIcon, XCircleIcon } from '@/shared/components/icons';
 import { useAuth } from '@/contexts/auth';
 import { useUpsertPushSubscription } from '@/api';
+import { VAPID_PUBLIC_KEY } from '@/config';
 
 // Helper to convert VAPID key for the browser
 function urlBase64ToUint8Array(base64String: string) {
@@ -18,10 +19,7 @@ function urlBase64ToUint8Array(base64String: string) {
         outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
-}
-
-// TODO: Generate VAPID keys using `npx web-push generate-vapid-keys` and paste the Public Key here.
-const PUBLIC_VAPID_KEY = ''; 
+} 
 
 const NotificationPermissionBanner: React.FC = () => {
     const [showBanner, setShowBanner] = useState(false);
@@ -60,14 +58,14 @@ const NotificationPermissionBanner: React.FC = () => {
 
                         // 2. Subscribe if not already subscribed
                         if (!subscription) {
-                            if (PUBLIC_VAPID_KEY) {
-                                const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
+                            if (VAPID_PUBLIC_KEY) {
+                                const convertedVapidKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
                                 subscription = await registration.pushManager.subscribe({
                                     userVisibleOnly: true,
                                     applicationServerKey: convertedVapidKey
                                 });
                             } else {
-                                console.warn("Falta PUBLIC_VAPID_KEY en NotificationPermissionBanner.tsx. La suscripción remota no se creará, pero las notificaciones locales funcionarán.");
+                                console.warn("Falta VITE_VAPID_PUBLIC_KEY en las variables de entorno. La suscripción remota no se creará, pero las notificaciones locales funcionarán.");
                             }
                         }
 

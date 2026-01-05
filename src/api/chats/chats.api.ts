@@ -162,6 +162,57 @@ export const sendMessage = async (chatId: string, senderEmail: string, text: str
   });
 
   if (error) throw error;
+
+  // Get chat participants to send push notifications
+  // The trigger will create notifications in the database, but we also want to send
+  // push notifications when the app is closed
+  try {
+    const { data: chatData, error: chatError } = await supabase
+      .from('chats')
+      .select('participant_emails')
+      .eq('id', chatId)
+      .single();
+
+    if (!chatError && chatData) {
+      // Get other participants (excluding sender)
+      const normalizedSenderEmail = senderEmail.toLowerCase().trim();
+      const otherParticipants = (chatData.participant_emails || [])
+        .map((email: string) => email.toLowerCase().trim())
+        .filter((email: string) => email !== normalizedSenderEmail);
+
+      if (otherParticipants.length > 0) {
+        // Get user IDs for other participants
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('email', otherParticipants);
+
+        if (profiles && profiles.length > 0) {
+          // Truncate message preview
+          const messagePreview = text.length > 50 ? text.substring(0, 50) + '...' : text;
+
+          // Send push notifications to each participant
+          // The trigger already creates notifications in the database, so this is just for push when app is closed
+          for (const profile of profiles) {
+            supabase.functions.invoke('send-message-notifications', {
+              body: {
+                userId: profile.id,
+                message: `Nuevo mensaje: ${messagePreview}`,
+                link: '#/mensajes'
+              }
+            }).catch((err) => {
+              // Silently fail - we don't want to block message sending if push notifications fail
+              console.warn('Failed to send push notification for message:', err);
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Silently fail - we don't want to block message sending if push notifications fail
+    console.warn('Error sending push notifications for message:', err);
+  }
+
   return messageId;
 };
 

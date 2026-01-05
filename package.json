@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "gen:types": "supabase gen types typescript --local > src/types/database.types.ts"
+    "gen:types": "supabase gen types typescript --local > src/types/database.types.ts",
+    "check:push": "node scripts/check-push-notifications-config.js",
+    "setup:supabase-secrets": "node -e \"console.log('Para Windows PowerShell: .\\\\scripts\\\\setup-supabase-secrets.ps1\\nPara Bash/Linux/Mac: bash scripts/setup-supabase-secrets.sh')\""
   },
   "dependencies": {
     "@google/genai": "latest",
@@ -35,6 +37,7 @@
     "supabase": "^2.65.6",
     "typescript": "~5.8.2",
     "vite": "^7.2.4",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.14",
+    "web-push": "^3.6.7"
   }
 }
