@@ -10,22 +10,46 @@ function htmlEnvPlugin(mode: string): Plugin {
     transformIndexHtml(html: string) {
       // Cargar variables de entorno
       const env = loadEnv(mode, (process as any).cwd(), '');
+      const gtmId = env.VITE_GTM_ID || '';
       const gaId = env.VITE_GA_MEASUREMENT_ID || '';
       
-      // Reemplazar el placeholder con el ID real o eliminar el script si no hay ID
+      let result = html;
+      
+      // Procesar Google Tag Manager
+      if (gtmId) {
+        // Reemplazar el placeholder GTM-XXXXXXX con el ID real
+        result = result.replace(/GTM-XXXXXXX/g, gtmId);
+      } else {
+        // Si no hay ID, reemplazar todo el bloque de GTM con un comentario
+        const gtmBlockPattern = /<!-- Google Tag Manager -->[\s\S]*?<!-- End Google Tag Manager -->/;
+        const gtmNoscriptPattern = /<!-- Google Tag Manager \(noscript\) -->[\s\S]*?<!-- End Google Tag Manager \(noscript\) -->/;
+        
+        result = result.replace(
+          gtmBlockPattern,
+          '<!-- Google Tag Manager - Disabled: VITE_GTM_ID not set -->'
+        );
+        result = result.replace(
+          gtmNoscriptPattern,
+          '<!-- Google Tag Manager (noscript) - Disabled: VITE_GTM_ID not set -->'
+        );
+      }
+      
+      // Procesar Google Analytics 4
       if (gaId) {
-        const replaced = html.replace(/G-XXXXXXXXXX/g, gaId);
-        return replaced;
+        // Reemplazar el placeholder con el ID real
+        result = result.replace(/G-XXXXXXXXXX/g, gaId);
       } else {
         // Si no hay ID, reemplazar todo el bloque de Google Analytics con un no-op
         // Match desde el comentario hasta el último </script> de Google Analytics (3 script tags)
         const gaBlockPattern = /<!-- Google Analytics 4 -->[\s\S]*?<!-- If VITE_GA_MEASUREMENT_ID is not set, this section will be commented out -->[\s\S]*?<\/script>\s*<script[^>]*>[\s\S]*?<\/script>\s*<script[^>]*>[\s\S]*?<\/script>/;
         
-        return html.replace(
+        result = result.replace(
           gaBlockPattern,
           '<!-- Google Analytics 4 - Disabled: VITE_GA_MEASUREMENT_ID not set -->\n    <script>\n      // No-op gtag function to prevent errors\n      window.gtag = window.gtag || function(){};\n    </script>'
         );
       }
+      
+      return result;
     },
   };
 }
