@@ -7,6 +7,11 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1D4ED8" />
     
+    <!-- Safety: Ensure gtag is always defined to prevent errors -->
+    <script>
+      window.gtag = window.gtag || function(){};
+    </script>
+    
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/assets/images/logo.png" />
     <link rel="apple-touch-icon" href="/assets/images/logo.png" />
@@ -16,12 +21,12 @@
     <!-- If VITE_GA_MEASUREMENT_ID is not set, this section will be commented out -->
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+      window.gtag = window.gtag || function(){dataLayer.push(arguments);};
+      window.gtag('js', new Date());
     </script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
-      gtag('config', 'G-XXXXXXXXXX', {
+      window.gtag('config', 'G-XXXXXXXXXX', {
         send_page_view: false // We will handle this manually in React
       });
     </script>

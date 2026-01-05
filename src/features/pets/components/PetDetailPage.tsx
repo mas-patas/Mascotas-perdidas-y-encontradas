@@ -399,6 +399,9 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             const L = (window as any).L;
             if (!L) return;
 
+            // Detectar si es desktop (ancho >= 768px, breakpoint md de Tailwind)
+            const isDesktop = window.innerWidth >= 768;
+
             if (mapInstance.current) {
                 mapInstance.current.invalidateSize();
                 mapInstance.current.setView([pet.lat, pet.lng], 15);
@@ -406,13 +409,36 @@ export const PetDetailPage: React.FC<PetDetailPageProps> = ({
             }
 
             if (!mapInstance.current) {
-                mapInstance.current = L.map(mapRef.current, {
+                // Configuración según el tipo de dispositivo
+                const mapOptions: any = {
                     center: [pet.lat, pet.lng],
                     zoom: 15,
-                    zoomControl: false,
                     dragging: true,
-                    scrollWheelZoom: false
-                });
+                    zoomControl: false, // Deshabilitamos el control por defecto para agregarlo manualmente
+                };
+
+                if (isDesktop) {
+                    // Desktop: solo zoom con botones de control
+                    mapOptions.scrollWheelZoom = false;
+                    mapOptions.doubleClickZoom = false;
+                    mapOptions.boxZoom = false;
+                    mapOptions.touchZoom = false;
+                } else {
+                    // Tablet/Móvil: solo zoom con pellizco (2 dedos)
+                    mapOptions.scrollWheelZoom = false;
+                    mapOptions.doubleClickZoom = false;
+                    mapOptions.boxZoom = false;
+                    mapOptions.touchZoom = true; // Permite zoom con pellizco
+                }
+
+                mapInstance.current = L.map(mapRef.current, mapOptions);
+                
+                // Agregar controles de zoom solo en desktop
+                if (isDesktop) {
+                    L.control.zoom({
+                        position: 'topright'
+                    }).addTo(mapInstance.current);
+                }
                 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap contributors'

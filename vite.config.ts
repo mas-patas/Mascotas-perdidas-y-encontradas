@@ -17,10 +17,13 @@ function htmlEnvPlugin(mode: string): Plugin {
         const replaced = html.replace(/G-XXXXXXXXXX/g, gaId);
         return replaced;
       } else {
-        // Si no hay ID, comentar el código de Google Analytics
+        // Si no hay ID, reemplazar todo el bloque de Google Analytics con un no-op
+        // Match desde el comentario hasta el último </script> de Google Analytics (3 script tags)
+        const gaBlockPattern = /<!-- Google Analytics 4 -->[\s\S]*?<!-- If VITE_GA_MEASUREMENT_ID is not set, this section will be commented out -->[\s\S]*?<\/script>\s*<script[^>]*>[\s\S]*?<\/script>\s*<script[^>]*>[\s\S]*?<\/script>/;
+        
         return html.replace(
-          /<!-- Google Analytics 4 -->[\s\S]*?<\/script>/,
-          '<!-- Google Analytics 4 - Disabled: VITE_GA_MEASUREMENT_ID not set -->'
+          gaBlockPattern,
+          '<!-- Google Analytics 4 - Disabled: VITE_GA_MEASUREMENT_ID not set -->\n    <script>\n      // No-op gtag function to prevent errors\n      window.gtag = window.gtag || function(){};\n    </script>'
         );
       }
     },
