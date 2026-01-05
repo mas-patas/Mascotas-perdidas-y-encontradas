@@ -36,15 +36,7 @@ npx web-push generate-vapid-keys
 Las claves VAPID deben estar configuradas como secrets en Supabase:
 
 ```bash
-# Verificar secrets configurados
-supabase secrets list
 
-# Si no están configuradas, configúralas:
-# Primero genera tus claves VAPID:
-# npx web-push generate-vapid-keys
-supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
-supabase secrets set VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
-supabase secrets set VAPID_EMAIL=noreply@maspatas.com
 ```
 
 #### 3. Verificar en la base de datos
@@ -75,7 +67,7 @@ SELECT user_id, endpoint, created_at FROM push_subscriptions LIMIT 5;
 
 1. **Frontend (.env.local):**
    ```env
-   VITE_VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
+ 
    ```
    **Genera tus claves VAPID:**
    ```bash
@@ -83,11 +75,7 @@ SELECT user_id, endpoint, created_at FROM push_subscriptions LIMIT 5;
    ```
 
 2. **Backend (Supabase Secrets):**
-   ```bash
-   supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
-   supabase secrets set VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
-   supabase secrets set VAPID_EMAIL=noreply@maspatas.com
-   ```
+
    **Nota:** Usa las mismas claves que generaste para el frontend.
 
 ## Cómo funciona
