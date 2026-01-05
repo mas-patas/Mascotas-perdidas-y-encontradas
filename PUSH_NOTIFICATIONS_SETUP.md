@@ -23,7 +23,12 @@ Este script verificará:
 Revisa tu archivo `.env.local`:
 
 ```env
-VITE_VAPID_PUBLIC_KEY=BNepH_8rdfK9D9wWcal70NjGRJy8w5dinBP3sao3X1Wh-9fzo6rHN2_p7jh9vdF1X6YGawkLyqZWfJ8sclK1pBk
+VITE_VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
+```
+
+**Para generar tus propias claves VAPID:**
+```bash
+npx web-push generate-vapid-keys
 ```
 
 #### 2. Verificar Backend (Supabase Edge Functions)
@@ -35,8 +40,10 @@ Las claves VAPID deben estar configuradas como secrets en Supabase:
 supabase secrets list
 
 # Si no están configuradas, configúralas:
-supabase secrets set VAPID_PUBLIC_KEY=BNepH_8rdfK9D9wWcal70NjGRJy8w5dinBP3sao3X1Wh-9fzo6rHN2_p7jh9vdF1X6YGawkLyqZWfJ8sclK1pBk
-supabase secrets set VAPID_PRIVATE_KEY=gdAFPyAlke2av2Vr634wuR-wDx2P7s5VyQsn1B5YTEc
+# Primero genera tus claves VAPID:
+# npx web-push generate-vapid-keys
+supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
+supabase secrets set VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
 supabase secrets set VAPID_EMAIL=noreply@maspatas.com
 ```
 
@@ -68,15 +75,20 @@ SELECT user_id, endpoint, created_at FROM push_subscriptions LIMIT 5;
 
 1. **Frontend (.env.local):**
    ```env
-   VITE_VAPID_PUBLIC_KEY=BNepH_8rdfK9D9wWcal70NjGRJy8w5dinBP3sao3X1Wh-9fzo6rHN2_p7jh9vdF1X6YGawkLyqZWfJ8sclK1pBk
+   VITE_VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
+   ```
+   **Genera tus claves VAPID:**
+   ```bash
+   npx web-push generate-vapid-keys
    ```
 
 2. **Backend (Supabase Secrets):**
    ```bash
-   supabase secrets set VAPID_PUBLIC_KEY=BNepH_8rdfK9D9wWcal70NjGRJy8w5dinBP3sao3X1Wh-9fzo6rHN2_p7jh9vdF1X6YGawkLyqZWfJ8sclK1pBk
-   supabase secrets set VAPID_PRIVATE_KEY=gdAFPyAlke2av2Vr634wuR-wDx2P7s5VyQsn1B5YTEc
+   supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY_HERE
+   supabase secrets set VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
    supabase secrets set VAPID_EMAIL=noreply@maspatas.com
    ```
+   **Nota:** Usa las mismas claves que generaste para el frontend.
 
 ## Cómo funciona
 

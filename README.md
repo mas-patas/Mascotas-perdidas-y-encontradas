@@ -88,8 +88,11 @@ supabase secrets set VAPID_PRIVATE_KEY=tu_clave_privada
 supabase secrets set VAPID_EMAIL=noreply@maspatas.com
 ```
 
-**Claves generadas para este proyecto:**
-- Public Key: `BNepH_8rdfK9D9wWcal70NjGRJy8w5dinBP3sao3X1Wh-9fzo6rHN2_p7jh9vdF1X6YGawkLyqZWfJ8sclK1pBk`
-- Private Key: `gdAFPyAlke2av2Vr634wuR-wDx2P7s5VyQsn1B5YTEc`
+**Generar tus propias claves VAPID:**
+```bash
+npx web-push generate-vapid-keys
+```
+
+Esto generará un par de claves (pública y privada) que debes usar en tu configuración.
 
 Para más detalles, consulta [PUSH_NOTIFICATIONS_SETUP.md](./PUSH_NOTIFICATIONS_SETUP.md)
